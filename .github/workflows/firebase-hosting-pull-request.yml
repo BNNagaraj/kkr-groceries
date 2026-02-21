@@ -16,5 +16,5 @@ jobs:
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CUSTOM_DATA_RECORDER_APP_V1 }}
-          projectId: custom-data-recorder-app-v1
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KKR_GROCERIES_02 }}
+          projectId: kkr-groceries-02
