@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "kkr-groceries-02"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

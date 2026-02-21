@@ -30,5 +30,15 @@
         ]
       }
     ]
+  },
+  "auth": {
+    "providers": {
+      "anonymous": false,
+      "emailPassword": false,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "KKR Groceries",
+        "supportEmail": "raju2uraju@gmail.com"
+      }
+    }
   }
 }

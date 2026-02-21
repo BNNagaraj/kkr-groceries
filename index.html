@@ -24,6 +24,10 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
+    <!-- Leaflet Location Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <style>
         * {
             margin: 0;
@@ -564,6 +568,7 @@
             font-size: 1.1rem;
             color: #0f172a;
             font-family: inherit;
+            appearance: textfield;
             -moz-appearance: textfield
         }
 
@@ -766,6 +771,7 @@
             border-radius: 10px;
             font-size: 16px;
             font-family: inherit;
+            appearance: none;
             -webkit-appearance: none
         }
 
@@ -1665,7 +1671,7 @@
         <div style="padding:0 0.75rem;margin-bottom:1rem">
             <div style="position:relative">
                 <input type="text" id="searchInput" placeholder="Search vegetables... (English, Telugu, Hindi)"
-                    style="width:100%;padding:0.875rem 1rem 0.875rem 2.75rem;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;font-family:inherit;background:white;-webkit-appearance:none"
+                    style="width:100%;padding:0.875rem 1rem 0.875rem 2.75rem;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;font-family:inherit;background:white;appearance:none;-webkit-appearance:none"
                     oninput="handleSearch(this.value)">
                 <span
                     style="position:absolute;left:0.875rem;top:50%;transform:translateY(-50%);font-size:1.1rem;opacity:0.5">🔍</span>
@@ -1697,8 +1703,25 @@
                     <div class="form-group"><label for="customerPhone">Phone Number *</label><input type="tel"
                             id="customerPhone" required placeholder="10-digit mobile" pattern="[0-9]{10}"
                             inputmode="numeric"></div>
-                    <div class="form-group"><label for="deliveryLocation">Delivery Location *</label><input type="text"
-                            id="deliveryLocation" required placeholder="Area in Hyderabad"></div>
+                    <div class="form-group"><label>Delivery Location *</label>
+                        <div class="location-section"
+                            style="border:2px solid #e2e8f0;border-radius:10px;overflow:hidden">
+                            <button type="button" onclick="getCurrentLocation()" id="locateBtn" class="locate-btn"
+                                style="width:100%;padding:0.75rem;background:#f8fafc;border:none;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.5rem">📍
+                                Use Current Location</button>
+                            <div id="deliveryMap" style="height:200px;background:#f1f5f9;width:100%"></div>
+                            <input type="text" id="deliveryLocation" required
+                                placeholder="Full Address / Area in Hyderabad"
+                                style="border:none;border-radius:0;border-top:1px solid #e2e8f0"
+                                autocomplete="street-address">
+                        </div>
+                    </div>
+                    <div class="form-group"
+                        style="display:flex;align-items:center;gap:0.5rem;margin-top:-0.5rem;margin-bottom:1rem">
+                        <input type="checkbox" id="saveAddress" style="width:auto;margin:0" checked>
+                        <label for="saveAddress" style="margin:0;font-weight:600;font-size:0.85rem">Save this
+                            address</label>
+                    </div>
                     <div class="form-group"><label for="pincode">Pincode *</label><input type="text" id="pincode"
                             required placeholder="6-digit pincode" pattern="[0-9]{6}" inputmode="numeric"></div>
                     <div class="form-group"><label for="businessType">Business Type</label><input type="text"
@@ -1739,9 +1762,14 @@
                 <div class="phone-section">
                     <p style="font-size:0.85rem;color:#64748b;margin-bottom:0.5rem;font-weight:600">Sign in with Phone
                     </p>
-                    <div class="phone-row">
-                        <input type="tel" id="phoneInput" placeholder="+91 XXXXX XXXXX"
-                            style="padding:0.75rem;border:2px solid #e2e8f0;border-radius:10px;font-size:1rem;font-family:inherit">
+                    <div class="phone-row" style="align-items:center">
+                        <div
+                            style="display:flex;align-items:center;border:2px solid #e2e8f0;border-radius:10px;flex:1;background:white;padding:0 0.5rem">
+                            <span
+                                style="font-weight:700;color:#64748b;padding-right:0.5rem;border-right:1px solid #e2e8f0">+91</span>
+                            <input type="tel" id="phoneInput" placeholder="XXXXX XXXXX" maxlength="10"
+                                style="border:none;flex:1;padding:0.75rem 0.5rem;font-size:1rem;font-family:inherit;outline:none;background:transparent">
+                        </div>
                         <button onclick="sendOTP()" id="sendOtpBtn">Send OTP</button>
                     </div>
                     <div id="recaptchaContainer"></div>
@@ -1771,9 +1799,11 @@
                 <div class="admin-tabs">
                     <button class="admin-tab active" onclick="switchBuyerTab('overview',this)">📊 Overview</button>
                     <button class="admin-tab" onclick="switchBuyerTab('orders',this)">📋 My Orders</button>
+                    <button class="admin-tab" onclick="switchBuyerTab('addresses',this)">📍 Addresses</button>
                 </div>
                 <div id="buyerOverviewTab"></div>
                 <div id="buyerOrdersTab" style="display:none"></div>
+                <div id="buyerAddressesTab" style="display:none"></div>
             </div>
         </div>
     </div>
@@ -1855,7 +1885,9 @@
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
 
-        const GOOGLE_SCRIPT_URL = 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE';
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZqsUibqT13ENoo6GKux-WvMXRvC4PpOyjJXH7lIH4SWSWNnq4jntgPPAubnnz3NM81w/exec';
+        const ADMIN_EMAILS = ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com'];
+        function isAdmin() { return currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase()); }
 
         const products = [
             { id: 1, name: 'Tomato', telugu: '\u0C1F\u0C2E\u0C3E\u0C1F\u0C4B', hindi: 'Tamatar', price: 24, unit: 'kg', moq: 100, category: 'daily', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tomato_je.jpg/220px-Tomato_je.jpg', hot: true },
@@ -1879,6 +1911,7 @@
         let confirmationResult = null;
         let commissionPercent = parseFloat(localStorage.getItem('kkr_commission') || '15');
         let apmcPrices = null;
+        let selectedApmcMarket = 'Bowenpally';
 
         // Load saved prices & MOQ
         (function loadSaved() {
@@ -1889,9 +1922,12 @@
         })();
 
         // ===== APMC PRICE ENGINE =====
-        function generateAPMCPrices() {
+        function generateAPMCPrices(marketName = 'Bowenpally') {
+            selectedApmcMarket = marketName;
             const d = new Date();
-            const seed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+            // Vary seed strictly by date and market name
+            let marketHash = 0; for (let i = 0; i < marketName.length; i++) marketHash += marketName.charCodeAt(i);
+            const seed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate() + marketHash;
             const commodities = [
                 { name: 'Tomato', bMin: 18, bMax: 35 }, { name: 'Onion', bMin: 22, bMax: 45 }, { name: 'Potato', bMin: 20, bMax: 38 },
                 { name: 'Green Chilli', bMin: 30, bMax: 65 }, { name: "Lady's Finger", bMin: 28, bMax: 50 }, { name: 'Brinjal', bMin: 22, bMax: 42 },
@@ -1924,6 +1960,8 @@
             currentUser = user;
             const loginBtn = document.getElementById('loginBtn');
             const userMenu = document.getElementById('userMenu');
+            const adminToggle = document.querySelector('.admin-toggle');
+
             if (user) {
                 loginBtn.style.display = 'none';
                 userMenu.style.display = 'block';
@@ -1937,9 +1975,13 @@
                 const phoneInput = document.getElementById('customerPhone');
                 if (nameInput && user.displayName) nameInput.value = user.displayName;
                 if (phoneInput && user.phoneNumber) phoneInput.value = user.phoneNumber.replace('+91', '');
+
+                // Show/hide Admin button
+                if (adminToggle) adminToggle.style.display = isAdmin() ? 'flex' : 'none';
             } else {
                 loginBtn.style.display = 'block';
                 userMenu.style.display = 'none';
+                if (adminToggle) adminToggle.style.display = 'none';
             }
         });
 
@@ -2141,14 +2183,98 @@
             if (!items.length) { list.innerHTML = '<span style="color:#64748b;font-size:0.9rem">No items added.</span>'; sb.disabled = true; }
             else {
                 const valid = validateCart(); ve.style.display = valid ? 'none' : 'block'; sb.disabled = !valid;
-                list.innerHTML = items.map(i => { const iv = i.qty >= i.moq; const tp = i.price * i.qty; return `<div class="item-row ${!iv ? 'moq-warning' : ''}"><div class="item-info"><div class="item-name">${i.name} <span style="color:#64748b;font-size:0.8rem">(${i.telugu})</span></div><div class="item-qty" style="color:${iv ? 'var(--primary)' : 'var(--danger)'}">Qty: ${i.qty} ${i.unit} ${!iv ? '\u26A0\uFE0F Below MOQ!' : ''}</div></div><div style="text-align:right"><div class="item-price">\u20B9${tp}</div><div style="font-size:0.75rem;color:#64748b">\u20B9${i.price}/${i.unit}</div></div></div>`; }).join('');
+                const totalValue = items.reduce((s, i) => s + (i.price * i.qty), 0);
+                const totalItems = items.reduce((s, i) => s + i.qty, 0);
+                let html = items.map(i => { const iv = i.qty >= i.moq; const tp = i.price * i.qty; return `<div class="item-row ${!iv ? 'moq-warning' : ''}"><div class="item-info"><div class="item-name">${i.name} <span style="color:#64748b;font-size:0.8rem">(${i.telugu})</span></div><div class="item-qty" style="color:${iv ? 'var(--primary)' : 'var(--danger)'}">Qty: ${i.qty} ${i.unit} ${!iv ? '\u26A0\uFE0F Below MOQ!' : ''}</div></div><div style="text-align:right"><div class="item-price">\u20B9${tp}</div><div style="font-size:0.75rem;color:#64748b">\u20B9${i.price}/${i.unit}</div></div></div>`; }).join('');
+
+                // Grand Total Row
+                html += `<div style="background:var(--primary);color:white;padding:1rem;border-radius:10px;margin-top:1rem;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 15px rgba(5,150,105,0.3)">
+                            <div>
+                                <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:1px;opacity:0.9">Checkout Total</div>
+                                <div style="font-size:0.9rem;font-weight:600">${items.length} Products \u00B7 ${totalItems} Items</div>
+                            </div>
+                            <div style="font-size:1.5rem;font-weight:800">\u20B9${totalValue.toLocaleString('en-IN')}</div>
+                         </div>`;
+
+                list.innerHTML = html;
             }
+            populateSavedAddresses();
             document.getElementById('enquiryModal').style.display = 'flex';
+            setTimeout(() => { if (!window.deliveryMap) initMap(); else window.deliveryMap.invalidateSize(); }, 300);
             document.body.style.overflow = 'hidden';
         }
         function closeEnquiryModal() { document.getElementById('enquiryModal').style.display = 'none'; document.body.style.overflow = 'auto'; }
 
         function showToast(msg, type = 'info') { const c = document.getElementById('toastContainer'); if (!c) return; const t = document.createElement('div'); t.className = 'toast ' + type; t.textContent = msg; c.appendChild(t); setTimeout(() => { if (t.parentNode) t.remove(); }, 3000); }
+
+        // ===== MAP & LOCATION =====
+        function initMap() {
+            if (window.deliveryMap) return;
+            const defaultLoc = [17.4065, 78.4772]; // Hyderabad
+            window.deliveryMap = L.map('deliveryMap').setView(defaultLoc, 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(window.deliveryMap);
+            window.deliveryMarker = L.marker(defaultLoc, { draggable: true }).addTo(window.deliveryMap);
+            window.deliveryMarker.on('dragend', function (e) { reverseGeocode(e.target.getLatLng()); });
+            window.deliveryMap.on('click', function (e) { window.deliveryMarker.setLatLng(e.latlng); reverseGeocode(e.latlng); });
+        }
+        function getCurrentLocation() {
+            const btn = document.getElementById('locateBtn'); btn.textContent = '📍 Locating...'; btn.disabled = true;
+            if (!navigator.geolocation) { showToast('Geolocation not supported', 'error'); btn.textContent = '📍 Use Current Location'; btn.disabled = false; return; }
+            navigator.geolocation.getCurrentPosition(pos => {
+                const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                initMap(); window.deliveryMap.setView(latlng, 16); window.deliveryMarker.setLatLng(latlng);
+                reverseGeocode(latlng);
+                btn.textContent = '📍 Use Current Location'; btn.disabled = false;
+            }, err => {
+                showToast('Location access denied', 'error'); btn.textContent = '📍 Use Current Location'; btn.disabled = false;
+            });
+        }
+        async function reverseGeocode(latlng) {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=18&addressdetails=1`);
+                const data = await res.json();
+                if (data && data.display_name) {
+                    document.getElementById('deliveryLocation').value = data.display_name;
+                    if (data.address && data.address.postcode) document.getElementById('pincode').value = data.address.postcode;
+                }
+            } catch (e) { console.error('Geocode err', e); showToast('Failed to auto-fetch address details', 'error'); }
+        }
+
+        // ===== SAVED ADDRESSES =====
+        function populateSavedAddresses() {
+            if (!currentUser) return;
+            const list = JSON.parse(localStorage.getItem('kkr_addrs_' + currentUser.uid) || '[]');
+            let dd = document.getElementById('savedAddrSelect');
+            if (!dd && list.length > 0) {
+                dd = document.createElement('select'); dd.id = 'savedAddrSelect';
+                dd.style = 'width:100%;margin-bottom:0.75rem;padding:0.6rem;border:2px solid #e2e8f0;border-radius:8px';
+                dd.addEventListener('change', e => {
+                    if (!e.target.value) return; const a = list[e.target.value];
+                    document.getElementById('deliveryLocation').value = a.loc;
+                    document.getElementById('pincode').value = a.pin;
+                    if (a.coords && window.deliveryMap) { window.deliveryMap.setView(a.coords, 16); window.deliveryMarker.setLatLng(a.coords); }
+                });
+                document.getElementById('deliveryLocation').parentNode.parentNode.insertBefore(dd, document.getElementById('deliveryLocation').parentNode);
+            }
+            if (dd) {
+                dd.innerHTML = '<option value="">-- Or choose saved address --</option>' + list.map((a, i) => `<option value="${i}">${a.loc.substring(0, 40)}... (${a.pin})</option>`).join('');
+                dd.style.display = list.length ? 'block' : 'none';
+            }
+        }
+        function saveAddressIfRequested() {
+            if (!currentUser || !document.getElementById('saveAddress').checked) return;
+            const loc = document.getElementById('deliveryLocation').value;
+            const pin = document.getElementById('pincode').value;
+            if (!loc || !pin) return;
+            const k = 'kkr_addrs_' + currentUser.uid;
+            const list = JSON.parse(localStorage.getItem(k) || '[]');
+            const exists = list.some(a => a.loc.toLowerCase() === loc.toLowerCase());
+            if (!exists) {
+                const coords = window.deliveryMarker ? window.deliveryMarker.getLatLng() : null;
+                list.push({ loc, pin, coords });
+                localStorage.setItem(k, JSON.stringify(list));
+            }
+        }
 
         function saveOrder(data) { const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]'); orders.unshift({ id: 'ORD-' + Date.now().toString(36).toUpperCase(), ...data }); if (orders.length > 50) orders.length = 50; localStorage.setItem('kkr_orders', JSON.stringify(orders)); }
 
@@ -2174,7 +2300,7 @@
 
             if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
                 // Save locally only
-                saveOrder(formData);
+                saveOrder(formData); saveAddressIfRequested();
                 document.getElementById('successMsg').style.display = 'block';
                 showToast('Order saved locally!', 'success');
                 setTimeout(() => { closeEnquiryModal(); cart = {}; updateUI(); renderProducts(currentCategory); document.getElementById('enquiryForm').reset(); document.getElementById('successMsg').style.display = 'none'; }, 2000);
@@ -2184,13 +2310,21 @@
             const sb = document.getElementById('submitBtn'); const spinner = document.getElementById('spinner');
             sb.disabled = true; sb.querySelector('span').textContent = 'Sending...'; spinner.style.display = 'block';
             try {
-                const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
-                if (!res.ok) throw new Error('Status ' + res.status);
-                saveOrder(formData);
+                // Fixed: using mode no-cors for Google Apps Script without returning complex JSON
+                await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(formData)
+                });
+
+                saveOrder(formData); saveAddressIfRequested();
                 document.getElementById('successMsg').style.display = 'block';
                 setTimeout(() => { closeEnquiryModal(); cart = {}; updateUI(); renderProducts(currentCategory); document.getElementById('enquiryForm').reset(); document.getElementById('successMsg').style.display = 'none'; sb.disabled = false; sb.querySelector('span').textContent = 'Send Enquiry'; spinner.style.display = 'none'; }, 2000);
             } catch (err) {
                 document.getElementById('errorMsg').style.display = 'block';
+                showToast('Network error, but saved locally.', 'error');
+                saveOrder(formData); saveAddressIfRequested();
                 sb.disabled = false; sb.querySelector('span').textContent = 'Send Enquiry'; spinner.style.display = 'none';
             }
         }
@@ -2198,7 +2332,13 @@
         // ===== BUYER DASHBOARD =====
         function openBuyerDashboard() { document.getElementById('userDropdown').classList.remove('show'); document.getElementById('buyerPanel').classList.add('open'); document.body.style.overflow = 'hidden'; renderBuyerOverview(); }
         function closeBuyerDashboard() { document.getElementById('buyerPanel').classList.remove('open'); document.body.style.overflow = 'auto'; }
-        function switchBuyerTab(tab, btn) { document.querySelectorAll('#buyerPanel .admin-tab').forEach(t => t.classList.remove('active')); btn.classList.add('active'); document.getElementById('buyerOverviewTab').style.display = tab === 'overview' ? 'block' : 'none'; document.getElementById('buyerOrdersTab').style.display = tab === 'orders' ? 'block' : 'none'; if (tab === 'overview') renderBuyerOverview(); if (tab === 'orders') renderBuyerOrders(); }
+        function switchBuyerTab(tab, btn) {
+            document.querySelectorAll('#buyerPanel .admin-tab').forEach(t => t.classList.remove('active')); btn.classList.add('active');
+            ['Overview', 'Orders', 'Addresses'].forEach(t => { document.getElementById('buyer' + t + 'Tab').style.display = tab === t.toLowerCase() ? 'block' : 'none'; });
+            if (tab === 'overview') renderBuyerOverview();
+            if (tab === 'orders') renderBuyerOrders();
+            if (tab === 'addresses') renderBuyerAddresses();
+        }
 
         function renderBuyerOverview() {
             const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
@@ -2220,8 +2360,41 @@
             document.getElementById('buyerOrdersTab').innerHTML = myOrders.map(o => `<div class="history-card"><div class="h-header"><span class="h-date">${o.timestamp}</span><span class="h-id">${o.id}</span></div><div class="h-items">${o.orderSummary || ''}</div><div class="h-total">${o.totalValue || ''} \u00B7 ${o.productCount || 0} items</div></div>`).join('');
         }
 
+        function renderBuyerAddresses() {
+            if (!currentUser) { document.getElementById('buyerAddressesTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">Please sign in to view addresses</div>'; return; }
+            const k = 'kkr_addrs_' + currentUser.uid;
+            const list = JSON.parse(localStorage.getItem(k) || '[]');
+            if (!list.length) { document.getElementById('buyerAddressesTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">📍 No saved addresses</div>'; return; }
+
+            document.getElementById('buyerAddressesTab').innerHTML = list.map((a, i) => `
+                <div class="history-card" style="display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                        <div style="font-weight:700;color:#0f172a;margin-bottom:0.25rem">${a.loc}</div>
+                        <div style="font-size:0.8rem;color:#64748b">Pincode: ${a.pin}</div>
+                    </div>
+                    <button onclick="deleteSavedAddress(${i})" style="background:#fee2e2;color:#ef4444;border:none;padding:0.5rem;border-radius:8px;cursor:pointer;font-size:1rem" title="Delete Address">🗑️</button>
+                </div>
+            `).join('');
+        }
+
+        function deleteSavedAddress(idx) {
+            if (!currentUser) return;
+            const k = 'kkr_addrs_' + currentUser.uid;
+            const list = JSON.parse(localStorage.getItem(k) || '[]');
+            list.splice(idx, 1);
+            localStorage.setItem(k, JSON.stringify(list));
+            renderBuyerAddresses();
+            showToast('Address deleted', 'info');
+        }
+
         // ===== ADMIN PANEL =====
-        function toggleAdmin() { const p = document.getElementById('adminPanel'); p.classList.toggle('open'); if (p.classList.contains('open')) { renderPricesTab(); document.body.style.overflow = 'hidden'; } else { document.body.style.overflow = 'auto'; } }
+        function toggleAdmin() {
+            if (!isAdmin()) { showToast('Admin access restricted', 'error'); return; }
+            const p = document.getElementById('adminPanel');
+            p.classList.toggle('open');
+            if (p.classList.contains('open')) { renderPricesTab(); document.body.style.overflow = 'hidden'; }
+            else { document.body.style.overflow = 'auto'; }
+        }
         function switchAdminTab(tab, btn) { document.querySelectorAll('#adminPanel .admin-tab').forEach(t => t.classList.remove('active')); btn.classList.add('active');['Prices', 'Apmc', 'History', 'Stats'].forEach(t => { document.getElementById('admin' + t + 'Tab').style.display = tab === t.toLowerCase() ? 'block' : 'none'; }); if (tab === 'prices') renderPricesTab(); if (tab === 'apmc') renderApmcTab(); if (tab === 'history') renderHistoryTab(); if (tab === 'stats') renderStatsTab(); }
 
         function renderPricesTab() {
@@ -2238,9 +2411,20 @@
         }
 
         function renderApmcTab() {
-            if (!apmcPrices) generateAPMCPrices();
+            if (!apmcPrices) generateAPMCPrices(selectedApmcMarket);
             const d = apmcPrices[0] ? apmcPrices[0].date : 'N/A';
-            let h = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><div><h3 style="font-size:1rem;color:#334155">\uD83C\uDFEA Hyderabad APMC (Bowenpally)</h3><p style="font-size:0.8rem;color:#64748b">Date: ${d} | Unit: \u20B9/Quintal</p></div><button onclick="generateAPMCPrices();renderApmcTab();renderProducts(currentCategory);showToast('Prices refreshed!','success')" style="padding:0.5rem 1rem;background:#3b82f6;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.85rem">\u21BB Refresh</button></div>`;
+            let h = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
+                        <div>
+                            <select id="apmcMarketSelect" onchange="generateAPMCPrices(this.value);renderApmcTab();renderProducts(currentCategory);" style="padding:0.4rem;font-weight:700;border:2px solid #e2e8f0;border-radius:8px;margin-bottom:0.25rem">
+                                <option value="Bowenpally" ${selectedApmcMarket === 'Bowenpally' ? 'selected' : ''}>Hyderabad (Bowenpally)</option>
+                                <option value="Gaddiannaram" ${selectedApmcMarket === 'Gaddiannaram' ? 'selected' : ''}>Hyderabad (Gaddiannaram)</option>
+                                <option value="Gudimalkapur" ${selectedApmcMarket === 'Gudimalkapur' ? 'selected' : ''}>Hyderabad (Gudimalkapur)</option>
+                                <option value="Monda" ${selectedApmcMarket === 'Monda' ? 'selected' : ''}>Secunderabad (Monda Market)</option>
+                            </select>
+                            <p style="font-size:0.8rem;color:#64748b">Date: ${d} | Unit: \u20B9/Quintal</p>
+                        </div>
+                        <button onclick="generateAPMCPrices(document.getElementById('apmcMarketSelect').value);renderApmcTab();renderProducts(currentCategory);showToast('Prices refreshed!','success')" style="padding:0.5rem 1rem;background:#3b82f6;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.85rem">\u21BB Refresh</button>
+                    </div>`;
             h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:0.5rem;margin-bottom:1rem;text-align:center"><div style="padding:0.5rem;background:#dbeafe;border-radius:8px"><div style="font-size:0.7rem;color:#1e40af;font-weight:700">MIN</div></div><div style="padding:0.5rem;background:#d1fae5;border-radius:8px"><div style="font-size:0.7rem;color:#065f46;font-weight:700">MODAL</div></div><div style="padding:0.5rem;background:#fee2e2;border-radius:8px"><div style="font-size:0.7rem;color:#991b1b;font-weight:700">MAX</div></div></div>';
             apmcPrices.forEach(p => {
                 h += `<div class="apmc-rate-row"><div class="apmc-rate-name">${p.commodity}</div><div class="apmc-rate-prices"><span class="apmc-min">\u20B9${p.minPrice}</span><span class="apmc-modal">\u20B9${p.modalPrice}</span><span class="apmc-max">\u20B9${p.maxPrice}</span></div></div>`;
