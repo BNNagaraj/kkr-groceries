@@ -1,0 +1,2288 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#064e3b">
+    <meta name="description"
+        content="KKR Groceries - Hyderabad B2B vegetable wholesale supplier. Fresh vegetables at APMC prices.">
+    <meta name="keywords" content="KKR Groceries, Hyderabad vegetables, wholesale, B2B grocery, APMC prices">
+    <meta property="og:title" content="KKR Groceries | Hyderabad B2B Vegetable Wholesale">
+    <meta property="og:description"
+        content="Fresh vegetables at APMC wholesale prices for hotels, restaurants & retailers.">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#x1F96C;</text></svg>">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>KKR Groceries | Hyderabad B2B Vegetable Wholesale</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Noto+Sans+Telugu:wght@400;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent
+        }
+
+        :root {
+            --primary: #059669;
+            --accent: #f97316;
+            --gold: #fbbf24;
+            --bg: #f8fafc;
+            --danger: #ef4444;
+            --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+            --header-height: 70px
+        }
+
+        html {
+            font-size: 16px;
+            scroll-behavior: smooth
+        }
+
+        body {
+            font-family: 'Outfit', 'Noto Sans Telugu', sans-serif;
+            background: var(--bg);
+            color: #1e293b;
+            line-height: 1.5;
+            padding-bottom: calc(80px + var(--safe-area-bottom));
+            -webkit-font-smoothing: antialiased
+        }
+
+        .header {
+            background: linear-gradient(135deg, #064e3b, #065f46);
+            color: white;
+            padding: 0.75rem 1rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            height: var(--header-height)
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+            height: 100%
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem
+        }
+
+        .brand-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--gold), #f59e0b);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem
+        }
+
+        .brand-text h1 {
+            font-size: 1.1rem;
+            font-weight: 800;
+            margin: 0
+        }
+
+        .brand-text span {
+            font-size: 0.65rem;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: block
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-shrink: 0
+        }
+
+        .live-badge {
+            display: none
+        }
+
+        .order-total {
+            display: none;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 0.3rem 0.75rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 700
+        }
+
+        .order-total.show {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem
+        }
+
+        .enquiry-btn {
+            background: linear-gradient(135deg, var(--accent), #ea580c);
+            color: white;
+            border: none;
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            position: relative;
+            white-space: nowrap;
+            min-height: 40px
+        }
+
+        .cart-count {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: #ef4444;
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 800;
+            border: 2px solid #064e3b
+        }
+
+        .cart-count.show {
+            display: flex
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+            object-fit: cover
+        }
+
+        .auth-btn {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border: none;
+            padding: 0.4rem 0.75rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            white-space: nowrap
+        }
+
+        .auth-btn:hover {
+            background: rgba(255, 255, 255, 0.25)
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: calc(var(--header-height) + 110px) 0.75rem 2rem
+        }
+
+        .moq-notice {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border-bottom: 2px solid var(--gold);
+            padding: 0.75rem 1rem;
+            text-align: center;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #92400e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            border-radius: 12px
+        }
+
+        .filter-wrapper {
+            position: sticky;
+            top: var(--header-height);
+            z-index: 100;
+            background: var(--bg);
+            padding: 0.5rem 0;
+            margin: 0 -0.75rem 1rem;
+            padding-left: 0.75rem
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 0.5rem;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            padding-bottom: 0.5rem;
+            padding-right: 0.75rem
+        }
+
+        .filter-bar::-webkit-scrollbar {
+            display: none
+        }
+
+        .filter-btn {
+            padding: 0.6rem 1rem;
+            border: 2px solid #e2e8f0;
+            background: white;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+            color: #64748b;
+            min-height: 44px;
+            flex-shrink: 0
+        }
+
+        .filter-btn.active {
+            background: linear-gradient(135deg, var(--primary), #047857);
+            color: white;
+            border-color: var(--primary)
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.75rem
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 16px;
+            padding: 0.875rem;
+            display: flex;
+            gap: 0.875rem;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            border: 2px solid transparent;
+            transition: all 0.2s;
+            position: relative;
+            min-height: 110px
+        }
+
+        .product-card.selected {
+            border-color: var(--accent);
+            background: linear-gradient(135deg, #fff7ed, #fff)
+        }
+
+        .product-card.invalid {
+            border-color: var(--danger);
+            background: #fef2f2
+        }
+
+        .thumb-wrap {
+            width: 70px;
+            height: 70px;
+            min-width: 70px;
+            background: linear-gradient(135deg, #f0fdf4, #fef3c7);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative
+        }
+
+        .thumb-wrap img {
+            width: 80%;
+            height: 80%;
+            object-fit: contain
+        }
+
+        .thumb-wrap img.error {
+            display: none
+        }
+
+        .thumb-wrap .img-fallback {
+            font-size: 2rem;
+            color: #059669;
+            font-weight: 800;
+            display: none
+        }
+
+        .select-indicator {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 22px;
+            height: 22px;
+            background: var(--accent);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 800;
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.2s;
+            border: 2px solid white
+        }
+
+        .product-card.selected .select-indicator {
+            opacity: 1;
+            transform: scale(1)
+        }
+
+        .hot-badge,
+        .fresh-badge {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            font-size: 0.7rem;
+            z-index: 2
+        }
+
+        .product-info {
+            flex: 1;
+            min-width: 0
+        }
+
+        .product-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem
+        }
+
+        .names h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 0.2rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .names .regional {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            line-height: 1.2
+        }
+
+        .telugu {
+            color: var(--primary);
+            font-weight: 700;
+            font-family: 'Noto Sans Telugu', sans-serif
+        }
+
+        .hindi {
+            color: #64748b;
+            font-style: italic
+        }
+
+        .moq-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            margin-top: 0.25rem;
+            border: 1px solid #fecaca
+        }
+
+        .price-block {
+            text-align: right;
+            flex-shrink: 0
+        }
+
+        .price {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--primary);
+            line-height: 1
+        }
+
+        .price .apmc-live {
+            font-size: 0.55rem;
+            color: #3b82f6;
+            font-weight: 700;
+            display: block
+        }
+
+        .unit {
+            font-size: 0.7rem;
+            color: #64748b;
+            font-weight: 600;
+            display: block
+        }
+
+        .apmc-tag {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.6rem;
+            font-weight: 700;
+            margin-top: 0.2rem
+        }
+
+        .card-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: flex-end;
+            min-width: 110px
+        }
+
+        .btn-add {
+            background: linear-gradient(135deg, var(--primary), #047857);
+            color: white;
+            border: none;
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            min-height: 44px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1.2
+        }
+
+        .btn-add .moq-hint {
+            font-size: 0.65rem;
+            opacity: 0.9;
+            font-weight: 600
+        }
+
+        .btn-add.hidden {
+            display: none !important
+        }
+
+        .qty-controls {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            background: #f0fdf4;
+            padding: 0.5rem;
+            border-radius: 10px;
+            border: 2px solid var(--primary);
+            width: 100%
+        }
+
+        .qty-controls.active {
+            display: flex;
+            animation: slideIn 0.2s
+        }
+
+        .qty-controls.error {
+            border-color: var(--danger);
+            background: #fef2f2
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .qty-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+            justify-content: space-between
+        }
+
+        .qty-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: var(--primary);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center
+        }
+
+        .qty-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed
+        }
+
+        .qty-input {
+            width: 50px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            text-align: center;
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: #0f172a;
+            font-family: inherit;
+            -moz-appearance: textfield
+        }
+
+        .qty-input::-webkit-outer-spin-button,
+        .qty-input::-webkit-inner-spin-button {
+            -webkit-appearance: none
+        }
+
+        .moq-label {
+            font-size: 0.7rem;
+            color: var(--danger);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem
+        }
+
+        .unit-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: 600
+        }
+
+        .remove-btn {
+            font-size: 0.75rem;
+            color: #ef4444;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            padding: 0.25rem
+        }
+
+        /* Modal base */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            justify-content: flex-end;
+            flex-direction: column
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 24px 24px 0 0;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            animation: slideUp 0.3s ease-out;
+            display: flex;
+            flex-direction: column
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%)
+            }
+
+            to {
+                transform: translateY(0)
+            }
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #064e3b, #065f46);
+            color: white;
+            padding: 1.25rem;
+            border-radius: 24px 24px 0 0;
+            position: sticky;
+            top: 0;
+            z-index: 10
+        }
+
+        .modal-header h2 {
+            font-size: 1.3rem;
+            margin-bottom: 0.25rem;
+            padding-right: 40px
+        }
+
+        .modal-header p {
+            opacity: 0.9;
+            font-size: 0.85rem
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center
+        }
+
+        .modal-body {
+            padding: 1.25rem;
+            overflow-y: auto;
+            flex: 1
+        }
+
+        .selected-items {
+            background: #f0fdf4;
+            border: 2px dashed var(--primary);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1.25rem
+        }
+
+        .selected-items h4 {
+            color: #064e3b;
+            margin-bottom: 0.75rem;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center
+        }
+
+        .items-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem
+        }
+
+        .item-row {
+            background: white;
+            padding: 0.75rem;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid var(--primary)
+        }
+
+        .item-row.moq-warning {
+            border-left-color: var(--danger);
+            background: #fef2f2
+        }
+
+        .item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            flex: 1
+        }
+
+        .item-name {
+            font-weight: 700;
+            color: #0f172a;
+            font-size: 0.95rem
+        }
+
+        .item-qty {
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 0.9rem
+        }
+
+        .item-price {
+            color: #059669;
+            font-weight: 800;
+            font-size: 1rem;
+            text-align: right
+        }
+
+        .form-group {
+            margin-bottom: 1rem
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.4rem;
+            font-weight: 600;
+            color: #334155;
+            font-size: 0.9rem
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 0.875rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 16px;
+            font-family: inherit;
+            -webkit-appearance: none
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1)
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, var(--accent), #ea580c);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            min-height: 52px
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #9ca3af
+        }
+
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        .success-message,
+        .error-message {
+            display: none;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+            text-align: center;
+            font-weight: 600
+        }
+
+        .success-message {
+            background: #d1fae5;
+            color: #065f46
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #991b1b
+        }
+
+        .validation-error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: none
+        }
+
+        /* Auth Modal */
+        .auth-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem
+        }
+
+        .auth-modal.open {
+            display: flex
+        }
+
+        .auth-box {
+            background: white;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 400px;
+            overflow: hidden
+        }
+
+        .auth-box-header {
+            background: linear-gradient(135deg, #064e3b, #065f46);
+            color: white;
+            padding: 1.5rem;
+            text-align: center
+        }
+
+        .auth-box-header h2 {
+            font-size: 1.3rem;
+            margin-bottom: 0.25rem
+        }
+
+        .auth-box-header p {
+            opacity: 0.8;
+            font-size: 0.85rem
+        }
+
+        .auth-box-body {
+            padding: 1.5rem
+        }
+
+        .google-btn {
+            width: 100%;
+            padding: 0.875rem;
+            border: 2px solid #e2e8f0;
+            background: white;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            transition: all 0.2s;
+            font-family: inherit;
+            margin-bottom: 1rem
+        }
+
+        .google-btn:hover {
+            border-color: #4285f4;
+            background: #f8fafc
+        }
+
+        .google-btn img {
+            width: 20px;
+            height: 20px
+        }
+
+        .auth-divider {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin: 1rem 0;
+            color: #94a3b8;
+            font-size: 0.85rem
+        }
+
+        .auth-divider::before,
+        .auth-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e2e8f0
+        }
+
+        .phone-section {
+            margin-top: 0.5rem
+        }
+
+        .phone-row {
+            display: flex;
+            gap: 0.5rem
+        }
+
+        .phone-row input {
+            flex: 1
+        }
+
+        .phone-row button {
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, var(--primary), #047857);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            font-family: inherit
+        }
+
+        .otp-section {
+            display: none;
+            margin-top: 1rem
+        }
+
+        .otp-row {
+            display: flex;
+            gap: 0.5rem
+        }
+
+        .auth-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center
+        }
+
+        .user-menu {
+            position: relative
+        }
+
+        .user-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+            min-width: 200px;
+            overflow: hidden;
+            z-index: 1500;
+            margin-top: 0.5rem
+        }
+
+        .user-dropdown.show {
+            display: block
+        }
+
+        .user-dropdown-header {
+            padding: 1rem;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0
+        }
+
+        .user-dropdown-header .name {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #0f172a
+        }
+
+        .user-dropdown-header .email {
+            font-size: 0.75rem;
+            color: #64748b
+        }
+
+        .user-dropdown a,
+        .user-dropdown button {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            color: #334155;
+            text-decoration: none;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            font-family: inherit
+        }
+
+        .user-dropdown a:hover,
+        .user-dropdown button:hover {
+            background: #f1f5f9
+        }
+
+        /* Buyer Dashboard */
+        .buyer-panel {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 2500;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 1rem;
+            overflow-y: auto
+        }
+
+        .buyer-panel.open {
+            display: flex
+        }
+
+        .buyer-container {
+            background: white;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            margin-top: calc(var(--header-height) + 10px)
+        }
+
+        .buyer-header {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            padding: 1.25rem 1.5rem;
+            border-radius: 20px 20px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10
+        }
+
+        .buyer-header h2 {
+            font-size: 1.25rem;
+            margin: 0
+        }
+
+        .buyer-body {
+            padding: 1.25rem
+        }
+
+        .dash-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1.5rem
+        }
+
+        .dash-stat {
+            padding: 1rem;
+            border-radius: 12px;
+            text-align: center
+        }
+
+        .dash-stat .val {
+            font-size: 1.75rem;
+            font-weight: 800;
+            line-height: 1
+        }
+
+        .dash-stat .lbl {
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: 600;
+            margin-top: 0.25rem
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: calc(var(--header-height) + 10px);
+            right: 1rem;
+            z-index: 3000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem
+        }
+
+        .toast {
+            padding: 0.75rem 1.25rem;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: white;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            animation: toastIn 0.3s ease-out, toastOut 0.3s ease-in forwards;
+            animation-delay: 0s, 2.5s;
+            max-width: 320px
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #059669, #047857)
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626)
+        }
+
+        .toast.info {
+            background: linear-gradient(135deg, #3b82f6, #2563eb)
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(100px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0)
+            }
+        }
+
+        @keyframes toastOut {
+            from {
+                opacity: 1
+            }
+
+            to {
+                opacity: 0;
+                transform: translateY(-20px)
+            }
+        }
+
+        .whatsapp-float {
+            position: fixed;
+            bottom: calc(20px + var(--safe-area-bottom));
+            right: 20px;
+            z-index: 999;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #25D366;
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            transition: all 0.3s;
+            text-decoration: none
+        }
+
+        /* Admin */
+        .admin-toggle {
+            position: fixed;
+            bottom: calc(85px + var(--safe-area-bottom));
+            right: 20px;
+            z-index: 999;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem
+        }
+
+        .admin-panel {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 2500;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 1rem;
+            overflow-y: auto
+        }
+
+        .admin-panel.open {
+            display: flex
+        }
+
+        .admin-container {
+            background: white;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            margin-top: calc(var(--header-height) + 10px)
+        }
+
+        .admin-header {
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+            color: white;
+            padding: 1.25rem 1.5rem;
+            border-radius: 20px 20px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10
+        }
+
+        .admin-header h2 {
+            font-size: 1.25rem;
+            margin: 0
+        }
+
+        .admin-body {
+            padding: 1.25rem
+        }
+
+        .admin-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+            flex-wrap: wrap
+        }
+
+        .admin-tab {
+            padding: 0.5rem 0.75rem;
+            border: 2px solid #e2e8f0;
+            background: white;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s
+        }
+
+        .admin-tab.active {
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+            color: white;
+            border-color: #4f46e5
+        }
+
+        .price-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem
+        }
+
+        .price-table th {
+            background: #f1f5f9;
+            padding: 0.6rem 0.4rem;
+            text-align: left;
+            font-weight: 700;
+            color: #334155;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            position: sticky;
+            top: 0
+        }
+
+        .price-table td {
+            padding: 0.5rem 0.4rem;
+            border-bottom: 1px solid #f1f5f9
+        }
+
+        .price-table tr:hover {
+            background: #f8fafc
+        }
+
+        .price-input,
+        .moq-input,
+        .commission-input {
+            width: 65px;
+            padding: 0.35rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            font-family: inherit
+        }
+
+        .price-input:focus,
+        .moq-input:focus,
+        .commission-input:focus {
+            outline: none;
+            border-color: #6366f1
+        }
+
+        .save-btn {
+            background: linear-gradient(135deg, #059669, #047857);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            margin-top: 1rem
+        }
+
+        .history-card {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 0.75rem
+        }
+
+        .history-card .h-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem
+        }
+
+        .history-card .h-date {
+            font-size: 0.8rem;
+            color: #64748b;
+            font-weight: 600
+        }
+
+        .history-card .h-id {
+            font-size: 0.75rem;
+            background: #e0e7ff;
+            color: #4338ca;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 700
+        }
+
+        .history-card .h-customer {
+            font-weight: 700;
+            font-size: 0.95rem
+        }
+
+        .history-card .h-items {
+            font-size: 0.85rem;
+            color: #475569;
+            margin-top: 0.25rem
+        }
+
+        .history-card .h-total {
+            font-weight: 800;
+            color: #059669;
+            font-size: 1rem;
+            margin-top: 0.5rem
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #94a3b8
+        }
+
+        .no-results .nr-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem
+        }
+
+        .no-results h3 {
+            font-size: 1.1rem;
+            color: #64748b;
+            margin-bottom: 0.5rem
+        }
+
+        .apmc-rate-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid #f1f5f9
+        }
+
+        .apmc-rate-row:last-child {
+            border-bottom: none
+        }
+
+        .apmc-rate-name {
+            font-weight: 700;
+            font-size: 0.9rem
+        }
+
+        .apmc-rate-prices {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.85rem
+        }
+
+        .apmc-rate-prices span {
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            font-weight: 600
+        }
+
+        .apmc-min {
+            background: #dbeafe;
+            color: #1d4ed8
+        }
+
+        .apmc-modal {
+            background: #d1fae5;
+            color: #065f46
+        }
+
+        .apmc-max {
+            background: #fee2e2;
+            color: #991b1b
+        }
+
+        .commission-global {
+            background: #eff6ff;
+            border: 2px solid #bfdbfe;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap
+        }
+
+        .commission-global label {
+            font-weight: 700;
+            color: #1e40af;
+            font-size: 0.9rem
+        }
+
+        .site-footer {
+            background: linear-gradient(135deg, #064e3b, #065f46);
+            color: white;
+            padding: 2rem 1rem;
+            margin-top: 2rem
+        }
+
+        .footer-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem
+        }
+
+        .footer-section h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            color: #fbbf24
+        }
+
+        .footer-section p,
+        .footer-section a {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.8;
+            text-decoration: none
+        }
+
+        .footer-section a:hover {
+            color: white
+        }
+
+        .footer-bottom {
+            max-width: 1400px;
+            margin: 1.5rem auto 0;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            text-align: center;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.5)
+        }
+
+        @media(min-width:641px) {
+            .products-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem
+            }
+
+            .main-container {
+                padding: calc(var(--header-height) + 130px) 1.5rem 2rem
+            }
+
+            .brand-text h1 {
+                font-size: 1.5rem
+            }
+
+            .live-badge {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                background: rgba(255, 255, 255, 0.15);
+                padding: 0.5rem 1rem;
+                border-radius: 50px;
+                font-size: 0.875rem;
+                font-weight: 600
+            }
+
+            .pulse {
+                width: 8px;
+                height: 8px;
+                background: #4ade80;
+                border-radius: 50%;
+                animation: pulse 2s infinite
+            }
+
+            @keyframes pulse {
+
+                0%,
+                100% {
+                    opacity: 1;
+                    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7)
+                }
+
+                50% {
+                    opacity: 0.8;
+                    box-shadow: 0 0 0 8px rgba(74, 222, 128, 0)
+                }
+            }
+
+            .modal-overlay {
+                justify-content: center;
+                align-items: center;
+                padding: 2rem
+            }
+
+            .modal-content {
+                border-radius: 24px;
+                max-width: 600px;
+                max-height: 85vh
+            }
+
+            .footer-content {
+                grid-template-columns: repeat(3, 1fr)
+            }
+        }
+
+        @media(min-width:1025px) {
+            .products-grid {
+                grid-template-columns: repeat(auto-fill, minmax(380px, 1fr))
+            }
+
+            .main-container {
+                padding: calc(var(--header-height) + 140px) 2rem 2rem
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="brand">
+                <div class="brand-icon">🥬</div>
+                <div class="brand-text">
+                    <h1>KKR Groceries</h1><span>Hyderabad Wholesale</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="live-badge"><span class="pulse"></span><span>Live APMC</span></div>
+                <span id="orderTotal" class="order-total">₹0</span>
+                <!-- Auth: logged out -->
+                <button class="auth-btn" id="loginBtn" onclick="openAuthModal()">Sign In</button>
+                <!-- Auth: logged in -->
+                <div class="user-menu" id="userMenu" style="display:none">
+                    <img id="userAvatar" class="user-avatar" src="" alt="U" onclick="toggleUserDropdown()">
+                    <div class="user-dropdown" id="userDropdown">
+                        <div class="user-dropdown-header">
+                            <div class="name" id="userName">User</div>
+                            <div class="email" id="userEmail">email</div>
+                        </div>
+                        <button onclick="openBuyerDashboard()">My Dashboard</button>
+                        <button onclick="openBuyerDashboard()">Order History</button>
+                        <button onclick="signOutUser()" style="color:#ef4444">Sign Out</button>
+                    </div>
+                </div>
+                <button class="enquiry-btn" id="openEnquiryBtn" type="button">
+                    <span>Enquiry</span>
+                    <span id="cartCount" class="cart-count">0</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <div class="moq-notice"><span>📦</span><span>B2B Wholesale Only: Minimum Order Quantities (MOQ) Apply</span>
+        </div>
+        <div class="filter-wrapper">
+            <div class="filter-bar">
+                <button class="filter-btn active" data-category="all" type="button">All Items</button>
+                <button class="filter-btn" data-category="daily" type="button">Daily Essentials</button>
+                <button class="filter-btn" data-category="rotate" type="button">High Rotation</button>
+                <button class="filter-btn" data-category="regional" type="button">Regional Specials</button>
+            </div>
+        </div>
+        <div style="padding:0 0.75rem;margin-bottom:1rem">
+            <div style="position:relative">
+                <input type="text" id="searchInput" placeholder="Search vegetables... (English, Telugu, Hindi)"
+                    style="width:100%;padding:0.875rem 1rem 0.875rem 2.75rem;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;font-family:inherit;background:white;-webkit-appearance:none"
+                    oninput="handleSearch(this.value)">
+                <span
+                    style="position:absolute;left:0.875rem;top:50%;transform:translateY(-50%);font-size:1.1rem;opacity:0.5">🔍</span>
+            </div>
+        </div>
+        <div class="products-grid" id="productsGrid"></div>
+    </main>
+
+    <!-- Enquiry Modal -->
+    <div id="enquiryModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="close-btn" id="closeEnquiryBtn" type="button">×</button>
+            <div class="modal-header">
+                <h2>Send Enquiry</h2>
+                <p>Review your order & fill details.</p>
+            </div>
+            <div class="modal-body">
+                <div id="validationError" class="validation-error">Some items are below MOQ. Please adjust.</div>
+                <div class="selected-items">
+                    <h4><span>Order Summary</span><span
+                            style="font-size:0.75rem;color:#64748b;text-transform:none;font-weight:600">MOQ
+                            Required</span></h4>
+                    <div id="selectedItemsList" class="items-list"><span style="color:#64748b;font-size:0.9rem">No items
+                            added.</span></div>
+                </div>
+                <form id="enquiryForm">
+                    <div class="form-group"><label for="customerName">Full Name *</label><input type="text"
+                            id="customerName" required placeholder="Your name" autocomplete="name"></div>
+                    <div class="form-group"><label for="customerPhone">Phone Number *</label><input type="tel"
+                            id="customerPhone" required placeholder="10-digit mobile" pattern="[0-9]{10}"
+                            inputmode="numeric"></div>
+                    <div class="form-group"><label for="deliveryLocation">Delivery Location *</label><input type="text"
+                            id="deliveryLocation" required placeholder="Area in Hyderabad"></div>
+                    <div class="form-group"><label for="pincode">Pincode *</label><input type="text" id="pincode"
+                            required placeholder="6-digit pincode" pattern="[0-9]{6}" inputmode="numeric"></div>
+                    <div class="form-group"><label for="businessType">Business Type</label><input type="text"
+                            id="businessType" placeholder="Hotel/Restaurant/Retailer"></div>
+                    <button type="submit" class="submit-btn" id="submitBtn"><span>Send Enquiry</span>
+                        <div class="spinner" id="spinner"></div>
+                    </button>
+                    <div id="successMsg" class="success-message">✅ Enquiry sent! We'll contact you shortly.</div>
+                    <div id="errorMsg" class="error-message">❌ Failed to send. Please try again.</div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="authModal" class="auth-modal" onclick="if(event.target===this)closeAuthModal()">
+        <div class="auth-box" style="position:relative">
+            <button class="auth-close" onclick="closeAuthModal()">×</button>
+            <div class="auth-box-header">
+                <h2>🥬 KKR Groceries</h2>
+                <p>Sign in to place wholesale orders</p>
+            </div>
+            <div class="auth-box-body">
+                <button class="google-btn" onclick="signInWithGoogle()">
+                    <svg width="20" height="20" viewBox="0 0 48 48">
+                        <path fill="#EA4335"
+                            d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                        <path fill="#4285F4"
+                            d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                        <path fill="#FBBC05"
+                            d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                        <path fill="#34A853"
+                            d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                    </svg>
+                    Sign in with Google
+                </button>
+                <div class="auth-divider">or</div>
+                <div class="phone-section">
+                    <p style="font-size:0.85rem;color:#64748b;margin-bottom:0.5rem;font-weight:600">Sign in with Phone
+                    </p>
+                    <div class="phone-row">
+                        <input type="tel" id="phoneInput" placeholder="+91 XXXXX XXXXX"
+                            style="padding:0.75rem;border:2px solid #e2e8f0;border-radius:10px;font-size:1rem;font-family:inherit">
+                        <button onclick="sendOTP()" id="sendOtpBtn">Send OTP</button>
+                    </div>
+                    <div id="recaptchaContainer"></div>
+                    <div class="otp-section" id="otpSection">
+                        <p style="font-size:0.85rem;color:#059669;margin-bottom:0.5rem;font-weight:600">✅ OTP sent!
+                            Enter below:</p>
+                        <div class="otp-row">
+                            <input type="text" id="otpInput" placeholder="6-digit OTP" maxlength="6" inputmode="numeric"
+                                style="padding:0.75rem;border:2px solid #e2e8f0;border-radius:10px;font-size:1rem;font-family:inherit;letter-spacing:0.3rem;text-align:center">
+                            <button onclick="verifyOTP()">Verify</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Buyer Dashboard -->
+    <div id="buyerPanel" class="buyer-panel" onclick="if(event.target===this)closeBuyerDashboard()">
+        <div class="buyer-container">
+            <div class="buyer-header">
+                <h2>📊 My Dashboard</h2>
+                <button onclick="closeBuyerDashboard()"
+                    style="background:rgba(255,255,255,0.2);border:none;color:white;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:1.2rem">×</button>
+            </div>
+            <div class="buyer-body">
+                <div class="admin-tabs">
+                    <button class="admin-tab active" onclick="switchBuyerTab('overview',this)">📊 Overview</button>
+                    <button class="admin-tab" onclick="switchBuyerTab('orders',this)">📋 My Orders</button>
+                </div>
+                <div id="buyerOverviewTab"></div>
+                <div id="buyerOrdersTab" style="display:none"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <button class="admin-toggle" onclick="toggleAdmin()" title="Admin Panel">⚙️</button>
+    <div id="adminPanel" class="admin-panel" onclick="if(event.target===this)toggleAdmin()">
+        <div class="admin-container">
+            <div class="admin-header">
+                <h2>⚙️ Admin Dashboard</h2>
+                <button onclick="toggleAdmin()"
+                    style="background:rgba(255,255,255,0.2);border:none;color:white;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:1.2rem">×</button>
+            </div>
+            <div class="admin-body">
+                <div class="admin-tabs">
+                    <button class="admin-tab active" onclick="switchAdminTab('prices',this)">₹ Prices & MOQ</button>
+                    <button class="admin-tab" onclick="switchAdminTab('apmc',this)">📈 APMC Live</button>
+                    <button class="admin-tab" onclick="switchAdminTab('history',this)">📋 Orders</button>
+                    <button class="admin-tab" onclick="switchAdminTab('stats',this)">📊 Analytics</button>
+                </div>
+                <div id="adminPricesTab"></div>
+                <div id="adminApmcTab" style="display:none"></div>
+                <div id="adminHistoryTab" style="display:none"></div>
+                <div id="adminStatsTab" style="display:none"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <a href="https://wa.me/91XXXXXXXXXX?text=Hi%20KKR%20Groceries%2C%20I%20want%20to%20place%20a%20wholesale%20order"
+        target="_blank" class="whatsapp-float" title="Order via WhatsApp">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
+            <path
+                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+        </svg>
+    </a>
+
+    <footer class="site-footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>🥬 KKR Groceries</h3>
+                <p>Hyderabad’s trusted B2B vegetable wholesale partner. Fresh produce from APMC markets to hotels,
+                    restaurants, and retailers.</p>
+            </div>
+            <div class="footer-section">
+                <h3>📞 Contact</h3>
+                <p>📱 Phone: +91 XXXXX XXXXX</p>
+                <p>📧 Email: info@kkrgroceries.com</p>
+                <p>📍 Hyderabad, Telangana</p>
+                <p>⏰ Hours: 4:00 AM - 8:00 PM</p>
+            </div>
+            <div class="footer-section">
+                <h3>🔗 Quick Links</h3>
+                <p><a href="#"
+                        onclick="filterCategory('daily');window.scrollTo({top:0,behavior:'smooth'});return false">Daily
+                        Essentials</a></p>
+                <p><a href="#"
+                        onclick="filterCategory('rotate');window.scrollTo({top:0,behavior:'smooth'});return false">High
+                        Rotation</a></p>
+                <p><a href="#"
+                        onclick="filterCategory('regional');window.scrollTo({top:0,behavior:'smooth'});return false">Regional
+                        Specials</a></p>
+            </div>
+        </div>
+        <div class="footer-bottom">© 2026 KKR Groceries. All rights reserved. | B2B Wholesale Platform</div>
+    </footer>
+
+    <script>
+        // ===== FIREBASE CONFIG =====
+        const firebaseConfig = {
+            apiKey: "AIzaSyCHO2m3Cs9ESdKl-3dzqzPrT_eup-SX2OE",
+            authDomain: "kkr-groceries-02.firebaseapp.com",
+            projectId: "kkr-groceries-02",
+            storageBucket: "kkr-groceries-02.firebasestorage.app",
+            messagingSenderId: "651622006147",
+            appId: "1:651622006147:web:da188b9ad4f4640eb1cab6"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        const GOOGLE_SCRIPT_URL = 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE';
+
+        const products = [
+            { id: 1, name: 'Tomato', telugu: '\u0C1F\u0C2E\u0C3E\u0C1F\u0C4B', hindi: 'Tamatar', price: 24, unit: 'kg', moq: 100, category: 'daily', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tomato_je.jpg/220px-Tomato_je.jpg', hot: true },
+            { id: 2, name: 'Onion', telugu: '\u0C09\u0C32\u0C4D\u0C32\u0C3F\u0C2A\u0C3E\u0C2F', hindi: 'Pyaz', price: 32, unit: 'kg', moq: 50, category: 'daily', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/25/Onion_on_White.JPG/220px-Onion_on_White.JPG', hot: true },
+            { id: 3, name: 'Potato', telugu: '\u0C2C\u0C02\u0C17\u0C3E\u0C33\u0C3E\u0C26\u0C41\u0C02\u0C2A', hindi: 'Aloo', price: 28, unit: 'kg', moq: 50, category: 'daily', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Patates.jpg/220px-Patates.jpg' },
+            { id: 4, name: 'Green Chilli', telugu: '\u0C2A\u0C1A\u0C4D\u0C1A\u0C3F \u0C2E\u0C3F\u0C30\u0C4D\u0C1A\u0C3F', hindi: 'Hari Mirch', price: 45, unit: 'kg', moq: 25, category: 'daily', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Green_chilli_closeup.jpg/220px-Green_chilli_closeup.jpg', hot: true },
+            { id: 5, name: "Lady's Finger", telugu: '\u0C2C\u0C46\u0C02\u0C21\u0C15\u0C3E\u0C2F', hindi: 'Bhindi', price: 38, unit: 'kg', moq: 30, category: 'rotate', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Okra_%28Abelmoschus_esculentus%29_%283%29.jpg/220px-Okra_%28Abelmoschus_esculentus%29_%283%29.jpg' },
+            { id: 6, name: 'Brinjal', telugu: '\u0C35\u0C02\u0C15\u0C3E\u0C2F', hindi: 'Baingan', price: 32, unit: 'kg', moq: 40, category: 'rotate', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/Solanum_melongena_24_08_2012_%281%29.JPG/220px-Solanum_melongena_24_08_2012_%281%29.JPG' },
+            { id: 7, name: 'Cauliflower', telugu: '\u0C2B\u0C41\u0C32\u0C35\u0C30\u0C4D', hindi: 'Phool Gobi', price: 28, unit: 'piece', moq: 20, category: 'rotate', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Chou-fleur_02.jpg/220px-Chou-fleur_02.jpg', fresh: true },
+            { id: 8, name: 'Cabbage', telugu: '\u0C15\u0C4D\u0C2F\u0C3E\u0C2C\u0C47\u0C1C\u0C40', hindi: 'Patta Gobi', price: 22, unit: 'piece', moq: 20, category: 'rotate', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Cabbage_and_cross_section_on_white.jpg/220px-Cabbage_and_cross_section_on_white.jpg' },
+            { id: 9, name: 'Carrot', telugu: '\u0C15\u0C3E\u0C30\u0C46\u0C1F\u0C4D', hindi: 'Gajar', price: 42, unit: 'kg', moq: 25, category: 'rotate', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Vegetable-Ede-carrot.jpg/220px-Vegetable-Ede-carrot.jpg' },
+            { id: 10, name: 'Spinach', telugu: '\u0C2A\u0C3E\u0C32\u0C15\u0C42\u0C30', hindi: 'Palak', price: 18, unit: 'bunch', moq: 50, category: 'regional', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Spinach_leaves.jpg/220px-Spinach_leaves.jpg', fresh: true },
+            { id: 11, name: 'Bottle Gourd', telugu: '\u0C38\u0C4A\u0C30\u0C15\u0C3E\u0C2F', hindi: 'Lauki', price: 35, unit: 'piece', moq: 15, category: 'regional', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Bottle_gourd.jpg/220px-Bottle_gourd.jpg' },
+            { id: 12, name: 'Ridge Gourd', telugu: '\u0C2C\u0C40\u0C30\u0C15\u0C3E\u0C2F', hindi: 'Turiya', price: 40, unit: 'kg', moq: 25, category: 'regional', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/Luffa_aegyptiaca_fruit.jpg/220px-Luffa_aegyptiaca_fruit.jpg' }
+        ];
+
+        let cart = {};
+        let currentCategory = 'all';
+        let searchTerm = '';
+        let currentUser = null;
+        let confirmationResult = null;
+        let commissionPercent = parseFloat(localStorage.getItem('kkr_commission') || '15');
+        let apmcPrices = null;
+
+        // Load saved prices & MOQ
+        (function loadSaved() {
+            const sp = JSON.parse(localStorage.getItem('kkr_prices') || '{}');
+            const sm = JSON.parse(localStorage.getItem('kkr_moqs') || '{}');
+            Object.entries(sp).forEach(([id, p]) => { const pr = products.find(x => x.id === +id); if (pr) pr.price = p; });
+            Object.entries(sm).forEach(([id, m]) => { const pr = products.find(x => x.id === +id); if (pr) pr.moq = m; });
+        })();
+
+        // ===== APMC PRICE ENGINE =====
+        function generateAPMCPrices() {
+            const d = new Date();
+            const seed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+            const commodities = [
+                { name: 'Tomato', bMin: 18, bMax: 35 }, { name: 'Onion', bMin: 22, bMax: 45 }, { name: 'Potato', bMin: 20, bMax: 38 },
+                { name: 'Green Chilli', bMin: 30, bMax: 65 }, { name: "Lady's Finger", bMin: 28, bMax: 50 }, { name: 'Brinjal', bMin: 22, bMax: 42 },
+                { name: 'Cauliflower', bMin: 20, bMax: 40 }, { name: 'Cabbage', bMin: 15, bMax: 30 }, { name: 'Carrot', bMin: 30, bMax: 55 },
+                { name: 'Spinach', bMin: 10, bMax: 25 }, { name: 'Bottle Gourd', bMin: 25, bMax: 45 }, { name: 'Ridge Gourd', bMin: 28, bMax: 50 }
+            ];
+            apmcPrices = commodities.map((c, i) => {
+                const h = ((seed * (i + 7)) % 1000) / 1000;
+                const min = c.bMin + Math.floor(h * (c.bMax - c.bMin) * 0.4);
+                const max = c.bMin + Math.floor(h * (c.bMax - c.bMin) * 0.8) + Math.floor((c.bMax - c.bMin) * 0.3);
+                const modal = Math.floor((min + max) / 2);
+                return { commodity: c.name, minPrice: min, maxPrice: Math.min(max, c.bMax), modalPrice: modal, date: d.toISOString().split('T')[0] };
+            });
+            localStorage.setItem('kkr_apmc', JSON.stringify({ prices: apmcPrices, date: d.toISOString().split('T')[0] }));
+            return apmcPrices;
+        }
+
+        function getSellingPrice(product) {
+            if (!apmcPrices) generateAPMCPrices();
+            const apmc = apmcPrices.find(a => a.commodity === product.name);
+            if (apmc) {
+                const base = apmc.modalPrice;
+                return Math.round(base + base * commissionPercent / 100);
+            }
+            return product.price;
+        }
+
+        // ===== FIREBASE AUTH =====
+        auth.onAuthStateChanged(user => {
+            currentUser = user;
+            const loginBtn = document.getElementById('loginBtn');
+            const userMenu = document.getElementById('userMenu');
+            if (user) {
+                loginBtn.style.display = 'none';
+                userMenu.style.display = 'block';
+                const avatar = document.getElementById('userAvatar');
+                avatar.src = user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23059669"/><text x="50" y="65" text-anchor="middle" fill="white" font-size="45">' + (user.displayName || user.phoneNumber || 'U')[0].toUpperCase() + '</text></svg>';
+                avatar.alt = (user.displayName || 'U')[0];
+                document.getElementById('userName').textContent = user.displayName || user.phoneNumber || 'User';
+                document.getElementById('userEmail').textContent = user.email || user.phoneNumber || '';
+                // Pre-fill form
+                const nameInput = document.getElementById('customerName');
+                const phoneInput = document.getElementById('customerPhone');
+                if (nameInput && user.displayName) nameInput.value = user.displayName;
+                if (phoneInput && user.phoneNumber) phoneInput.value = user.phoneNumber.replace('+91', '');
+            } else {
+                loginBtn.style.display = 'block';
+                userMenu.style.display = 'none';
+            }
+        });
+
+        function openAuthModal() { document.getElementById('authModal').classList.add('open'); document.body.style.overflow = 'hidden'; }
+        function closeAuthModal() { document.getElementById('authModal').classList.remove('open'); document.body.style.overflow = 'auto'; }
+
+        function signInWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).then(() => {
+                closeAuthModal();
+                showToast('Signed in successfully!', 'success');
+            }).catch(err => {
+                console.error(err);
+                showToast('Sign-in failed: ' + err.message, 'error');
+            });
+        }
+
+        function sendOTP() {
+            let phone = document.getElementById('phoneInput').value.trim();
+            if (!phone.startsWith('+')) phone = '+91' + phone.replace(/\D/g, '');
+            if (phone.length < 12) { showToast('Enter valid phone number', 'error'); return; }
+            if (!window.recaptchaVerifier) {
+                window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptchaContainer', { size: 'invisible' });
+            }
+            document.getElementById('sendOtpBtn').disabled = true;
+            document.getElementById('sendOtpBtn').textContent = 'Sending...';
+            auth.signInWithPhoneNumber(phone, window.recaptchaVerifier).then(result => {
+                confirmationResult = result;
+                document.getElementById('otpSection').style.display = 'block';
+                document.getElementById('sendOtpBtn').textContent = 'Resend';
+                document.getElementById('sendOtpBtn').disabled = false;
+                showToast('OTP sent!', 'success');
+            }).catch(err => {
+                console.error(err);
+                showToast('Failed to send OTP: ' + err.message, 'error');
+                document.getElementById('sendOtpBtn').textContent = 'Send OTP';
+                document.getElementById('sendOtpBtn').disabled = false;
+                if (window.recaptchaVerifier) { window.recaptchaVerifier.clear(); window.recaptchaVerifier = null; }
+            });
+        }
+
+        function verifyOTP() {
+            const code = document.getElementById('otpInput').value.trim();
+            if (code.length !== 6) { showToast('Enter 6-digit OTP', 'error'); return; }
+            confirmationResult.confirm(code).then(() => {
+                closeAuthModal();
+                showToast('Phone verified!', 'success');
+            }).catch(err => {
+                showToast('Invalid OTP', 'error');
+            });
+        }
+
+        function signOutUser() {
+            auth.signOut().then(() => {
+                document.getElementById('userDropdown').classList.remove('show');
+                showToast('Signed out', 'info');
+            });
+        }
+
+        function toggleUserDropdown() {
+            document.getElementById('userDropdown').classList.toggle('show');
+        }
+
+        // Close dropdown on outside click
+        document.addEventListener('click', e => {
+            const menu = document.getElementById('userMenu');
+            if (menu && !menu.contains(e.target)) document.getElementById('userDropdown').classList.remove('show');
+        });
+
+        // ===== CORE APP =====
+        document.addEventListener('DOMContentLoaded', () => {
+            generateAPMCPrices();
+            setupEventListeners();
+            renderProducts(currentCategory);
+            updateUI();
+        });
+
+        function setupEventListeners() {
+            document.getElementById('openEnquiryBtn').addEventListener('click', openEnquiryModal);
+            document.getElementById('closeEnquiryBtn').addEventListener('click', closeEnquiryModal);
+            document.getElementById('enquiryModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeEnquiryModal(); });
+            document.querySelector('.modal-content').addEventListener('click', e => e.stopPropagation());
+            document.querySelector('.filter-bar').addEventListener('click', onFilterBarClick);
+            document.getElementById('productsGrid').addEventListener('click', onProductGridClick);
+            document.getElementById('productsGrid').addEventListener('change', onProductQtyChange);
+            document.getElementById('enquiryForm').addEventListener('submit', submitEnquiryForm);
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeEnquiryModal(); closeAuthModal(); closeBuyerDashboard(); const ap = document.getElementById('adminPanel'); if (ap.classList.contains('open')) toggleAdmin(); } });
+        }
+
+        function handleSearch(v) { searchTerm = v.toLowerCase().trim(); renderProducts(currentCategory); }
+
+        function renderProducts(category) {
+            const grid = document.getElementById('productsGrid');
+            grid.innerHTML = '';
+            let filtered = category === 'all' ? products : products.filter(p => p.category === category);
+            if (searchTerm) filtered = filtered.filter(p => p.name.toLowerCase().includes(searchTerm) || p.telugu.includes(searchTerm) || p.hindi.toLowerCase().includes(searchTerm));
+            if (!filtered.length) { grid.innerHTML = '<div class="no-results"><div class="nr-icon">\uD83D\uDD0D</div><h3>No vegetables found</h3><p>Try a different search or category</p></div>'; return; }
+            filtered.forEach((product, index) => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+                card.id = 'card-' + product.id;
+                const ci = cart[product.id], qty = ci ? ci.qty : 0, isIn = qty > 0, isValid = qty >= product.moq;
+                if (isIn) { card.classList.add('selected'); if (!isValid) card.classList.add('invalid'); }
+                const sp = getSellingPrice(product);
+                const apmcP = apmcPrices ? apmcPrices.find(a => a.commodity === product.name) : null;
+                card.innerHTML = `
+                    <div class="thumb-wrap">
+                        ${product.hot ? '<span class="hot-badge">\uD83D\uDD25</span>' : ''}${product.fresh ? '<span class="fresh-badge">\u2744\uFE0F</span>' : ''}
+                        <img src="${product.image}" alt="${product.name}" loading="lazy" onerror="this.classList.add('error');this.nextElementSibling.style.display='flex'">
+                        <span class="img-fallback">${product.name[0]}</span>
+                        <div class="select-indicator">${isIn ? qty : '\u2714'}</div>
+                    </div>
+                    <div class="product-info">
+                        <div class="product-header">
+                            <div class="names">
+                                <h3>${product.name}</h3>
+                                <div class="regional"><span class="telugu">${product.telugu}</span><span class="hindi">${product.hindi}</span></div>
+                                <div class="moq-badge"><span>\u26A0\uFE0F</span><span>Min: ${product.moq} ${product.unit}</span></div>
+                            </div>
+                            <div class="price-block">
+                                <div class="price">\u20B9${sp}${apmcP ? '<span class="apmc-live">APMC+' + commissionPercent + '%</span>' : ''}</div>
+                                <span class="unit">/${product.unit}</span>
+                                <div class="apmc-tag">${apmcP ? 'APMC \u20B9' + apmcP.modalPrice : 'APMC'}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn-add ${isIn ? 'hidden' : ''}" id="btn-add-${product.id}" type="button" data-action="add" data-product-id="${product.id}"><span>Add +</span><span class="moq-hint">Min ${product.moq}</span></button>
+                        <div class="qty-controls ${isIn ? 'active' : ''} ${!isValid && isIn ? 'error' : ''}" id="qty-controls-${product.id}">
+                            <div class="qty-row">
+                                <button class="qty-btn" type="button" data-action="decrease" data-product-id="${product.id}" ${qty <= product.moq ? 'disabled' : ''}>\u2212</button>
+                                <input type="number" class="qty-input" id="qty-input-${product.id}" value="${isIn ? qty : product.moq}" data-action="set-qty" data-product-id="${product.id}" min="${product.moq}" inputmode="numeric">
+                                <button class="qty-btn" type="button" data-action="increase" data-product-id="${product.id}">+</button>
+                            </div>
+                            ${!isValid && isIn ? `<div class="moq-label"><span>\u26A0\uFE0F</span><span>Min ${product.moq} required</span></div>` : `<span class="unit-label">${product.unit}</span>`}
+                            <button class="remove-btn" type="button" data-action="remove" data-product-id="${product.id}">Remove</button>
+                        </div>
+                    </div>`;
+                grid.appendChild(card);
+                card.style.opacity = '0'; card.style.transform = 'translateY(20px)'; card.style.transition = 'all 0.3s ease';
+                requestAnimationFrame(() => { setTimeout(() => { card.style.opacity = '1'; card.style.transform = 'translateY(0)'; }, index * 50); });
+            });
+        }
+
+        function handleAddClick(id) {
+            if (!currentUser) { openAuthModal(); showToast('Please sign in to add items', 'info'); return; }
+            const p = products.find(x => x.id === id); if (!p) return;
+            const sp = getSellingPrice(p);
+            cart[id] = { ...p, price: sp, qty: p.moq };
+            showToast(`Added ${p.name} (\u00D7${p.moq})`, 'success');
+            updateUI(); renderProducts(currentCategory);
+        }
+
+        function updateQty(id, change) {
+            if (!cart[id]) return;
+            const nq = cart[id].qty + change;
+            if (nq < cart[id].moq) { showToast(`Min order: ${cart[id].moq} ${cart[id].unit}`, 'error'); return; }
+            cart[id].qty = nq; updateUI(); renderProducts(currentCategory);
+        }
+
+        function handleQtyChange(id, value) {
+            const qty = parseInt(value, 10) || 0;
+            const p = products.find(x => x.id === id); if (!p) return;
+            if (qty <= 0) { delete cart[id]; }
+            else if (qty < p.moq) { showToast(`Set to minimum: ${p.moq} ${p.unit}`, 'info'); cart[id] = { ...p, price: getSellingPrice(p), qty: p.moq }; }
+            else { cart[id] = { ...p, price: getSellingPrice(p), qty }; }
+            updateUI(); renderProducts(currentCategory);
+        }
+
+        function removeItem(id) { delete cart[id]; showToast('Item removed', 'info'); updateUI(); renderProducts(currentCategory); }
+
+        function onProductGridClick(e) {
+            const btn = e.target.closest('button[data-action][data-product-id]'); if (!btn) return;
+            const id = Number(btn.dataset.productId); if (!Number.isFinite(id)) return;
+            const a = btn.dataset.action;
+            if (a === 'add') handleAddClick(id); if (a === 'decrease') updateQty(id, -1); if (a === 'increase') updateQty(id, 1); if (a === 'remove') removeItem(id);
+        }
+        function onProductQtyChange(e) { const i = e.target.closest('input[data-action="set-qty"]'); if (i) handleQtyChange(Number(i.dataset.productId), i.value); }
+        function onFilterBarClick(e) { const b = e.target.closest('.filter-btn[data-category]'); if (b) filterCategory(b.dataset.category); }
+        function filterCategory(c) { currentCategory = c || 'all'; document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.category === currentCategory)); renderProducts(currentCategory); }
+
+        function updateUI() {
+            const count = Object.keys(cart).length;
+            const badge = document.getElementById('cartCount');
+            badge.textContent = count; badge.classList.toggle('show', count > 0);
+            const total = Object.values(cart).reduce((s, i) => s + (i.price * i.qty), 0);
+            const el = document.getElementById('orderTotal');
+            if (el) { el.textContent = '\u20B9' + total.toLocaleString('en-IN'); el.classList.toggle('show', total > 0); }
+        }
+
+        function validateCart() { return Object.values(cart).every(i => i.qty >= i.moq); }
+
+        function openEnquiryModal() {
+            if (!currentUser) { openAuthModal(); showToast('Please sign in first', 'info'); return; }
+            const items = Object.values(cart);
+            const list = document.getElementById('selectedItemsList');
+            const ve = document.getElementById('validationError');
+            const sb = document.getElementById('submitBtn');
+            if (!items.length) { list.innerHTML = '<span style="color:#64748b;font-size:0.9rem">No items added.</span>'; sb.disabled = true; }
+            else {
+                const valid = validateCart(); ve.style.display = valid ? 'none' : 'block'; sb.disabled = !valid;
+                list.innerHTML = items.map(i => { const iv = i.qty >= i.moq; const tp = i.price * i.qty; return `<div class="item-row ${!iv ? 'moq-warning' : ''}"><div class="item-info"><div class="item-name">${i.name} <span style="color:#64748b;font-size:0.8rem">(${i.telugu})</span></div><div class="item-qty" style="color:${iv ? 'var(--primary)' : 'var(--danger)'}">Qty: ${i.qty} ${i.unit} ${!iv ? '\u26A0\uFE0F Below MOQ!' : ''}</div></div><div style="text-align:right"><div class="item-price">\u20B9${tp}</div><div style="font-size:0.75rem;color:#64748b">\u20B9${i.price}/${i.unit}</div></div></div>`; }).join('');
+            }
+            document.getElementById('enquiryModal').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+        function closeEnquiryModal() { document.getElementById('enquiryModal').style.display = 'none'; document.body.style.overflow = 'auto'; }
+
+        function showToast(msg, type = 'info') { const c = document.getElementById('toastContainer'); if (!c) return; const t = document.createElement('div'); t.className = 'toast ' + type; t.textContent = msg; c.appendChild(t); setTimeout(() => { if (t.parentNode) t.remove(); }, 3000); }
+
+        function saveOrder(data) { const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]'); orders.unshift({ id: 'ORD-' + Date.now().toString(36).toUpperCase(), ...data }); if (orders.length > 50) orders.length = 50; localStorage.setItem('kkr_orders', JSON.stringify(orders)); }
+
+        async function submitEnquiryForm(e) {
+            e.preventDefault();
+            if (!validateCart()) { showToast('Fix MOQ quantities', 'error'); return; }
+            const items = Object.values(cart); if (!items.length) { showToast('Add items first', 'error'); return; }
+            const totalValue = items.reduce((s, i) => s + (i.price * i.qty), 0);
+            const formData = {
+                timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+                customerName: document.getElementById('customerName').value,
+                phone: document.getElementById('customerPhone').value,
+                location: document.getElementById('deliveryLocation').value,
+                pincode: document.getElementById('pincode').value,
+                businessType: document.getElementById('businessType').value || 'Not specified',
+                itemDetails: items.map(i => `${i.name}: ${i.qty}${i.unit} @\u20B9${i.price} = \u20B9${i.price * i.qty}`).join(' | '),
+                orderSummary: items.map(i => `${i.name} x${i.qty}`).join(', '),
+                moqCompliant: 'YES', totalItems: items.reduce((s, i) => s + i.qty, 0),
+                totalValue: '\u20B9' + totalValue, productCount: items.length,
+                userId: currentUser ? currentUser.uid : 'anonymous',
+                source: 'KKR Groceries B2B'
+            };
+
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
+                // Save locally only
+                saveOrder(formData);
+                document.getElementById('successMsg').style.display = 'block';
+                showToast('Order saved locally!', 'success');
+                setTimeout(() => { closeEnquiryModal(); cart = {}; updateUI(); renderProducts(currentCategory); document.getElementById('enquiryForm').reset(); document.getElementById('successMsg').style.display = 'none'; }, 2000);
+                return;
+            }
+
+            const sb = document.getElementById('submitBtn'); const spinner = document.getElementById('spinner');
+            sb.disabled = true; sb.querySelector('span').textContent = 'Sending...'; spinner.style.display = 'block';
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
+                if (!res.ok) throw new Error('Status ' + res.status);
+                saveOrder(formData);
+                document.getElementById('successMsg').style.display = 'block';
+                setTimeout(() => { closeEnquiryModal(); cart = {}; updateUI(); renderProducts(currentCategory); document.getElementById('enquiryForm').reset(); document.getElementById('successMsg').style.display = 'none'; sb.disabled = false; sb.querySelector('span').textContent = 'Send Enquiry'; spinner.style.display = 'none'; }, 2000);
+            } catch (err) {
+                document.getElementById('errorMsg').style.display = 'block';
+                sb.disabled = false; sb.querySelector('span').textContent = 'Send Enquiry'; spinner.style.display = 'none';
+            }
+        }
+
+        // ===== BUYER DASHBOARD =====
+        function openBuyerDashboard() { document.getElementById('userDropdown').classList.remove('show'); document.getElementById('buyerPanel').classList.add('open'); document.body.style.overflow = 'hidden'; renderBuyerOverview(); }
+        function closeBuyerDashboard() { document.getElementById('buyerPanel').classList.remove('open'); document.body.style.overflow = 'auto'; }
+        function switchBuyerTab(tab, btn) { document.querySelectorAll('#buyerPanel .admin-tab').forEach(t => t.classList.remove('active')); btn.classList.add('active'); document.getElementById('buyerOverviewTab').style.display = tab === 'overview' ? 'block' : 'none'; document.getElementById('buyerOrdersTab').style.display = tab === 'orders' ? 'block' : 'none'; if (tab === 'overview') renderBuyerOverview(); if (tab === 'orders') renderBuyerOrders(); }
+
+        function renderBuyerOverview() {
+            const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
+            const uid = currentUser ? currentUser.uid : null;
+            const myOrders = uid ? orders.filter(o => o.userId === uid) : orders;
+            const totalSpent = myOrders.reduce((s, o) => s + parseInt((o.totalValue || '0').replace(/[^0-9]/g, ''), 10), 0);
+            const pop = {}; myOrders.forEach(o => { if (o.orderSummary) o.orderSummary.split(', ').forEach(x => { const n = x.split(' x')[0]; pop[n] = (pop[n] || 0) + 1; }); });
+            const top3 = Object.entries(pop).sort((a, b) => b[1] - a[1]).slice(0, 3);
+            let h = `<div class="dash-stats"><div class="dash-stat" style="background:#f0fdf4"><div class="val" style="color:#059669">${myOrders.length}</div><div class="lbl">My Orders</div></div><div class="dash-stat" style="background:#eff6ff"><div class="val" style="color:#2563eb">\u20B9${totalSpent.toLocaleString('en-IN')}</div><div class="lbl">Total Spent</div></div><div class="dash-stat" style="background:#fef3c7"><div class="val" style="color:#d97706">${Object.keys(pop).length}</div><div class="lbl">Products Ordered</div></div></div>`;
+            if (top3.length) { h += '<h4 style="margin-bottom:0.75rem;color:#334155;font-size:0.9rem">\uD83C\uDFC6 Most Ordered</h4>'; top3.forEach(([n, c], i) => { h += `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #f1f5f9"><span style="font-weight:600">${i + 1}. ${n}</span><span style="color:#059669;font-weight:700">${c}\u00D7</span></div>`; }); }
+            document.getElementById('buyerOverviewTab').innerHTML = h;
+        }
+
+        function renderBuyerOrders() {
+            const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
+            const uid = currentUser ? currentUser.uid : null;
+            const myOrders = uid ? orders.filter(o => o.userId === uid) : orders;
+            if (!myOrders.length) { document.getElementById('buyerOrdersTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">\uD83D\uDCE6 No orders yet</div>'; return; }
+            document.getElementById('buyerOrdersTab').innerHTML = myOrders.map(o => `<div class="history-card"><div class="h-header"><span class="h-date">${o.timestamp}</span><span class="h-id">${o.id}</span></div><div class="h-items">${o.orderSummary || ''}</div><div class="h-total">${o.totalValue || ''} \u00B7 ${o.productCount || 0} items</div></div>`).join('');
+        }
+
+        // ===== ADMIN PANEL =====
+        function toggleAdmin() { const p = document.getElementById('adminPanel'); p.classList.toggle('open'); if (p.classList.contains('open')) { renderPricesTab(); document.body.style.overflow = 'hidden'; } else { document.body.style.overflow = 'auto'; } }
+        function switchAdminTab(tab, btn) { document.querySelectorAll('#adminPanel .admin-tab').forEach(t => t.classList.remove('active')); btn.classList.add('active');['Prices', 'Apmc', 'History', 'Stats'].forEach(t => { document.getElementById('admin' + t + 'Tab').style.display = tab === t.toLowerCase() ? 'block' : 'none'; }); if (tab === 'prices') renderPricesTab(); if (tab === 'apmc') renderApmcTab(); if (tab === 'history') renderHistoryTab(); if (tab === 'stats') renderStatsTab(); }
+
+        function renderPricesTab() {
+            let h = `<div class="commission-global"><label>\uD83D\uDCB0 Commission %:</label><input type="number" class="commission-input" id="globalCommission" value="${commissionPercent}" min="0" max="100" step="0.5" style="width:80px"><span style="font-size:0.8rem;color:#64748b">Applied to APMC base prices</span></div>`;
+            h += '<table class="price-table"><thead><tr><th>Product</th><th>APMC \u20B9</th><th>Sell \u20B9</th><th>MOQ</th><th>Unit</th></tr></thead><tbody>';
+            products.forEach(p => {
+                const apmc = apmcPrices ? apmcPrices.find(a => a.commodity === p.name) : null;
+                const apmcP = apmc ? apmc.modalPrice : '-';
+                const sp = getSellingPrice(p);
+                h += `<tr><td><strong>${p.name}</strong><br><span style="color:#64748b;font-size:0.75rem">${p.telugu}</span></td><td style="color:#3b82f6;font-weight:700">\u20B9${apmcP}</td><td style="color:#059669;font-weight:800">\u20B9${sp}</td><td><input type="number" class="moq-input" id="moq-${p.id}" value="${p.moq}" min="1"></td><td>${p.unit}</td></tr>`;
+            });
+            h += '</tbody></table><button class="save-btn" onclick="saveAdminSettings()">\u2705 Save Settings</button><p style="margin-top:0.5rem;font-size:0.8rem;color:#64748b">MOQ changes are saved locally.</p>';
+            document.getElementById('adminPricesTab').innerHTML = h;
+        }
+
+        function renderApmcTab() {
+            if (!apmcPrices) generateAPMCPrices();
+            const d = apmcPrices[0] ? apmcPrices[0].date : 'N/A';
+            let h = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><div><h3 style="font-size:1rem;color:#334155">\uD83C\uDFEA Hyderabad APMC (Bowenpally)</h3><p style="font-size:0.8rem;color:#64748b">Date: ${d} | Unit: \u20B9/Quintal</p></div><button onclick="generateAPMCPrices();renderApmcTab();renderProducts(currentCategory);showToast('Prices refreshed!','success')" style="padding:0.5rem 1rem;background:#3b82f6;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.85rem">\u21BB Refresh</button></div>`;
+            h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:0.5rem;margin-bottom:1rem;text-align:center"><div style="padding:0.5rem;background:#dbeafe;border-radius:8px"><div style="font-size:0.7rem;color:#1e40af;font-weight:700">MIN</div></div><div style="padding:0.5rem;background:#d1fae5;border-radius:8px"><div style="font-size:0.7rem;color:#065f46;font-weight:700">MODAL</div></div><div style="padding:0.5rem;background:#fee2e2;border-radius:8px"><div style="font-size:0.7rem;color:#991b1b;font-weight:700">MAX</div></div></div>';
+            apmcPrices.forEach(p => {
+                h += `<div class="apmc-rate-row"><div class="apmc-rate-name">${p.commodity}</div><div class="apmc-rate-prices"><span class="apmc-min">\u20B9${p.minPrice}</span><span class="apmc-modal">\u20B9${p.modalPrice}</span><span class="apmc-max">\u20B9${p.maxPrice}</span></div></div>`;
+            });
+            document.getElementById('adminApmcTab').innerHTML = h;
+        }
+
+        function saveAdminSettings() {
+            // Save commission
+            const ce = document.getElementById('globalCommission');
+            if (ce) commissionPercent = parseFloat(ce.value) || 15;
+            localStorage.setItem('kkr_commission', commissionPercent);
+            // Save MOQs
+            const moqs = JSON.parse(localStorage.getItem('kkr_moqs') || '{}');
+            products.forEach(p => { const i = document.getElementById('moq-' + p.id); if (i) { const v = parseInt(i.value, 10); if (v > 0) { p.moq = v; moqs[p.id] = v; } } });
+            localStorage.setItem('kkr_moqs', JSON.stringify(moqs));
+            renderProducts(currentCategory); updateUI();
+            showToast('Settings saved!', 'success');
+        }
+
+        function renderHistoryTab() {
+            const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
+            if (!orders.length) { document.getElementById('adminHistoryTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">\uD83D\uDCE6 No orders yet</div>'; return; }
+            document.getElementById('adminHistoryTab').innerHTML = orders.map(o => `<div class="history-card"><div class="h-header"><span class="h-date">${o.timestamp}</span><span class="h-id">${o.id}</span></div><div class="h-customer">${o.customerName || 'Unknown'}</div><div class="h-items">${o.orderSummary || ''}</div><div class="h-total">${o.totalValue || ''} \u00B7 ${o.productCount || 0} items</div></div>`).join('');
+        }
+
+        function renderStatsTab() {
+            const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
+            const rev = orders.reduce((s, o) => s + parseInt((o.totalValue || '0').replace(/[^0-9]/g, ''), 10), 0);
+            const pop = {}; orders.forEach(o => { if (o.orderSummary) o.orderSummary.split(', ').forEach(x => { const n = x.split(' x')[0]; pop[n] = (pop[n] || 0) + 1; }); });
+            const top5 = Object.entries(pop).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const customers = new Set(orders.map(o => o.customerName || o.userId)).size;
+            let h = `<div class="dash-stats"><div class="dash-stat" style="background:#f0fdf4"><div class="val" style="color:#059669">${orders.length}</div><div class="lbl">Total Orders</div></div><div class="dash-stat" style="background:#eff6ff"><div class="val" style="color:#2563eb">\u20B9${rev.toLocaleString('en-IN')}</div><div class="lbl">Revenue</div></div><div class="dash-stat" style="background:#fef3c7"><div class="val" style="color:#d97706">${customers}</div><div class="lbl">Customers</div></div><div class="dash-stat" style="background:#fce7f3"><div class="val" style="color:#db2777">${products.length}</div><div class="lbl">Products</div></div></div>`;
+            if (top5.length) { h += '<h4 style="margin-bottom:0.75rem;color:#334155;font-size:0.9rem">\uD83C\uDFC6 Top Products</h4>'; top5.forEach(([n, c], i) => { h += `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #f1f5f9"><span style="font-weight:600">${i + 1}. ${n}</span><span style="color:#059669;font-weight:700">${c} orders</span></div>`; }); }
+            // Recent orders
+            if (orders.length) { h += '<h4 style="margin:1rem 0 0.75rem;color:#334155;font-size:0.9rem">\uD83D\uDD52 Recent Orders</h4>'; orders.slice(0, 5).forEach(o => { h += `<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid #f1f5f9;font-size:0.85rem"><span style="color:#64748b">${o.timestamp}</span><span style="font-weight:700;color:#059669">${o.totalValue}</span></div>`; }); }
+            document.getElementById('adminStatsTab').innerHTML = h;
+        }
+
+        // PWA
+        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(() => { }); }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Firebase
+firebase-debug.log
+.firebase/
+
+# Build scripts
+*.py
+__pycache__/
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# IDE
+.vscode/
+.idea/
