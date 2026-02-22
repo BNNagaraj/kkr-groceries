@@ -2210,6 +2210,7 @@
         // ===== MAP & LOCATION =====
         function initMap() {
             if (window.deliveryMap) return;
+            L.Icon.Default.imagePath = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/';
             const defaultLoc = [17.4065, 78.4772]; // Hyderabad
             window.deliveryMap = L.map('deliveryMap').setView(defaultLoc, 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(window.deliveryMap);
@@ -2250,33 +2251,39 @@
                 dd.style = 'width:100%;margin-bottom:0.75rem;padding:0.6rem;border:2px solid #e2e8f0;border-radius:8px';
                 dd.addEventListener('change', e => {
                     if (!e.target.value) return; const a = list[e.target.value];
+                    document.getElementById('customerName').value = a.name || '';
+                    document.getElementById('customerPhone').value = a.phone || '';
                     document.getElementById('deliveryLocation').value = a.loc;
                     document.getElementById('pincode').value = a.pin;
-                    if (a.coords && window.deliveryMap) { window.deliveryMap.setView(a.coords, 16); window.deliveryMarker.setLatLng(a.coords); }
+                    if (a.coords && window.deliveryMap) { window.deliveryMap.setView(a.coords, 16); window.deliveryMarker.setLatLng(a.coords); window.deliveryMap.invalidateSize(); }
                 });
-                document.getElementById('deliveryLocation').parentNode.parentNode.insertBefore(dd, document.getElementById('deliveryLocation').parentNode);
+                document.getElementById('customerName').parentNode.parentNode.insertBefore(dd, document.getElementById('customerName').parentNode);
             }
             if (dd) {
-                dd.innerHTML = '<option value="">-- Or choose saved address --</option>' + list.map((a, i) => `<option value="${i}">${a.loc.substring(0, 40)}... (${a.pin})</option>`).join('');
+                dd.innerHTML = '<option value="">-- Choose a saved profile --</option>' + list.map((a, i) => `<option value="${i}">${a.name || 'Profile'} - ${a.loc.substring(0, 30)}... (${a.pin})</option>`).join('');
                 dd.style.display = list.length ? 'block' : 'none';
             }
         }
         function saveAddressIfRequested() {
             if (!currentUser || !document.getElementById('saveAddress').checked) return;
-            const loc = document.getElementById('deliveryLocation').value;
-            const pin = document.getElementById('pincode').value;
-            if (!loc || !pin) return;
+            const name = document.getElementById('customerName').value.trim();
+            const phone = document.getElementById('customerPhone').value.trim();
+            const loc = document.getElementById('deliveryLocation').value.trim();
+            const pin = document.getElementById('pincode').value.trim();
+            if (!loc || !pin || !name || !phone) { showToast('Please completely fill contact info to save profile', 'error'); return; }
+
             const k = 'kkr_addrs_' + currentUser.uid;
             const list = JSON.parse(localStorage.getItem(k) || '[]');
-            const exists = list.some(a => a.loc.toLowerCase() === loc.toLowerCase());
+            const exists = list.some(a => a.loc.toLowerCase() === loc.toLowerCase() && a.name.toLowerCase() === name.toLowerCase() && a.phone === phone);
             if (!exists) {
                 const coords = window.deliveryMarker ? window.deliveryMarker.getLatLng() : null;
-                list.push({ loc, pin, coords });
+                list.push({ name, phone, loc, pin, coords });
                 localStorage.setItem(k, JSON.stringify(list));
+                showToast('Profile and address saved!', 'success');
             }
         }
 
-        function saveOrder(data) { const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]'); orders.unshift({ id: 'ORD-' + Date.now().toString(36).toUpperCase(), ...data }); if (orders.length > 50) orders.length = 50; localStorage.setItem('kkr_orders', JSON.stringify(orders)); }
+        function saveOrder(data) { const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]'); orders.unshift({ id: 'ORD-' + Date.now().toString(36).toUpperCase(), status: 'Pending', ...data }); if (orders.length > 50) orders.length = 50; localStorage.setItem('kkr_orders', JSON.stringify(orders)); }
 
         async function submitEnquiryForm(e) {
             e.preventDefault();
@@ -2356,8 +2363,26 @@
             const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
             const uid = currentUser ? currentUser.uid : null;
             const myOrders = uid ? orders.filter(o => o.userId === uid) : orders;
-            if (!myOrders.length) { document.getElementById('buyerOrdersTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">\uD83D\uDCE6 No orders yet</div>'; return; }
-            document.getElementById('buyerOrdersTab').innerHTML = myOrders.map(o => `<div class="history-card"><div class="h-header"><span class="h-date">${o.timestamp}</span><span class="h-id">${o.id}</span></div><div class="h-items">${o.orderSummary || ''}</div><div class="h-total">${o.totalValue || ''} \u00B7 ${o.productCount || 0} items</div></div>`).join('');
+            if (!myOrders.length) {
+                document.getElementById('buyerOrdersTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">\uD83D\uDCE6 No orders yet</div>'; return;
+            }
+            document.getElementById('buyerOrdersTab').innerHTML = myOrders.map(o => {
+                const sColor = o.status === 'Fulfilled' ? '#10b981' : (o.status === 'Accepted' ? '#3b82f6' : (o.status === 'Rejected' ? '#ef4444' : '#f59e0b'));
+                return `<div class="history-card">
+                    <div class="h-header">
+                        <div>
+                            <span class="h-date">${o.timestamp}</span>
+                            <span class="h-id" style="display:block">${o.id}</span>
+                        </div>
+                        <span style="background:${sColor}20;color:${sColor};padding:0.25rem 0.5rem;border-radius:12px;font-size:0.75rem;font-weight:700">${o.status || 'Pending'}</span>
+                    </div>
+                    <div class="h-items" style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid #f1f5f9">${o.orderSummary || ''}</div>
+                    <div class="h-total" style="display:flex;justify-content:space-between;align-items:center;margin-top:0.5rem">
+                        <span>${o.productCount || 0} items</span>
+                        <span style="font-size:1.1rem;font-weight:800;color:#0f172a">${o.totalValue || ''}</span>
+                    </div>
+                </div>`;
+            }).join('');
         }
 
         function renderBuyerAddresses() {
@@ -2369,7 +2394,8 @@
             document.getElementById('buyerAddressesTab').innerHTML = list.map((a, i) => `
                 <div class="history-card" style="display:flex;justify-content:space-between;align-items:center">
                     <div>
-                        <div style="font-weight:700;color:#0f172a;margin-bottom:0.25rem">${a.loc}</div>
+                        <div style="font-weight:700;color:#0f172a;margin-bottom:0.25rem">${a.name || 'Contact'} <span style="font-weight:400;color:#475569">- ${a.phone || ''}</span></div>
+                        <div style="font-size:0.9rem;color:#334155;margin-bottom:0.25rem">${a.loc}</div>
                         <div style="font-size:0.8rem;color:#64748b">Pincode: ${a.pin}</div>
                     </div>
                     <button onclick="deleteSavedAddress(${i})" style="background:#fee2e2;color:#ef4444;border:none;padding:0.5rem;border-radius:8px;cursor:pointer;font-size:1rem" title="Delete Address">🗑️</button>
@@ -2445,11 +2471,49 @@
             showToast('Settings saved!', 'success');
         }
 
-        function renderHistoryTab() {
+        function updateOrderStatus(id, newStatus) {
             const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
-            if (!orders.length) { document.getElementById('adminHistoryTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">\uD83D\uDCE6 No orders yet</div>'; return; }
-            document.getElementById('adminHistoryTab').innerHTML = orders.map(o => `<div class="history-card"><div class="h-header"><span class="h-date">${o.timestamp}</span><span class="h-id">${o.id}</span></div><div class="h-customer">${o.customerName || 'Unknown'}</div><div class="h-items">${o.orderSummary || ''}</div><div class="h-total">${o.totalValue || ''} \u00B7 ${o.productCount || 0} items</div></div>`).join('');
+            const idx = orders.findIndex(o => o.id === id);
+            if (idx > -1) {
+                orders[idx].status = newStatus;
+                localStorage.setItem('kkr_orders', JSON.stringify(orders));
+                showToast(`Order ${id} marked as ${newStatus}`, 'success');
+                renderOrdersTab();
+            }
         }
+
+        function renderOrdersTab() {
+            const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
+            if (!orders.length) { document.getElementById('adminOrdersTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">\uD83D\uDCE6 No orders yet</div>'; return; }
+            document.getElementById('adminOrdersTab').innerHTML = orders.map(o => {
+                const sColor = o.status === 'Fulfilled' ? '#10b981' : (o.status === 'Accepted' ? '#3b82f6' : (o.status === 'Rejected' ? '#ef4444' : '#f59e0b'));
+                let actions = '';
+                if (o.status === 'Pending' || !o.status) {
+                    actions = `<div style="margin-top:0.5rem;display:flex;gap:0.5rem"><button onclick="updateOrderStatus('${o.id}', 'Accepted')" style="flex:1;background:#3b82f6;color:white;border:none;padding:0.4rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem">Accept</button><button onclick="updateOrderStatus('${o.id}', 'Rejected')" style="flex:1;background:#fee2e2;color:#ef4444;border:none;padding:0.4rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem">Reject</button></div>`;
+                } else if (o.status === 'Accepted') {
+                    actions = `<div style="margin-top:0.5rem"><button onclick="updateOrderStatus('${o.id}', 'Fulfilled')" style="width:100%;background:#10b981;color:white;border:none;padding:0.4rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem">Mark as Fulfilled</button></div>`;
+                }
+
+                return `<div class="history-card">
+                    <div class="h-header" style="align-items:flex-start">
+                        <div>
+                            <span class="h-date">${o.timestamp}</span>
+                            <div class="h-id">${o.id}</div>
+                            <div style="font-size:0.85rem;color:#475569;margin-top:2px">${o.customerName} - ${o.phone}</div>
+                        </div>
+                        <span style="background:${sColor}20;color:${sColor};padding:0.25rem 0.5rem;border-radius:12px;font-size:0.75rem;font-weight:700">${o.status || 'Pending'}</span>
+                    </div>
+                    <div class="h-items" style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid #f1f5f9">${o.orderSummary || ''}</div>
+                    <div class="h-total" style="display:flex;justify-content:space-between;align-items:center;margin-top:0.5rem">
+                        <span>${o.productCount || 0} items</span>
+                        <span style="font-size:1.1rem;font-weight:800;color:#0f172a">${o.totalValue || ''}</span>
+                    </div>
+                    ${actions}
+                </div>`;
+            }).join('');
+        }
+
+        function renderHistoryTab() { document.getElementById('adminHistoryTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">\u23F3 Order history will appear here</div>'; }
 
         function renderStatsTab() {
             const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
@@ -2466,7 +2530,76 @@
 
         // PWA
         if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(() => { }); }
+
+        // ===== GOOGLE MAPS & GEOLOCATION =====
+        let autocomplete;
+        function initMapServices() {
+            const input = document.getElementById('deliveryLocation');
+            if (input && typeof google !== 'undefined') {
+                autocomplete = new google.maps.places.Autocomplete(input, {
+                    componentRestrictions: { country: 'in' }, // Restrict to India
+                    fields: ['formatted_address', 'geometry', 'name'],
+                });
+            }
+        }
+
+        function getCurrentLocation() {
+            const btn = document.getElementById('locateBtn');
+            const input = document.getElementById('deliveryLocation');
+
+            if (!navigator.geolocation) {
+                showToast('Geolocation is not supported by your browser', 'error');
+                return;
+            }
+
+            btn.innerHTML = '⏳ Locating...';
+            btn.disabled = true;
+
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    if (typeof google === 'undefined') {
+                        showToast('Google Maps setup incomplete (Add API Key)', 'error');
+                        btn.innerHTML = '📍 Use Current Location';
+                        btn.disabled = false;
+                        return;
+                    }
+
+                    const latlng = { lat: position.coords.latitude, lng: position.coords.longitude };
+                    const geocoder = new google.maps.Geocoder();
+
+                    try {
+                        const response = await geocoder.geocode({ location: latlng });
+                        if (response.results[0]) {
+                            input.value = response.results[0].formatted_address;
+                            showToast('Location found!', 'success');
+
+                            // Try to auto-fill pincode if possible
+                            const pinComponent = response.results[0].address_components.find(c => c.types.includes('postal_code'));
+                            if (pinComponent) {
+                                document.getElementById('pincode').value = pinComponent.long_name;
+                            }
+                        } else {
+                            showToast('No address found for this location', 'error');
+                        }
+                    } catch (e) {
+                        showToast('Geocoder failed: ' + e.message, 'error');
+                    }
+
+                    btn.innerHTML = '📍 Use Current Location';
+                    btn.disabled = false;
+                },
+                (error) => {
+                    showToast('Unable to retrieve your location', 'error');
+                    btn.innerHTML = '📍 Use Current Location';
+                    btn.disabled = false;
+                },
+                { enableHighAccuracy: true }
+            );
+        }
     </script>
+    <script
+        src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places&callback=initMapServices"
+        async defer></script>
 </body>
 
 </html>
