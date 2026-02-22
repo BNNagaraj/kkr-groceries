@@ -23,6 +23,7 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 
 
@@ -1890,10 +1891,18 @@
         };
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // ===== SECURITY: HTML Escape Utility =====
+        function escapeHTML(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
 
         const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZqsUibqT13ENoo6GKux-WvMXRvC4PpOyjJXH7lIH4SWSWNnq4jntgPPAubnnz3NM81w/exec';
-        const ADMIN_EMAILS = ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com'];
-        function isAdmin() { return currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase()); }
+        const ADMIN_EMAILS = ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com']; // fallback list
+        let _isAdminClaim = false;
+        function isAdmin() { return _isAdminClaim || (currentUser && currentUser.email && ADMIN_EMAILS.includes(currentUser.email.toLowerCase())); }
 
         const products = [
             { id: 1, name: 'Tomato', telugu: '\u0C1F\u0C2E\u0C3E\u0C1F\u0C4B', hindi: 'Tamatar', price: 24, unit: 'kg', moq: 100, category: 'daily', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tomato_je.jpg/220px-Tomato_je.jpg', hot: true },
@@ -1915,17 +1924,27 @@
         let searchTerm = '';
         let currentUser = null;
         let confirmationResult = null;
-        let commissionPercent = parseFloat(localStorage.getItem('kkr_commission') || '15');
+        let commissionPercent = 15;
         let apmcPrices = null;
         let selectedApmcMarket = 'Bowenpally';
 
-        // Load saved prices & MOQ
-        (function loadSaved() {
-            const sp = JSON.parse(localStorage.getItem('kkr_prices') || '{}');
-            const sm = JSON.parse(localStorage.getItem('kkr_moqs') || '{}');
-            Object.entries(sp).forEach(([id, p]) => { const pr = products.find(x => x.id === +id); if (pr) pr.price = p; });
-            Object.entries(sm).forEach(([id, m]) => { const pr = products.find(x => x.id === +id); if (pr) pr.moq = m; });
-        })();
+        // Load settings from Firestore (real-time sync)
+        function loadSettingsFromFirestore() {
+            db.collection('settings').doc('config').onSnapshot(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (data.commission != null) commissionPercent = parseFloat(data.commission);
+                    if (data.moqs) {
+                        Object.entries(data.moqs).forEach(([id, m]) => { const pr = products.find(x => x.id === +id); if (pr) pr.moq = m; });
+                    }
+                    if (data.prices) {
+                        Object.entries(data.prices).forEach(([id, p]) => { const pr = products.find(x => x.id === +id); if (pr) pr.price = p; });
+                    }
+                    renderProducts(currentCategory);
+                    updateUI();
+                }
+            }, err => { console.log('Settings not yet in Firestore, using defaults'); });
+        }
 
         // ===== APMC PRICE ENGINE =====
         function generateAPMCPrices(marketName = 'Bowenpally') {
@@ -1947,7 +1966,7 @@
                 const modal = Math.floor((min + max) / 2);
                 return { commodity: c.name, minPrice: min, maxPrice: Math.min(max, c.bMax), modalPrice: modal, date: d.toISOString().split('T')[0] };
             });
-            localStorage.setItem('kkr_apmc', JSON.stringify({ prices: apmcPrices, date: d.toISOString().split('T')[0] }));
+            // APMC prices are simulated client-side, no need to persist
             return apmcPrices;
         }
 
@@ -1962,7 +1981,7 @@
         }
 
         // ===== FIREBASE AUTH =====
-        auth.onAuthStateChanged(user => {
+        auth.onAuthStateChanged(async user => {
             currentUser = user;
             const loginBtn = document.getElementById('loginBtn');
             const userMenu = document.getElementById('userMenu');
@@ -1982,11 +2001,21 @@
                 if (nameInput && user.displayName) nameInput.value = user.displayName;
                 if (phoneInput && user.phoneNumber) phoneInput.value = user.phoneNumber.replace('+91', '');
 
-                // Show/hide Admin button
+                // Check Firebase Custom Claims for admin
+                try {
+                    const tokenResult = await user.getIdTokenResult();
+                    _isAdminClaim = tokenResult.claims.admin === true;
+                } catch (e) { _isAdminClaim = false; }
+
+                // Show/hide Admin button based on claims
                 if (adminToggle) adminToggle.style.display = isAdmin() ? 'flex' : 'none';
+
+                // Load Firestore settings
+                loadSettingsFromFirestore();
             } else {
                 loginBtn.style.display = 'block';
                 userMenu.style.display = 'none';
+                _isAdminClaim = false;
                 if (adminToggle) adminToggle.style.display = 'none';
             }
         });
@@ -2063,6 +2092,7 @@
             setupEventListeners();
             renderProducts(currentCategory);
             updateUI();
+            loadSettingsFromFirestore();
         });
 
         function setupEventListeners() {
@@ -2216,29 +2246,34 @@
         // ===== MAP & LOCATION (handled by Google Maps at bottom of file) =====
 
         // ===== SAVED ADDRESSES =====
-        function populateSavedAddresses() {
+        async function populateSavedAddresses() {
             if (!currentUser) return;
-            const list = JSON.parse(localStorage.getItem('kkr_addrs_' + currentUser.uid) || '[]');
+            let list = [];
+            try {
+                const snap = await db.collection('users').doc(currentUser.uid).collection('addresses').get();
+                list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            } catch (e) { console.log('No saved addresses yet'); }
             let dd = document.getElementById('savedAddrSelect');
             if (!dd && list.length > 0) {
                 dd = document.createElement('select'); dd.id = 'savedAddrSelect';
                 dd.style = 'width:100%;margin-bottom:0.75rem;padding:0.6rem;border:2px solid #e2e8f0;border-radius:8px';
                 dd.addEventListener('change', e => {
-                    if (!e.target.value) return; const a = list[e.target.value];
+                    if (!e.target.value) return; const a = list[parseInt(e.target.value)];
+                    if (!a) return;
                     document.getElementById('customerName').value = a.name || '';
                     document.getElementById('customerPhone').value = a.phone || '';
-                    document.getElementById('deliveryLocation').value = a.loc;
-                    document.getElementById('pincode').value = a.pin;
+                    document.getElementById('deliveryLocation').value = a.loc || '';
+                    document.getElementById('pincode').value = a.pin || '';
                     if (a.coords && deliveryMap) { const pos = new google.maps.LatLng(a.coords.lat, a.coords.lng); deliveryMap.setCenter(pos); deliveryMap.setZoom(16); deliveryMarker.setPosition(pos); google.maps.event.trigger(deliveryMap, 'resize'); }
                 });
                 document.getElementById('customerName').parentNode.parentNode.insertBefore(dd, document.getElementById('customerName').parentNode);
             }
             if (dd) {
-                dd.innerHTML = '<option value="">-- Choose a saved profile --</option>' + list.map((a, i) => `<option value="${i}">${a.name || 'Profile'} - ${a.loc.substring(0, 30)}... (${a.pin})</option>`).join('');
+                dd.innerHTML = '<option value="">-- Choose a saved profile --</option>' + list.map((a, i) => `<option value="${i}">${escapeHTML(a.name || 'Profile')} - ${escapeHTML((a.loc || '').substring(0, 30))}... (${escapeHTML(a.pin)})</option>`).join('');
                 dd.style.display = list.length ? 'block' : 'none';
             }
         }
-        function saveAddressIfRequested() {
+        async function saveAddressIfRequested() {
             if (!currentUser || !document.getElementById('saveAddress').checked) return;
             const name = document.getElementById('customerName').value.trim();
             const phone = document.getElementById('customerPhone').value.trim();
@@ -2246,18 +2281,22 @@
             const pin = document.getElementById('pincode').value.trim();
             if (!loc || !pin || !name || !phone) { showToast('Please completely fill contact info to save profile', 'error'); return; }
 
-            const k = 'kkr_addrs_' + currentUser.uid;
-            const list = JSON.parse(localStorage.getItem(k) || '[]');
-            const exists = list.some(a => a.loc.toLowerCase() === loc.toLowerCase() && a.name.toLowerCase() === name.toLowerCase() && a.phone === phone);
-            if (!exists) {
+            try {
                 const coords = deliveryMarker ? { lat: deliveryMarker.getPosition().lat(), lng: deliveryMarker.getPosition().lng() } : null;
-                list.push({ name, phone, loc, pin, coords });
-                localStorage.setItem(k, JSON.stringify(list));
+                await db.collection('users').doc(currentUser.uid).collection('addresses').add({ name, phone, loc, pin, coords, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                 showToast('Profile and address saved!', 'success');
-            }
+            } catch (e) { showToast('Failed to save address: ' + e.message, 'error'); }
         }
 
-        function saveOrder(data) { const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]'); orders.unshift({ id: 'ORD-' + Date.now().toString(36).toUpperCase(), status: 'Pending', ...data }); if (orders.length > 50) orders.length = 50; localStorage.setItem('kkr_orders', JSON.stringify(orders)); }
+        async function saveOrder(data) {
+            const orderId = 'ORD-' + Date.now().toString(36).toUpperCase();
+            try {
+                await db.collection('orders').doc(orderId).set({
+                    id: orderId, status: 'Pending', ...data,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } catch (e) { console.error('Failed to save order to Firestore:', e); }
+        }
 
         async function submitEnquiryForm(e) {
             e.preventDefault();
@@ -2321,22 +2360,36 @@
             if (tab === 'addresses') renderBuyerAddresses();
         }
 
-        function renderBuyerOverview() {
-            const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
-            const uid = currentUser ? currentUser.uid : null;
-            const myOrders = uid ? orders.filter(o => o.userId === uid) : orders;
+        async function renderBuyerOverview() {
+            let myOrders = [];
+            try {
+                if (currentUser) {
+                    const snap = await db.collection('orders').where('userId', '==', currentUser.uid).get();
+                    myOrders = snap.docs.map(d => d.data());
+                }
+            } catch (e) { console.log('Error loading buyer orders:', e); }
             const totalSpent = myOrders.reduce((s, o) => s + parseInt((o.totalValue || '0').replace(/[^0-9]/g, ''), 10), 0);
             const pop = {}; myOrders.forEach(o => { if (o.orderSummary) o.orderSummary.split(', ').forEach(x => { const n = x.split(' x')[0]; pop[n] = (pop[n] || 0) + 1; }); });
             const top3 = Object.entries(pop).sort((a, b) => b[1] - a[1]).slice(0, 3);
             let h = `<div class="dash-stats"><div class="dash-stat" style="background:#f0fdf4"><div class="val" style="color:#059669">${myOrders.length}</div><div class="lbl">My Orders</div></div><div class="dash-stat" style="background:#eff6ff"><div class="val" style="color:#2563eb">\u20B9${totalSpent.toLocaleString('en-IN')}</div><div class="lbl">Total Spent</div></div><div class="dash-stat" style="background:#fef3c7"><div class="val" style="color:#d97706">${Object.keys(pop).length}</div><div class="lbl">Products Ordered</div></div></div>`;
-            if (top3.length) { h += '<h4 style="margin-bottom:0.75rem;color:#334155;font-size:0.9rem">\uD83C\uDFC6 Most Ordered</h4>'; top3.forEach(([n, c], i) => { h += `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #f1f5f9"><span style="font-weight:600">${i + 1}. ${n}</span><span style="color:#059669;font-weight:700">${c}\u00D7</span></div>`; }); }
+            if (top3.length) { h += '<h4 style="margin-bottom:0.75rem;color:#334155;font-size:0.9rem">\uD83C\uDFC6 Most Ordered</h4>'; top3.forEach(([n, c], i) => { h += `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #f1f5f9"><span style="font-weight:600">${i + 1}. ${escapeHTML(n)}</span><span style="color:#059669;font-weight:700">${c}\u00D7</span></div>`; }); }
             document.getElementById('buyerOverviewTab').innerHTML = h;
         }
 
-        function renderBuyerOrders() {
-            const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
-            const uid = currentUser ? currentUser.uid : null;
-            const myOrders = uid ? orders.filter(o => o.userId === uid) : orders;
+        async function renderBuyerOrders() {
+            let myOrders = [];
+            try {
+                if (currentUser) {
+                    const snap = await db.collection('orders').where('userId', '==', currentUser.uid).orderBy('createdAt', 'desc').get();
+                    myOrders = snap.docs.map(d => d.data());
+                }
+            } catch (e) {
+                // Index may not exist yet, try without orderBy
+                try {
+                    const snap = await db.collection('orders').where('userId', '==', currentUser.uid).get();
+                    myOrders = snap.docs.map(d => d.data());
+                } catch (e2) { console.log('Error loading buyer orders:', e2); }
+            }
             if (!myOrders.length) {
                 document.getElementById('buyerOrdersTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">\uD83D\uDCE6 No orders yet</div>'; return;
             }
@@ -2345,46 +2398,48 @@
                 return `<div class="history-card">
                     <div class="h-header">
                         <div>
-                            <span class="h-date">${o.timestamp}</span>
-                            <span class="h-id" style="display:block">${o.id}</span>
+                            <span class="h-date">${escapeHTML(o.timestamp)}</span>
+                            <span class="h-id" style="display:block">${escapeHTML(o.id)}</span>
                         </div>
-                        <span style="background:${sColor}20;color:${sColor};padding:0.25rem 0.5rem;border-radius:12px;font-size:0.75rem;font-weight:700">${o.status || 'Pending'}</span>
+                        <span style="background:${sColor}20;color:${sColor};padding:0.25rem 0.5rem;border-radius:12px;font-size:0.75rem;font-weight:700">${escapeHTML(o.status || 'Pending')}</span>
                     </div>
-                    <div class="h-items" style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid #f1f5f9">${o.orderSummary || ''}</div>
+                    <div class="h-items" style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid #f1f5f9">${escapeHTML(o.orderSummary || '')}</div>
                     <div class="h-total" style="display:flex;justify-content:space-between;align-items:center;margin-top:0.5rem">
                         <span>${o.productCount || 0} items</span>
-                        <span style="font-size:1.1rem;font-weight:800;color:#0f172a">${o.totalValue || ''}</span>
+                        <span style="font-size:1.1rem;font-weight:800;color:#0f172a">${escapeHTML(o.totalValue || '')}</span>
                     </div>
                 </div>`;
             }).join('');
         }
 
-        function renderBuyerAddresses() {
+        async function renderBuyerAddresses() {
             if (!currentUser) { document.getElementById('buyerAddressesTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">Please sign in to view addresses</div>'; return; }
-            const k = 'kkr_addrs_' + currentUser.uid;
-            const list = JSON.parse(localStorage.getItem(k) || '[]');
+            let list = [];
+            try {
+                const snap = await db.collection('users').doc(currentUser.uid).collection('addresses').get();
+                list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            } catch (e) { console.log('Error loading addresses:', e); }
             if (!list.length) { document.getElementById('buyerAddressesTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">📍 No saved addresses</div>'; return; }
 
-            document.getElementById('buyerAddressesTab').innerHTML = list.map((a, i) => `
+            document.getElementById('buyerAddressesTab').innerHTML = list.map((a) => `
                 <div class="history-card" style="display:flex;justify-content:space-between;align-items:center">
                     <div>
-                        <div style="font-weight:700;color:#0f172a;margin-bottom:0.25rem">${a.name || 'Contact'} <span style="font-weight:400;color:#475569">- ${a.phone || ''}</span></div>
-                        <div style="font-size:0.9rem;color:#334155;margin-bottom:0.25rem">${a.loc}</div>
-                        <div style="font-size:0.8rem;color:#64748b">Pincode: ${a.pin}</div>
+                        <div style="font-weight:700;color:#0f172a;margin-bottom:0.25rem">${escapeHTML(a.name || 'Contact')} <span style="font-weight:400;color:#475569">- ${escapeHTML(a.phone || '')}</span></div>
+                        <div style="font-size:0.9rem;color:#334155;margin-bottom:0.25rem">${escapeHTML(a.loc)}</div>
+                        <div style="font-size:0.8rem;color:#64748b">Pincode: ${escapeHTML(a.pin)}</div>
                     </div>
-                    <button onclick="deleteSavedAddress(${i})" style="background:#fee2e2;color:#ef4444;border:none;padding:0.5rem;border-radius:8px;cursor:pointer;font-size:1rem" title="Delete Address">🗑️</button>
+                    <button onclick="deleteSavedAddress('${a.id}')" style="background:#fee2e2;color:#ef4444;border:none;padding:0.5rem;border-radius:8px;cursor:pointer;font-size:1rem" title="Delete Address">🗑️</button>
                 </div>
             `).join('');
         }
 
-        function deleteSavedAddress(idx) {
+        async function deleteSavedAddress(addrId) {
             if (!currentUser) return;
-            const k = 'kkr_addrs_' + currentUser.uid;
-            const list = JSON.parse(localStorage.getItem(k) || '[]');
-            list.splice(idx, 1);
-            localStorage.setItem(k, JSON.stringify(list));
-            renderBuyerAddresses();
-            showToast('Address deleted', 'info');
+            try {
+                await db.collection('users').doc(currentUser.uid).collection('addresses').doc(addrId).delete();
+                renderBuyerAddresses();
+                showToast('Address deleted', 'info');
+            } catch (e) { showToast('Failed to delete: ' + e.message, 'error'); }
         }
 
         // ===== ADMIN PANEL =====
@@ -2406,7 +2461,7 @@
                 const sp = getSellingPrice(p);
                 h += `<tr><td><strong>${p.name}</strong><br><span style="color:#64748b;font-size:0.75rem">${p.telugu}</span></td><td style="color:#3b82f6;font-weight:700">\u20B9${apmcP}</td><td style="color:#059669;font-weight:800">\u20B9${sp}</td><td><input type="number" class="moq-input" id="moq-${p.id}" value="${p.moq}" min="1"></td><td>${p.unit}</td></tr>`;
             });
-            h += '</tbody></table><button class="save-btn" onclick="saveAdminSettings()">\u2705 Save Settings</button><p style="margin-top:0.5rem;font-size:0.8rem;color:#64748b">MOQ changes are saved locally.</p>';
+            h += '</tbody></table><button class="save-btn" onclick="saveAdminSettings()">\u2705 Save Settings</button><p style="margin-top:0.5rem;font-size:0.8rem;color:#64748b">Settings are saved to cloud and synced to all users.</p>';
             document.getElementById('adminPricesTab').innerHTML = h;
         }
 
@@ -2432,55 +2487,60 @@
             document.getElementById('adminApmcTab').innerHTML = h;
         }
 
-        function saveAdminSettings() {
+        async function saveAdminSettings() {
             // Save commission
             const ce = document.getElementById('globalCommission');
             if (ce) commissionPercent = parseFloat(ce.value) || 15;
-            localStorage.setItem('kkr_commission', commissionPercent);
             // Save MOQs
-            const moqs = JSON.parse(localStorage.getItem('kkr_moqs') || '{}');
+            const moqs = {};
             products.forEach(p => { const i = document.getElementById('moq-' + p.id); if (i) { const v = parseInt(i.value, 10); if (v > 0) { p.moq = v; moqs[p.id] = v; } } });
-            localStorage.setItem('kkr_moqs', JSON.stringify(moqs));
+            try {
+                await db.collection('settings').doc('config').set({ commission: commissionPercent, moqs: moqs }, { merge: true });
+                showToast('Settings saved to cloud!', 'success');
+            } catch (e) { showToast('Failed to save: ' + e.message, 'error'); }
             renderProducts(currentCategory); updateUI();
-            showToast('Settings saved!', 'success');
         }
 
-        function updateOrderStatus(id, newStatus) {
-            const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
-            const idx = orders.findIndex(o => o.id === id);
-            if (idx > -1) {
-                orders[idx].status = newStatus;
-                localStorage.setItem('kkr_orders', JSON.stringify(orders));
-                showToast(`Order ${id} marked as ${newStatus}`, 'success');
+        async function updateOrderStatus(id, newStatus) {
+            try {
+                await db.collection('orders').doc(id).update({ status: newStatus });
+                showToast(`Order ${escapeHTML(id)} marked as ${escapeHTML(newStatus)}`, 'success');
                 renderOrdersTab();
-            }
+            } catch (e) { showToast('Failed to update: ' + e.message, 'error'); }
         }
 
-        function renderOrdersTab() {
-            const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
+        async function renderOrdersTab() {
+            let orders = [];
+            try {
+                const snap = await db.collection('orders').orderBy('createdAt', 'desc').get();
+                orders = snap.docs.map(d => d.data());
+            } catch (e) {
+                try { const snap = await db.collection('orders').get(); orders = snap.docs.map(d => d.data()); }
+                catch (e2) { console.log('Error loading orders:', e2); }
+            }
             if (!orders.length) { document.getElementById('adminOrdersTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">\uD83D\uDCE6 No orders yet</div>'; return; }
             document.getElementById('adminOrdersTab').innerHTML = orders.map(o => {
                 const sColor = o.status === 'Fulfilled' ? '#10b981' : (o.status === 'Accepted' ? '#3b82f6' : (o.status === 'Rejected' ? '#ef4444' : '#f59e0b'));
                 let actions = '';
                 if (o.status === 'Pending' || !o.status) {
-                    actions = `<div style="margin-top:0.5rem;display:flex;gap:0.5rem"><button onclick="updateOrderStatus('${o.id}', 'Accepted')" style="flex:1;background:#3b82f6;color:white;border:none;padding:0.4rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem">Accept</button><button onclick="updateOrderStatus('${o.id}', 'Rejected')" style="flex:1;background:#fee2e2;color:#ef4444;border:none;padding:0.4rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem">Reject</button></div>`;
+                    actions = `<div style="margin-top:0.5rem;display:flex;gap:0.5rem"><button onclick="updateOrderStatus('${escapeHTML(o.id)}', 'Accepted')" style="flex:1;background:#3b82f6;color:white;border:none;padding:0.4rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem">Accept</button><button onclick="updateOrderStatus('${escapeHTML(o.id)}', 'Rejected')" style="flex:1;background:#fee2e2;color:#ef4444;border:none;padding:0.4rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem">Reject</button></div>`;
                 } else if (o.status === 'Accepted') {
-                    actions = `<div style="margin-top:0.5rem"><button onclick="updateOrderStatus('${o.id}', 'Fulfilled')" style="width:100%;background:#10b981;color:white;border:none;padding:0.4rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem">Mark as Fulfilled</button></div>`;
+                    actions = `<div style="margin-top:0.5rem"><button onclick="updateOrderStatus('${escapeHTML(o.id)}', 'Fulfilled')" style="width:100%;background:#10b981;color:white;border:none;padding:0.4rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem">Mark as Fulfilled</button></div>`;
                 }
 
                 return `<div class="history-card">
                     <div class="h-header" style="align-items:flex-start">
                         <div>
-                            <span class="h-date">${o.timestamp}</span>
-                            <div class="h-id">${o.id}</div>
-                            <div style="font-size:0.85rem;color:#475569;margin-top:2px">${o.customerName} - ${o.phone}</div>
+                            <span class="h-date">${escapeHTML(o.timestamp)}</span>
+                            <div class="h-id">${escapeHTML(o.id)}</div>
+                            <div style="font-size:0.85rem;color:#475569;margin-top:2px">${escapeHTML(o.customerName)} - ${escapeHTML(o.phone)}</div>
                         </div>
-                        <span style="background:${sColor}20;color:${sColor};padding:0.25rem 0.5rem;border-radius:12px;font-size:0.75rem;font-weight:700">${o.status || 'Pending'}</span>
+                        <span style="background:${sColor}20;color:${sColor};padding:0.25rem 0.5rem;border-radius:12px;font-size:0.75rem;font-weight:700">${escapeHTML(o.status || 'Pending')}</span>
                     </div>
-                    <div class="h-items" style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid #f1f5f9">${o.orderSummary || ''}</div>
+                    <div class="h-items" style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid #f1f5f9">${escapeHTML(o.orderSummary || '')}</div>
                     <div class="h-total" style="display:flex;justify-content:space-between;align-items:center;margin-top:0.5rem">
                         <span>${o.productCount || 0} items</span>
-                        <span style="font-size:1.1rem;font-weight:800;color:#0f172a">${o.totalValue || ''}</span>
+                        <span style="font-size:1.1rem;font-weight:800;color:#0f172a">${escapeHTML(o.totalValue || '')}</span>
                     </div>
                     ${actions}
                 </div>`;
@@ -2489,16 +2549,19 @@
 
         function renderHistoryTab() { document.getElementById('adminHistoryTab').innerHTML = '<div style="text-align:center;color:#94a3b8;padding:2rem">\u23F3 Order history will appear here</div>'; }
 
-        function renderStatsTab() {
-            const orders = JSON.parse(localStorage.getItem('kkr_orders') || '[]');
+        async function renderStatsTab() {
+            let orders = [];
+            try {
+                const snap = await db.collection('orders').get();
+                orders = snap.docs.map(d => d.data());
+            } catch (e) { console.log('Error loading stats:', e); }
             const rev = orders.reduce((s, o) => s + parseInt((o.totalValue || '0').replace(/[^0-9]/g, ''), 10), 0);
             const pop = {}; orders.forEach(o => { if (o.orderSummary) o.orderSummary.split(', ').forEach(x => { const n = x.split(' x')[0]; pop[n] = (pop[n] || 0) + 1; }); });
             const top5 = Object.entries(pop).sort((a, b) => b[1] - a[1]).slice(0, 5);
             const customers = new Set(orders.map(o => o.customerName || o.userId)).size;
             let h = `<div class="dash-stats"><div class="dash-stat" style="background:#f0fdf4"><div class="val" style="color:#059669">${orders.length}</div><div class="lbl">Total Orders</div></div><div class="dash-stat" style="background:#eff6ff"><div class="val" style="color:#2563eb">\u20B9${rev.toLocaleString('en-IN')}</div><div class="lbl">Revenue</div></div><div class="dash-stat" style="background:#fef3c7"><div class="val" style="color:#d97706">${customers}</div><div class="lbl">Customers</div></div><div class="dash-stat" style="background:#fce7f3"><div class="val" style="color:#db2777">${products.length}</div><div class="lbl">Products</div></div></div>`;
-            if (top5.length) { h += '<h4 style="margin-bottom:0.75rem;color:#334155;font-size:0.9rem">\uD83C\uDFC6 Top Products</h4>'; top5.forEach(([n, c], i) => { h += `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #f1f5f9"><span style="font-weight:600">${i + 1}. ${n}</span><span style="color:#059669;font-weight:700">${c} orders</span></div>`; }); }
-            // Recent orders
-            if (orders.length) { h += '<h4 style="margin:1rem 0 0.75rem;color:#334155;font-size:0.9rem">\uD83D\uDD52 Recent Orders</h4>'; orders.slice(0, 5).forEach(o => { h += `<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid #f1f5f9;font-size:0.85rem"><span style="color:#64748b">${o.timestamp}</span><span style="font-weight:700;color:#059669">${o.totalValue}</span></div>`; }); }
+            if (top5.length) { h += '<h4 style="margin-bottom:0.75rem;color:#334155;font-size:0.9rem">\uD83C\uDFC6 Top Products</h4>'; top5.forEach(([n, c], i) => { h += `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #f1f5f9"><span style="font-weight:600">${i + 1}. ${escapeHTML(n)}</span><span style="color:#059669;font-weight:700">${c} orders</span></div>`; }); }
+            if (orders.length) { h += '<h4 style="margin:1rem 0 0.75rem;color:#334155;font-size:0.9rem">\uD83D\uDD52 Recent Orders</h4>'; orders.slice(0, 5).forEach(o => { h += `<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid #f1f5f9;font-size:0.85rem"><span style="color:#64748b">${escapeHTML(o.timestamp)}</span><span style="font-weight:700;color:#059669">${escapeHTML(o.totalValue)}</span></div>`; }); }
             document.getElementById('adminStatsTab').innerHTML = h;
         }
 
