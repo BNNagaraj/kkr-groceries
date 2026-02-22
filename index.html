@@ -24,9 +24,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
-    <!-- Leaflet Location Map -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 
     <style>
         * {
@@ -1709,11 +1707,19 @@
                             <button type="button" onclick="getCurrentLocation()" id="locateBtn" class="locate-btn"
                                 style="width:100%;padding:0.75rem;background:#f8fafc;border:none;border-bottom:1px solid #e2e8f0;color:#059669;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.5rem">📍
                                 Use Current Location</button>
-                            <div id="deliveryMap" style="height:200px;background:#f1f5f9;width:100%"></div>
+                            <div id="deliveryMap" style="height:220px;width:100%;position:relative">
+                                <div
+                                    style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#94a3b8;font-size:0.85rem;text-align:center;z-index:0">
+                                    🗺️ Loading Map...</div>
+                            </div>
+                            <div
+                                style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0.75rem;background:#f0fdf4;border-top:1px solid #e2e8f0;font-size:0.75rem;color:#059669;font-weight:600">
+                                <span>📌</span> <span id="mapHint">Type address below or click/drag pin on map</span>
+                            </div>
                             <input type="text" id="deliveryLocation" required
-                                placeholder="Full Address / Area in Hyderabad"
-                                style="border:none;border-radius:0;border-top:1px solid #e2e8f0"
-                                autocomplete="street-address">
+                                placeholder="Search address... e.g. Madhapur, Hyderabad"
+                                style="border:none;border-radius:0;border-top:1px solid #e2e8f0;padding:0.85rem 0.75rem;font-size:0.95rem"
+                                autocomplete="off">
                         </div>
                     </div>
                     <div class="form-group"
@@ -2200,46 +2206,14 @@
             }
             populateSavedAddresses();
             document.getElementById('enquiryModal').style.display = 'flex';
-            setTimeout(() => { if (!window.deliveryMap) initMap(); else window.deliveryMap.invalidateSize(); }, 300);
+            setTimeout(() => { initDeliveryMap(); }, 300);
             document.body.style.overflow = 'hidden';
         }
         function closeEnquiryModal() { document.getElementById('enquiryModal').style.display = 'none'; document.body.style.overflow = 'auto'; }
 
         function showToast(msg, type = 'info') { const c = document.getElementById('toastContainer'); if (!c) return; const t = document.createElement('div'); t.className = 'toast ' + type; t.textContent = msg; c.appendChild(t); setTimeout(() => { if (t.parentNode) t.remove(); }, 3000); }
 
-        // ===== MAP & LOCATION =====
-        function initMap() {
-            if (window.deliveryMap) return;
-            L.Icon.Default.imagePath = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/';
-            const defaultLoc = [17.4065, 78.4772]; // Hyderabad
-            window.deliveryMap = L.map('deliveryMap').setView(defaultLoc, 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(window.deliveryMap);
-            window.deliveryMarker = L.marker(defaultLoc, { draggable: true }).addTo(window.deliveryMap);
-            window.deliveryMarker.on('dragend', function (e) { reverseGeocode(e.target.getLatLng()); });
-            window.deliveryMap.on('click', function (e) { window.deliveryMarker.setLatLng(e.latlng); reverseGeocode(e.latlng); });
-        }
-        function getCurrentLocation() {
-            const btn = document.getElementById('locateBtn'); btn.textContent = '📍 Locating...'; btn.disabled = true;
-            if (!navigator.geolocation) { showToast('Geolocation not supported', 'error'); btn.textContent = '📍 Use Current Location'; btn.disabled = false; return; }
-            navigator.geolocation.getCurrentPosition(pos => {
-                const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                initMap(); window.deliveryMap.setView(latlng, 16); window.deliveryMarker.setLatLng(latlng);
-                reverseGeocode(latlng);
-                btn.textContent = '📍 Use Current Location'; btn.disabled = false;
-            }, err => {
-                showToast('Location access denied', 'error'); btn.textContent = '📍 Use Current Location'; btn.disabled = false;
-            });
-        }
-        async function reverseGeocode(latlng) {
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=18&addressdetails=1`);
-                const data = await res.json();
-                if (data && data.display_name) {
-                    document.getElementById('deliveryLocation').value = data.display_name;
-                    if (data.address && data.address.postcode) document.getElementById('pincode').value = data.address.postcode;
-                }
-            } catch (e) { console.error('Geocode err', e); showToast('Failed to auto-fetch address details', 'error'); }
-        }
+        // ===== MAP & LOCATION (handled by Google Maps at bottom of file) =====
 
         // ===== SAVED ADDRESSES =====
         function populateSavedAddresses() {
@@ -2255,7 +2229,7 @@
                     document.getElementById('customerPhone').value = a.phone || '';
                     document.getElementById('deliveryLocation').value = a.loc;
                     document.getElementById('pincode').value = a.pin;
-                    if (a.coords && window.deliveryMap) { window.deliveryMap.setView(a.coords, 16); window.deliveryMarker.setLatLng(a.coords); window.deliveryMap.invalidateSize(); }
+                    if (a.coords && deliveryMap) { const pos = new google.maps.LatLng(a.coords.lat, a.coords.lng); deliveryMap.setCenter(pos); deliveryMap.setZoom(16); deliveryMarker.setPosition(pos); google.maps.event.trigger(deliveryMap, 'resize'); }
                 });
                 document.getElementById('customerName').parentNode.parentNode.insertBefore(dd, document.getElementById('customerName').parentNode);
             }
@@ -2276,7 +2250,7 @@
             const list = JSON.parse(localStorage.getItem(k) || '[]');
             const exists = list.some(a => a.loc.toLowerCase() === loc.toLowerCase() && a.name.toLowerCase() === name.toLowerCase() && a.phone === phone);
             if (!exists) {
-                const coords = window.deliveryMarker ? window.deliveryMarker.getLatLng() : null;
+                const coords = deliveryMarker ? { lat: deliveryMarker.getPosition().lat(), lng: deliveryMarker.getPosition().lng() } : null;
                 list.push({ name, phone, loc, pin, coords });
                 localStorage.setItem(k, JSON.stringify(list));
                 showToast('Profile and address saved!', 'success');
@@ -2531,24 +2505,136 @@
         // PWA
         if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(() => { }); }
 
-        // ===== GOOGLE MAPS & GEOLOCATION =====
-        let autocomplete;
+        // ===== INTERACTIVE GOOGLE MAP =====
+        let deliveryMap, deliveryMarker, autocomplete, geocoder;
+        const HYDERABAD = { lat: 17.385, lng: 78.4867 };
+
+        // Called when Google Maps SDK loads — only sets up autocomplete (input is always visible when needed)
         function initMapServices() {
+            if (typeof google === 'undefined') return;
+            geocoder = new google.maps.Geocoder();
+
+            // Places Autocomplete on the text input
             const input = document.getElementById('deliveryLocation');
-            if (input && typeof google !== 'undefined') {
+            if (input) {
                 autocomplete = new google.maps.places.Autocomplete(input, {
-                    componentRestrictions: { country: 'in' }, // Restrict to India
-                    fields: ['formatted_address', 'geometry', 'name'],
+                    componentRestrictions: { country: 'in' },
+                    fields: ['formatted_address', 'geometry', 'address_components', 'name'],
+                });
+
+                // When user selects an autocomplete suggestion → move map + marker
+                autocomplete.addListener('place_changed', function () {
+                    const place = autocomplete.getPlace();
+                    if (!place.geometry || !place.geometry.location) {
+                        showToast('Could not find that place, try again', 'error');
+                        return;
+                    }
+                    const loc = place.geometry.location;
+                    if (deliveryMap && deliveryMarker) {
+                        deliveryMap.setCenter(loc);
+                        deliveryMap.setZoom(16);
+                        deliveryMarker.setPosition(loc);
+                        deliveryMarker.setAnimation(google.maps.Animation.DROP);
+                    }
+                    input.value = place.formatted_address || place.name;
+                    extractPincode(place.address_components);
+                    updateMapHint(place.formatted_address || place.name);
                 });
             }
         }
 
+        // Called when modal opens — creates the actual map (lazy initialization)
+        function initDeliveryMap() {
+            if (typeof google === 'undefined') return;
+            const mapDiv = document.getElementById('deliveryMap');
+            if (!mapDiv) return;
+
+            if (deliveryMap) {
+                // Map already exists, just trigger resize
+                google.maps.event.trigger(deliveryMap, 'resize');
+                deliveryMap.setCenter(deliveryMarker.getPosition());
+                return;
+            }
+
+            // First time: create map now that the modal is visible
+            deliveryMap = new google.maps.Map(mapDiv, {
+                center: HYDERABAD,
+                zoom: 12,
+                mapTypeControl: false,
+                streetViewControl: false,
+                fullscreenControl: false,
+                zoomControl: true,
+                styles: [
+                    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+                    { featureType: 'transit', stylers: [{ visibility: 'off' }] }
+                ]
+            });
+
+            // Draggable marker
+            deliveryMarker = new google.maps.Marker({
+                position: HYDERABAD,
+                map: deliveryMap,
+                draggable: true,
+                animation: google.maps.Animation.DROP,
+                title: 'Drag me to your delivery location'
+            });
+
+            // When the user DRAGS the marker → reverse-geocode to fill the address
+            deliveryMarker.addListener('dragend', function () {
+                const pos = deliveryMarker.getPosition();
+                reverseGeocode({ lat: pos.lat(), lng: pos.lng() });
+            });
+
+            // When the user CLICKS on the map → move marker + reverse-geocode
+            deliveryMap.addListener('click', function (e) {
+                const pos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+                deliveryMarker.setPosition(pos);
+                deliveryMarker.setAnimation(google.maps.Animation.DROP);
+                reverseGeocode(pos);
+            });
+        }
+
+        // Helper: reverse-geocode a lat/lng and update the input + pincode
+        async function reverseGeocode(latlng) {
+            if (!geocoder) return;
+            const input = document.getElementById('deliveryLocation');
+            try {
+                const response = await geocoder.geocode({ location: latlng });
+                if (response.results && response.results[0]) {
+                    input.value = response.results[0].formatted_address;
+                    extractPincode(response.results[0].address_components);
+                    updateMapHint(response.results[0].formatted_address);
+                }
+            } catch (e) {
+                showToast('Could not resolve address', 'error');
+            }
+        }
+
+        // Helper: extract pincode from address_components
+        function extractPincode(components) {
+            if (!components) return;
+            const pin = components.find(c => c.types.includes('postal_code'));
+            if (pin) document.getElementById('pincode').value = pin.long_name;
+        }
+
+        // Helper: update the hint strip below the map
+        function updateMapHint(addr) {
+            const hint = document.getElementById('mapHint');
+            if (hint && addr) {
+                const short = addr.length > 50 ? addr.substring(0, 50) + '...' : addr;
+                hint.textContent = '✅ ' + short;
+            }
+        }
+
+        // "Use Current Location" button
         function getCurrentLocation() {
             const btn = document.getElementById('locateBtn');
-            const input = document.getElementById('deliveryLocation');
-
             if (!navigator.geolocation) {
                 showToast('Geolocation is not supported by your browser', 'error');
+                return;
+            }
+            if (typeof google === 'undefined') {
+                showToast('Google Maps not loaded. Check your API Key.', 'error');
                 return;
             }
 
@@ -2556,49 +2642,28 @@
             btn.disabled = true;
 
             navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                    if (typeof google === 'undefined') {
-                        showToast('Google Maps setup incomplete (Add API Key)', 'error');
-                        btn.innerHTML = '📍 Use Current Location';
-                        btn.disabled = false;
-                        return;
-                    }
-
-                    const latlng = { lat: position.coords.latitude, lng: position.coords.longitude };
-                    const geocoder = new google.maps.Geocoder();
-
-                    try {
-                        const response = await geocoder.geocode({ location: latlng });
-                        if (response.results[0]) {
-                            input.value = response.results[0].formatted_address;
-                            showToast('Location found!', 'success');
-
-                            // Try to auto-fill pincode if possible
-                            const pinComponent = response.results[0].address_components.find(c => c.types.includes('postal_code'));
-                            if (pinComponent) {
-                                document.getElementById('pincode').value = pinComponent.long_name;
-                            }
-                        } else {
-                            showToast('No address found for this location', 'error');
-                        }
-                    } catch (e) {
-                        showToast('Geocoder failed: ' + e.message, 'error');
-                    }
-
+                (position) => {
+                    const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
+                    deliveryMap.setCenter(pos);
+                    deliveryMap.setZoom(16);
+                    deliveryMarker.setPosition(pos);
+                    deliveryMarker.setAnimation(google.maps.Animation.DROP);
+                    reverseGeocode(pos);
+                    showToast('Location found!', 'success');
                     btn.innerHTML = '📍 Use Current Location';
                     btn.disabled = false;
                 },
                 (error) => {
-                    showToast('Unable to retrieve your location', 'error');
+                    showToast('Unable to retrieve your location. Please allow location access.', 'error');
                     btn.innerHTML = '📍 Use Current Location';
                     btn.disabled = false;
                 },
-                { enableHighAccuracy: true }
+                { enableHighAccuracy: true, timeout: 10000 }
             );
         }
     </script>
     <script
-        src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places&callback=initMapServices"
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCcVIg-biOWJHDatqjifBLeHdchX95ncwc&libraries=places&callback=initMapServices"
         async defer></script>
 </body>
 
