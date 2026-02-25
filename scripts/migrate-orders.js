@@ -1,5 +1,5 @@
 /**
- * Migration Script: Update existing orders with buyer details
+ * Migration Script: Update existing orders with buyer details and status timestamps
  * 
  * This script fetches all existing orders and updates them with:
  * - customerName (from user profile)
@@ -8,6 +8,10 @@
  * - pincode (extracted from address or set to 'N/A')
  * - userEmail (copied from order or fetched from user)
  * - userPhone (from user profile)
+ * - placedAt (from createdAt or timestamp)
+ * - acceptedAt (for Accepted/Fulfilled orders)
+ * - shippedAt (for Fulfilled orders)
+ * - deliveredAt (for Fulfilled orders)
  * 
  * Usage: node scripts/migrate-orders.js
  */
@@ -186,6 +190,61 @@ async function migrateOrders() {
                         updates.pincode = extractedPin;
                     } else {
                         updates.pincode = 'N/A';
+                    }
+                }
+                
+                // Set up status timestamps for workflow tracking
+                // placedAt - use existing createdAt, timestamp, or current time
+                if (!order.placedAt) {
+                    if (order.createdAt) {
+                        updates.placedAt = order.createdAt;
+                    } else if (order.timestamp) {
+                        updates.placedAt = admin.firestore.Timestamp.fromDate(new Date(order.timestamp));
+                    }
+                }
+                
+                // acceptedAt - for Accepted/Fulfilled orders, estimate if not present
+                if (!order.acceptedAt && (order.status === 'Accepted' || order.status === 'Fulfilled')) {
+                    // Use placedAt + 1 hour as estimate, or current time as fallback
+                    if (updates.placedAt || order.placedAt || order.createdAt) {
+                        const baseTime = (updates.placedAt || order.placedAt || order.createdAt).toDate 
+                            ? (updates.placedAt || order.placedAt || order.createdAt).toDate() 
+                            : new Date(order.timestamp);
+                        baseTime.setHours(baseTime.getHours() + 1);
+                        updates.acceptedAt = admin.firestore.Timestamp.fromDate(baseTime);
+                    }
+                }
+                
+                // shippedAt - for Fulfilled orders
+                if (!order.shippedAt && order.status === 'Fulfilled') {
+                    // Use acceptedAt + 2 hours as estimate, or placedAt + 3 hours
+                    const baseTime = (updates.acceptedAt || order.acceptedAt || updates.placedAt || order.placedAt || order.createdAt)?.toDate 
+                        ? (updates.acceptedAt || order.acceptedAt || updates.placedAt || order.placedAt || order.createdAt).toDate()
+                        : new Date(order.timestamp);
+                    if (baseTime) {
+                        baseTime.setHours(baseTime.getHours() + (updates.acceptedAt || order.acceptedAt ? 2 : 3));
+                        updates.shippedAt = admin.firestore.Timestamp.fromDate(baseTime);
+                    }
+                }
+                
+                // deliveredAt (fulfilledAt) - for Fulfilled orders
+                if (!order.deliveredAt && !order.fulfilledAt && order.status === 'Fulfilled') {
+                    // Use shippedAt + 2 hours as estimate, or placedAt + 5 hours
+                    const baseTime = (updates.shippedAt || order.shippedAt || updates.acceptedAt || order.acceptedAt || updates.placedAt || order.placedAt || order.createdAt)?.toDate
+                        ? (updates.shippedAt || order.shippedAt || updates.acceptedAt || order.acceptedAt || updates.placedAt || order.placedAt || order.createdAt).toDate()
+                        : new Date(order.timestamp);
+                    if (baseTime) {
+                        baseTime.setHours(baseTime.getHours() + (updates.shippedAt || order.shippedAt ? 2 : 5));
+                        updates.deliveredAt = admin.firestore.Timestamp.fromDate(baseTime);
+                    }
+                }
+                
+                // rejectedAt - for Rejected orders
+                if (!order.rejectedAt && order.status === 'Rejected') {
+                    if (order.createdAt) {
+                        updates.rejectedAt = order.createdAt;
+                    } else if (order.timestamp) {
+                        updates.rejectedAt = admin.firestore.Timestamp.fromDate(new Date(order.timestamp));
                     }
                 }
                 

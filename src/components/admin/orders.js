@@ -18,6 +18,72 @@ let originalCartData = [];
 let adminOrderFilterState = 'all';
 
 /**
+ * Format timestamp for display (handles Firestore timestamps and ISO strings)
+ * @param {any} timestamp - Firestore timestamp or ISO string
+ * @returns {string} Formatted date/time string
+ */
+function formatStatusTime(timestamp) {
+    if (!timestamp) return '';
+    try {
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        return date.toLocaleString('en-IN', { 
+            day: 'numeric', 
+            month: 'short', 
+            year: 'numeric',
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true 
+        });
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * Render status timeline for admin view
+ * @param {Object} o - Order object
+ * @returns {string} HTML for status timeline
+ */
+function renderAdminStatusTimeline(o) {
+    const statuses = [
+        { key: 'placed', label: 'Placed', time: o.placedAt || o.createdAt },
+        { key: 'accepted', label: 'Accepted', time: o.acceptedAt },
+        { key: 'shipped', label: 'Shipped', time: o.shippedAt },
+        { key: 'delivered', label: 'Delivered', time: o.deliveredAt || o.fulfilledAt }
+    ];
+    
+    // For rejected orders
+    if (o.status === 'Rejected') {
+        return `<div style="margin-top:6px;padding:4px 8px;background:#fee2e2;border-radius:4px;font-size:0.75rem;color:#dc2626">
+            ❌ Rejected ${o.rejectedAt ? `on ${formatStatusTime(o.rejectedAt)}` : ''}
+        </div>`;
+    }
+    
+    // Build timeline showing completed and pending steps
+    const timelineItems = statuses.map(s => {
+        const timeStr = formatStatusTime(s.time);
+        if (!timeStr) {
+            // Future step (not yet completed)
+            return `<span style="color:#cbd5e1;font-size:0.7rem">→ ${s.label}</span>`;
+        }
+        // Completed step
+        const isActive = s.key.toLowerCase() === (o.status || 'pending').toLowerCase() ||
+                        (s.key === 'delivered' && o.status === 'Fulfilled');
+        const color = isActive ? '#059669' : '#64748b';
+        const bg = isActive ? '#d1fae5' : '#f1f5f9';
+        return `<span style="background:${bg};color:${color};padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:500;white-space:nowrap">
+            ✓ ${s.label}: ${timeStr}
+        </span>`;
+    }).filter(Boolean);
+    
+    if (timelineItems.length <= 1) return ''; // Don't show if only placed
+    
+    return `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+        ${timelineItems.join('')}
+    </div>`;
+}
+
+/**
  * Render the orders management tab
  */
 export async function renderOrdersTab() {
@@ -136,6 +202,9 @@ export async function renderOrdersTab() {
 
         // Order ID with blue background style
         const orderIdStyle = `background:#e0e7ff;color:#4338ca;padding:2px 8px;border-radius:4px;font-size:0.85rem;font-weight:600;font-family:monospace;display:inline-block;margin-top:2px`;
+        
+        // Status timeline for admin
+        const statusTimeline = renderAdminStatusTimeline(o);
 
         return `<div class="history-card">
             <div class="h-header" style="align-items:flex-start">
@@ -144,6 +213,7 @@ export async function renderOrdersTab() {
                     <div style="${orderIdStyle}">${escapeHTML(o.id)}</div>
                     ${buyerInfo}
                     ${loc}
+                    ${statusTimeline}
                 </div>
                 <span style="background:${sColor}20;color:${sColor};padding:0.25rem 0.75rem;border-radius:12px;font-size:0.75rem;font-weight:700;flex-shrink:0;margin-left:8px">${escapeHTML(statusText)}</span>
                 ${hasPendingMod ? `<div style="margin-top:0.25rem;font-size:0.7rem;color:#f97316;background:#fff7ed;padding:0.2rem 0.4rem;border-radius:4px;border:1px solid #fed7aa;">⏳ Waiting for buyer approval</div>` : ''}

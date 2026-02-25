@@ -151,7 +151,14 @@ export async function renderBuyerOrders() {
                       (o.status === 'Rejected' ? '#ef4444' : 
                       (hasPendingMod ? '#f97316' : '#f59e0b')));
         const statusText = hasPendingMod ? 'Modification Pending' : (o.status || 'Pending');
-        const timelineHtml = renderOrderTimeline(o.status, o.timeline);
+        // Build timeline from status timestamps
+        const timeline = {
+            placed: o.placedAt || o.createdAt || o.timestamp,
+            accepted: o.acceptedAt,
+            shipped: o.shippedAt,
+            fulfilled: o.deliveredAt || o.fulfilledAt
+        };
+        const timelineHtml = renderOrderTimeline(o.status, timeline);
         
         // Pending modification UI
         let pendingModHtml = '';
@@ -439,8 +446,10 @@ function renderOrderTimeline(status, timeline = {}) {
 
 function formatTimelineTime(timestamp) {
     if (!timestamp) return '';
-    const date = new Date(timestamp);
-    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const dateStr = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' });
+    const timeStr = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${dateStr}, ${timeStr}`;
 }
 
 // Reorder functionality

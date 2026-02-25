@@ -14,11 +14,14 @@ import { logError } from '../utils/errorHandler.js';
 export async function saveOrder(data) {
     const orderId = 'ORD-' + Date.now().toString(36).toUpperCase();
     try {
+        const now = firebase.firestore.FieldValue.serverTimestamp();
         await db.collection('orders').doc(orderId).set({
             id: orderId,
             status: 'Pending',
             ...data,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            placedAt: now,           // Timestamp when order was placed
+            createdAt: now,
+            updatedAt: now
         });
         return orderId;
     } catch (error) {
@@ -28,7 +31,17 @@ export async function saveOrder(data) {
 }
 
 /**
- * Update order status
+ * Status timestamp field mapping
+ */
+const STATUS_TIMESTAMP_FIELDS = {
+    'Pending': 'placedAt',
+    'Accepted': 'acceptedAt',
+    'Fulfilled': 'deliveredAt',
+    'Rejected': 'rejectedAt'
+};
+
+/**
+ * Update order status with timestamp tracking
  * @param {string} id - Order ID
  * @param {string} newStatus - New status (Pending, Accepted, Fulfilled, Rejected)
  * @returns {Promise<boolean>}
@@ -41,10 +54,23 @@ export async function updateOrderStatus(id, newStatus) {
     }
 
     try {
-        await db.collection('orders').doc(id).update({
+        const updates = {
             status: newStatus,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        };
+        
+        // Add timestamp for this status change
+        const timestampField = STATUS_TIMESTAMP_FIELDS[newStatus];
+        if (timestampField) {
+            updates[timestampField] = firebase.firestore.FieldValue.serverTimestamp();
+        }
+        
+        // If status is Fulfilled, also set shippedAt if not already set
+        if (newStatus === 'Fulfilled' && !updates.shippedAt) {
+            updates.shippedAt = firebase.firestore.FieldValue.serverTimestamp();
+        }
+        
+        await db.collection('orders').doc(id).update(updates);
         return true;
     } catch (error) {
         logError(error, 'updateOrderStatus');
