@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -14,7 +14,7 @@
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#x1F96C;</text></svg>">
     <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>KKR Groceries | Hyderabad B2B Vegetable Wholesale</title>
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Noto+Sans+Telugu:wght@400;700&display=swap"
@@ -24,10 +24,16 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.js"></script>
+
+    <!-- Cropper.js -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 
 
 
-    
 </head>
 
 <body>
@@ -58,14 +64,14 @@
                     </div>
                 </div>
                 <button class="enquiry-btn" id="openEnquiryBtn" type="button">
-                    <span>Enquiry</span>
+                    <span>Send Order Request</span>
                     <span id="cartCount" class="cart-count">0</span>
                 </button>
             </div>
         </div>
     </header>
 
-    <main class="main-container">
+    <main id="app" class="main-container">
         <div class="moq-notice"><span>📦</span><span>B2B Wholesale Only: Minimum Order Quantities (MOQ) Apply</span>
         </div>
         <div class="filter-wrapper">
@@ -78,13 +84,29 @@
         </div>
         <div style="padding:0 0.75rem;margin-bottom:1rem">
             <div style="position:relative">
-                <input type="text" id="searchInput" placeholder="Search vegetables... (English, Telugu, Hindi)"
+                <input type="text" id="searchInput" name="searchInput"
+                    placeholder="Search vegetables... (English, Telugu, Hindi)" aria-label="Search products"
                     style="width:100%;padding:0.875rem 1rem 0.875rem 2.75rem;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;font-family:inherit;background:white;appearance:none;-webkit-appearance:none"
                     oninput="handleSearch(this.value)">
                 <span
                     style="position:absolute;left:0.875rem;top:50%;transform:translateY(-50%);font-size:1.1rem;opacity:0.5">🔍</span>
             </div>
         </div>
+
+        <!-- Listing Controls -->
+        <div class="listing-controls">
+            <div class="sort-wrapper">
+                <select id="sortSelect" name="sortSelect" onchange="setSort(this.value)" class="sort-select"
+                    aria-label="Sort products">
+                    <option value="popular">\ud83d\udd25 Popular</option>
+                    <option value="price-low">\u20b9 Price: Low to High</option>
+                    <option value="price-high">\u20b9 Price: High to Low</option>
+                    <option value="name">A-Z Name</option>
+                </select>
+            </div>
+            <div class="results-count" id="resultsCount"></div>
+        </div>
+
         <div class="products-grid" id="productsGrid"></div>
     </main>
 
@@ -93,7 +115,7 @@
         <div class="modal-content">
             <button class="close-btn" id="closeEnquiryBtn" type="button">×</button>
             <div class="modal-header">
-                <h2>Send Enquiry</h2>
+                <h2>Send Order Request</h2>
                 <p>Review your order & fill details.</p>
             </div>
             <div class="modal-body">
@@ -106,12 +128,20 @@
                             added.</span></div>
                 </div>
                 <form id="enquiryForm">
+                    <div class="form-group" id="savedAddressContainer" style="display:none;">
+                        <label for="savedAddrSelect">Select Saved Address</label>
+                        <select id="savedAddrSelect" style="width:100%;padding:0.6rem;border:2px solid #e2e8f0;border-radius:8px;">
+                            <option value="">-- Add New Address --</option>
+                        </select>
+                    </div>
                     <div class="form-group"><label for="customerName">Full Name *</label><input type="text"
-                            id="customerName" required placeholder="Your name" autocomplete="name"></div>
+                            id="customerName" name="customerName" required placeholder="Your name" autocomplete="name">
+                    </div>
                     <div class="form-group"><label for="customerPhone">Phone Number *</label><input type="tel"
-                            id="customerPhone" required placeholder="10-digit mobile" pattern="[0-9]{10}"
-                            inputmode="numeric"></div>
-                    <div class="form-group"><label>Delivery Location *</label>
+                            id="customerPhone" name="customerPhone" required placeholder="10-digit mobile"
+                            pattern="[0-9]{10}" maxlength="10" inputmode="numeric"
+                            oninput="this.value = this.value.replace(/[^0-9]/g, '')"></div>
+                    <div class="form-group"><label for="deliveryLocation">Delivery Location *</label>
                         <div class="location-section"
                             style="border:2px solid #e2e8f0;border-radius:10px;overflow:hidden">
                             <button type="button" onclick="getCurrentLocation()" id="locateBtn" class="locate-btn"
@@ -126,7 +156,11 @@
                                 style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0.75rem;background:#f0fdf4;border-top:1px solid #e2e8f0;font-size:0.75rem;color:#059669;font-weight:600">
                                 <span>📌</span> <span id="mapHint">Type address below or click/drag pin on map</span>
                             </div>
-                            <input type="text" id="deliveryLocation" required
+                            <!-- Container for new PlaceAutocompleteElement (shown when API supports it) -->
+                            <div id="placeAutocompleteContainer" style="display:none;border-top:1px solid #e2e8f0;">
+                            </div>
+                            <!-- Legacy input (shown when new API unavailable) -->
+                            <input type="text" id="deliveryLocation" name="deliveryLocation" required
                                 placeholder="Search address... e.g. Madhapur, Hyderabad"
                                 style="border:none;border-radius:0;border-top:1px solid #e2e8f0;padding:0.85rem 0.75rem;font-size:0.95rem"
                                 autocomplete="off">
@@ -134,15 +168,16 @@
                     </div>
                     <div class="form-group"
                         style="display:flex;align-items:center;gap:0.5rem;margin-top:-0.5rem;margin-bottom:1rem">
-                        <input type="checkbox" id="saveAddress" style="width:auto;margin:0" checked>
+                        <input type="checkbox" id="saveAddress" name="saveAddress" style="width:auto;margin:0" checked>
                         <label for="saveAddress" style="margin:0;font-weight:600;font-size:0.85rem">Save this
                             address</label>
                     </div>
                     <div class="form-group"><label for="pincode">Pincode *</label><input type="text" id="pincode"
-                            required placeholder="6-digit pincode" pattern="[0-9]{6}" inputmode="numeric"></div>
+                            name="pincode" required placeholder="6-digit pincode" pattern="[0-9]{6}" maxlength="6"
+                            inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')"></div>
                     <div class="form-group"><label for="businessType">Business Type</label><input type="text"
-                            id="businessType" placeholder="Hotel/Restaurant/Retailer"></div>
-                    <button type="submit" class="submit-btn" id="submitBtn"><span>Send Enquiry</span>
+                            id="businessType" name="businessType" placeholder="Hotel/Restaurant/Retailer"></div>
+                    <button type="submit" class="submit-btn" id="submitBtn"><span>Send Order Request</span>
                         <div class="spinner" id="spinner"></div>
                     </button>
                     <div id="successMsg" class="success-message">✅ Enquiry sent! We'll contact you shortly.</div>
@@ -183,7 +218,8 @@
                             style="display:flex;align-items:center;border:2px solid #e2e8f0;border-radius:10px;flex:1;background:white;padding:0 0.5rem">
                             <span
                                 style="font-weight:700;color:#64748b;padding-right:0.5rem;border-right:1px solid #e2e8f0">+91</span>
-                            <input type="tel" id="phoneInput" placeholder="XXXXX XXXXX" maxlength="10"
+                            <input type="tel" id="phoneInput" name="phoneInput" placeholder="XXXXX XXXXX" maxlength="10"
+                                aria-label="Phone number"
                                 style="border:none;flex:1;padding:0.75rem 0.5rem;font-size:1rem;font-family:inherit;outline:none;background:transparent">
                         </div>
                         <button onclick="sendOTP()" id="sendOtpBtn">Send OTP</button>
@@ -193,11 +229,68 @@
                         <p style="font-size:0.85rem;color:#059669;margin-bottom:0.5rem;font-weight:600">✅ OTP sent!
                             Enter below:</p>
                         <div class="otp-row">
-                            <input type="text" id="otpInput" placeholder="6-digit OTP" maxlength="6" inputmode="numeric"
+                            <input type="text" id="otpInput" name="otpInput" placeholder="6-digit OTP" maxlength="6"
+                                inputmode="numeric" aria-label="OTP code"
                                 style="padding:0.75rem;border:2px solid #e2e8f0;border-radius:10px;font-size:1rem;font-family:inherit;letter-spacing:0.3rem;text-align:center">
                             <button onclick="verifyOTP()">Verify</button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Order Modal Phase 8 -->
+    <div id="editOrderModal" class="modal-overlay" style="display:none;z-index:9999;">
+        <div class="modal-content" style="max-width:1100px; width:95%; max-height:90vh; overflow-y:auto; padding:2rem;">
+            <button class="close-btn" id="closeEditOrderBtn" type="button" onclick="closeEditOrderModal()">×</button>
+            <div class="modal-header">
+                <h2>Edit Order: <span id="editOrderIdLabel"></span></h2>
+                <p style="margin-top:0.5rem;color:#475569;">Status: <span id="editOrderStatusLabel"
+                        style="font-weight:700;"></span></p>
+            </div>
+            <div class="modal-body" style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; min-width:800px; font-size:0.9rem;"
+                    id="editOrderTable">
+                    <thead>
+                        <tr style="background:#f1f5f9;">
+                            <th style="padding:0.75rem;text-align:left;border:1px solid #cbd5e1;">Item Name & Unit</th>
+                            <th
+                                style="padding:0.75rem;text-align:right;border:1px solid #cbd5e1;background:#e2e8f0;width:24%;">
+                                Original Order</th>
+                            <th style="padding:0.75rem;text-align:right;border:1px solid #cbd5e1;background:#dbeafe;width:24%;"
+                                id="revisedAcceptedHeader">Revised Accepted Order</th>
+                            <th style="padding:0.75rem;text-align:right;border:1px solid #cbd5e1;background:#d1fae5;display:none;width:24%;"
+                                id="revisedFulfilledHeader">Revised Fulfilled Order</th>
+                        </tr>
+                    </thead>
+                    <tbody id="editOrderTableBody">
+                    </tbody>
+                    <tfoot style="font-weight:bold; background:#f8fafc;">
+                        <tr>
+                            <td style="padding:0.75rem;text-align:right;border:1px solid #cbd5e1;">Grand Total:</td>
+                            <td style="padding:0.75rem;text-align:right;border:1px solid #cbd5e1;"
+                                id="grandTotalOriginal">₹0</td>
+                            <td style="padding:0.75rem;text-align:right;border:1px solid #cbd5e1;background:#dbeafe;"
+                                id="grandTotalAccepted">₹0</td>
+                            <td style="padding:0.75rem;text-align:right;border:1px solid #cbd5e1;background:#d1fae5;display:none;"
+                                id="grandTotalFulfilled">₹0</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div
+                style="margin-top:1.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+                <div style="color:#64748b;font-size:0.85rem;flex:1;min-width:250px;">
+                    <span style="color:#f59e0b;">\u26a0\ufe0f</span> Changes will be sent to buyer for approval before
+                    being applied.
+                </div>
+                <div style="display:flex;gap:1rem;">
+                    <button type="button" onclick="closeEditOrderModal()"
+                        style="padding:0.75rem 1.5rem;background:#f1f5f9;color:#475569;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Cancel</button>
+                    <button type="button" onclick="saveEditedOrder()"
+                        style="padding:0.75rem 1.5rem;background:#3b82f6;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Send
+                        Changes to Buyer</button>
                 </div>
             </div>
         </div>
@@ -225,7 +318,7 @@
     </div>
 
     <!-- Admin Panel -->
-    <button class="admin-toggle" onclick="toggleAdmin()" title="Admin Panel">⚙️</button>
+    <button class="admin-toggle" onclick="window.location.hash='#/admin/dashboard'" title="Admin Panel">⚙️</button>
     <div id="adminPanel" class="admin-panel" onclick="if(event.target===this)toggleAdmin()">
         <div class="admin-container">
             <div class="admin-header">
@@ -237,13 +330,62 @@
                 <div class="admin-tabs">
                     <button class="admin-tab active" onclick="switchAdminTab('prices',this)">₹ Prices & MOQ</button>
                     <button class="admin-tab" onclick="switchAdminTab('apmc',this)">📈 APMC Live</button>
-                    <button class="admin-tab" onclick="switchAdminTab('history',this)">📋 Orders</button>
+                    <button class="admin-tab" onclick="switchAdminTab('orders',this)">📋 Orders</button>
+                    <button class="admin-tab" onclick="switchAdminTab('maps',this)">🗺️ Maps & Forms</button>
                     <button class="admin-tab" onclick="switchAdminTab('stats',this)">📊 Analytics</button>
                 </div>
                 <div id="adminPricesTab"></div>
                 <div id="adminApmcTab" style="display:none"></div>
-                <div id="adminHistoryTab" style="display:none"></div>
+                <div id="adminOrdersTab" style="display:none"></div>
+                <div id="adminMapsTab" style="display:none"></div>
                 <div id="adminStatsTab" style="display:none"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div id="imagePreviewModal" class="modal-overlay" style="display:none;z-index:10000;">
+        <div class="modal-content" style="max-width:500px; width:95%;">
+            <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>📷 Image Preview</h3>
+                <button class="close-btn" onclick="closeCropperModal()"
+                    style="background:rgba(255,255,255,0.2); border:none; color:white; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:1.2rem;">×</button>
+            </div>
+            <div class="modal-body" style="padding:1.5rem; text-align:center;">
+                <p id="previewProductName" style="font-weight:600; margin-bottom:1rem; color:#475569;"></p>
+                <img id="previewImage" src=""
+                    style="max-width:100%; max-height:300px; border-radius:8px; margin-bottom:1.5rem; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+                <div style="display:flex; gap:0.75rem; justify-content:center;">
+                    <button id="previewCancelBtn"
+                        style="padding:0.75rem 1.25rem; background:#f1f5f9; border:none; border-radius:8px; font-weight:600; cursor:pointer;">Cancel</button>
+                    <button id="previewCropBtn"
+                        style="padding:0.75rem 1.25rem; background:#3b82f6; color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer;">✂️
+                        Crop Image</button>
+                    <button id="previewUploadBtn"
+                        style="padding:0.75rem 1.25rem; background:#059669; color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer;">📤
+                        Upload</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Cropper Modal -->
+    <div id="cropperModal" class="modal-overlay" style="display:none;z-index:10001;">
+        <div class="modal-content" style="max-width:600px; width:95%; padding:1.5rem;">
+            <div class="modal-header">
+                <h2>✂️ Adjust Image Area</h2>
+                <p>Drag to move, scroll to zoom.</p>
+            </div>
+            <div
+                style="max-height:400px; background:#f1f5f9; border-radius:8px; overflow:hidden; margin-bottom:1.5rem;">
+                <img id="cropperImage" src="" style="max-width:100%; display:block;">
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:1rem;">
+                <button onclick="closeCropperModal()"
+                    style="padding:0.75rem 1.5rem; background:#f1f5f9; border:none; border-radius:8px; font-weight:600; cursor:pointer;">Cancel</button>
+                <button id="saveCropBtn"
+                    style="padding:0.75rem 1.5rem; background:#059669; color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer;">Save
+                    Crop & Upload</button>
             </div>
         </div>
     </div>
@@ -267,8 +409,8 @@
             </div>
             <div class="footer-section">
                 <h3>📞 Contact</h3>
-                <p>📱 Phone: +91 XXXXX XXXXX</p>
-                <p>📧 Email: info@kkrgroceries.com</p>
+                <p>📱 Phone: +91 91828 95565</p>
+                <p>📧 Email: kanthati.chakri@gmail.com</p>
                 <p>📍 Hyderabad, Telangana</p>
                 <p>⏰ Hours: 4:00 AM - 8:00 PM</p>
             </div>
@@ -289,9 +431,7 @@
     </footer>
 
     <script type="module" src="/src/main.js"></script>
-    <script
-        src="https://maps.googleapis.com/maps/api/js?key=%VITE_GOOGLE_MAPS_KEY%&libraries=places&callback=initMapServices"
-        async defer></script>
+
 </body>
 
 </html>

@@ -11,6 +11,11 @@ export function loadSettingsFromFirestore() {
             const data = doc.data();
             if (data.commission != null) state.commissionPercent = parseFloat(data.commission);
 
+            // Admin Map & Form controls
+            if (data.enableOrderRequests !== undefined) state.enableOrderRequests = data.enableOrderRequests;
+            if (data.minOrderValue != null) state.minOrderValue = Number(data.minOrderValue);
+            if (data.geofenceRadiusKm != null) state.geofenceRadiusKm = Number(data.geofenceRadiusKm);
+
             if (data.moqs) {
                 Object.entries(data.moqs).forEach(([id, m]) => {
                     const pr = products.find(x => x.id === +id);
@@ -25,6 +30,7 @@ export function loadSettingsFromFirestore() {
             }
             // Trigger UI updates safely if available
             if (window.renderProducts) window.renderProducts(state.currentCategory);
+            if (window.updateMapCircle) window.updateMapCircle();
             if (window.updateUI) window.updateUI();
         }
     }, err => {
@@ -56,5 +62,30 @@ export async function saveAdminSettings() {
         showToast('Settings saved successfully and synced!', 'success');
     } catch (e) {
         showToast('Failed to save settings: ' + e.message, 'error');
+    }
+}
+
+export async function saveAdminMapSettings() {
+    const enableOrderReq = document.getElementById('mapEnableOrders').checked;
+    const geofence = parseFloat(document.getElementById('mapGeofenceRadius').value) || 50;
+    const minVal = parseFloat(document.getElementById('mapMinOrderVal').value) || 0;
+
+    try {
+        await db.collection('settings').doc('config').set({
+            enableOrderRequests: enableOrderReq,
+            geofenceRadiusKm: geofence,
+            minOrderValue: minVal,
+            updatedAt: new Date().toISOString()
+        }, { merge: true });
+
+        state.enableOrderRequests = enableOrderReq;
+        state.geofenceRadiusKm = geofence;
+        state.minOrderValue = minVal;
+
+        if (window.updateMapCircle) window.updateMapCircle();
+
+        showToast('Map & Form controls saved!', 'success');
+    } catch (e) {
+        showToast('Failed to save map settings: ' + e.message, 'error');
     }
 }

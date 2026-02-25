@@ -1,0 +1,379 @@
+/**
+ * Product Grid and Card Styles
+ */
+
+.products-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+}
+
+@media (min-width: 641px) {
+    .products-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+}
+
+@media (min-width: 1025px) {
+    .products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    }
+}
+
+.product-card {
+    background: white;
+    border-radius: 16px;
+    padding: 0.875rem;
+    display: flex;
+    gap: 0.875rem;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 2px solid transparent;
+    transition: all 0.2s;
+    position: relative;
+    min-height: 110px;
+}
+
+.product-card.selected {
+    border-color: var(--accent);
+    background: linear-gradient(135deg, #fff7ed, #fff);
+}
+
+.product-card.invalid {
+    border-color: var(--danger);
+    background: #fef2f2;
+}
+
+.thumb-wrap {
+    width: 70px;
+    height: 70px;
+    min-width: 70px;
+    background: linear-gradient(135deg, #f0fdf4, #fef3c7);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.thumb-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.thumb-wrap:hover img {
+    transform: scale(1.5);
+}
+
+/* Image zoom modal */
+.image-zoom-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 3000;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    cursor: zoom-out;
+}
+
+.image-zoom-modal.active {
+    display: flex;
+}
+
+.image-zoom-modal img {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.thumb-wrap img.error {
+    display: none;
+}
+
+.thumb-wrap .img-fallback {
+    font-size: 2rem;
+    color: #059669;
+    font-weight: 800;
+    display: none;
+}
+
+.select-indicator {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 22px;
+    height: 22px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 800;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.2s;
+    border: 2px solid white;
+}
+
+.product-card.selected .select-indicator {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.hot-badge,
+.fresh-badge {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    font-size: 0.7rem;
+    z-index: 2;
+}
+
+.stock-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    z-index: 2;
+}
+
+.stock-badge.out-of-stock {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.stock-badge.low-stock {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.product-card.out-of-stock {
+    opacity: 0.7;
+}
+
+.product-card.out-of-stock .btn-add:disabled {
+    background: #e5e7eb;
+    color: #6b7280;
+    cursor: not-allowed;
+}
+
+/* Skeleton Loading States */
+.product-card.skeleton {
+    pointer-events: none;
+}
+
+.skeleton-image {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px;
+}
+
+.skeleton-text {
+    height: 16px;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    width: 80%;
+}
+
+.skeleton-text.short {
+    width: 50%;
+}
+
+.skeleton-badge {
+    height: 20px;
+    width: 60px;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+    margin-top: 8px;
+}
+
+.skeleton-button {
+    height: 40px;
+    width: 100%;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px;
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .skeleton-image,
+    .skeleton-text,
+    .skeleton-badge,
+    .skeleton-button {
+        animation: none;
+        background: #f0f0f0;
+    }
+}
+
+.product-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.product-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.names h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.names .regional {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.2;
+}
+
+.telugu {
+    color: var(--primary);
+    font-weight: 700;
+    font-family: 'Noto Sans Telugu', sans-serif;
+}
+
+.hindi {
+    color: #64748b;
+    font-style: italic;
+}
+
+.moq-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    margin-top: 0.25rem;
+    border: 1px solid #fecaca;
+}
+
+.moq-badge.no-moq {
+    background: #d1fae5;
+    color: #065f46;
+    border-color: #a7f3d0;
+}
+
+.price-block {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.price {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--primary);
+    line-height: 1;
+}
+
+.price .apmc-live {
+    font-size: 0.55rem;
+    color: #3b82f6;
+    font-weight: 700;
+    display: block;
+}
+
+.unit {
+    font-size: 0.7rem;
+    color: #64748b;
+    font-weight: 600;
+    display: block;
+}
+
+.apmc-tag {
+    display: inline-block;
+    background: #fef3c7;
+    color: #92400e;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    margin-top: 0.2rem;
+}
+
+.card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-end;
+    min-width: 110px;
+}
+
+.btn-add {
+    background: linear-gradient(135deg, var(--primary), #047857);
+    color: white;
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    min-height: 44px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.2;
+}
+
+.btn-add .moq-hint {
+    font-size: 0.65rem;
+    opacity: 0.9;
+    font-weight: 600;
+}
+
+.btn-add .moq-hint.no-moq {
+    color: #10b981;
+}
+
+.btn-add.hidden {
+    display: none !important;
+}

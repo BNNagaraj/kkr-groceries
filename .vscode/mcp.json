@@ -1,0 +1,17 @@
+{
+  "servers": {
+    "firebase-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@gannonh/firebase-mcp"
+      ],
+      "env": {
+        "SERVICE_ACCOUNT_KEY_PATH": "${workspaceFolder}/.firebase/serviceAccountKey.json",
+        "FIREBASE_STORAGE_BUCKET": "kkr-groceries-02.firebasestorage.app",
+        "DEBUG_LOG_FILE": "true"
+      }
+    }
+  }
+}

@@ -1,0 +1,1034 @@
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]: 🥬
+        - generic [ref=e6]:
+          - heading "KKR Groceries" [level=1] [ref=e7]
+          - generic [ref=e8]: Hyderabad Wholesale
+      - generic [ref=e9]:
+        - generic [ref=e12]: Live APMC
+        - img "N" [ref=e60] [cursor=pointer]
+        - button "Send Order Request" [ref=e14] [cursor=pointer]:
+          - generic [ref=e15]: Send Order Request
+  - main [ref=e16]:
+    - generic [ref=e325]:
+      - complementary [ref=e326]:
+        - generic [ref=e327]:
+          - generic [ref=e328]: 🥬
+          - generic [ref=e329]: Admin Portal
+        - navigation [ref=e330]:
+          - link "🏠 Home" [ref=e331] [cursor=pointer]:
+            - /url: "#"
+            - generic [ref=e332]: 🏠
+            - generic [ref=e333]: Home
+          - link "📊 Dashboard" [ref=e334] [cursor=pointer]:
+            - /url: "#/admin/dashboard"
+            - generic [ref=e335]: 📊
+            - generic [ref=e336]: Dashboard
+          - link "💰 Prices & MOQ" [ref=e337] [cursor=pointer]:
+            - /url: "#/admin/prices"
+            - generic [ref=e338]: 💰
+            - generic [ref=e339]: Prices & MOQ
+          - link "📈 APMC Live" [ref=e340] [cursor=pointer]:
+            - /url: "#/admin/apmc"
+            - generic [ref=e341]: 📈
+            - generic [ref=e342]: APMC Live
+          - link "📦 Orders ●" [ref=e343] [cursor=pointer]:
+            - /url: "#/admin/orders"
+            - generic [ref=e344]: 📦
+            - generic [ref=e345]: Orders
+            - generic [ref=e346]: ●
+          - link "🗺️ Maps & Forms" [ref=e347] [cursor=pointer]:
+            - /url: "#/admin/maps"
+            - generic [ref=e348]: 🗺️
+            - generic [ref=e349]: Maps & Forms
+        - button "← Exit Admin" [ref=e351] [cursor=pointer]:
+          - generic [ref=e352]: ←
+          - generic [ref=e353]: Exit Admin
+      - main [ref=e354]:
+        - generic [ref=e355]:
+          - heading "📦 Order Management" [level=1] [ref=e356]
+          - generic [ref=e357]:
+            - generic [ref=e358]: Wednesday, 25 Feb 2026
+            - button "Exit Admin" [ref=e359] [cursor=pointer]
+        - generic [ref=e361]:
+          - generic [ref=e1352]:
+            - heading "Order Management" [level=3] [ref=e1353]
+            - combobox [ref=e1354]:
+              - option "All Orders" [selected]
+              - option "Today"
+              - option "This Week"
+              - option "This Fortnight"
+              - option "This Month"
+              - option "This Quarter"
+              - option "Half Yearly"
+              - option "This Year"
+          - generic [ref=e1355]:
+            - generic [ref=e1356]:
+              - generic [ref=e1357]:
+                - text: 2026-02-25T07:24:15.555Z
+                - generic [ref=e1358]: ORD-MM1PKY83
+                - generic [ref=e1359]:
+                  - strong
+                  - text: "-"
+              - generic [ref=e1360]: Pending
+            - generic [ref=e1361]:
+              - generic [ref=e1362]:
+                - img "Tomato" [ref=e1364]
+                - generic [ref=e1365]: Tomato
+                - generic [ref=e1366]: 9 kg
+                - generic [ref=e1367]: ₹5
+                - generic [ref=e1368]: ₹45
+              - generic [ref=e1369]:
+                - img "Onion" [ref=e1371]
+                - generic [ref=e1372]: Onion
+                - generic [ref=e1373]: 50 kg
+                - generic [ref=e1374]: ₹5
+                - generic [ref=e1375]: ₹250
+              - generic [ref=e1376]:
+                - img "Potato" [ref=e1378]
+                - generic [ref=e1379]: Potato
+                - generic [ref=e1380]: 3 kg
+                - generic [ref=e1381]: ₹5
+                - generic [ref=e1382]: ₹15
+              - generic [ref=e1383]:
+                - img "Lady's Finger" [ref=e1385]
+                - generic [ref=e1386]: Lady's Finger
+                - generic [ref=e1387]: 1 kg
+                - generic [ref=e1388]: ₹5
+                - generic [ref=e1389]: ₹5
+              - generic [ref=e1390]:
+                - img "Brinjal" [ref=e1392]
+                - generic [ref=e1393]: Brinjal
+                - generic [ref=e1394]: 1 kg
+                - generic [ref=e1395]: ₹5
+                - generic [ref=e1396]: ₹5
+            - generic [ref=e1397]:
+              - generic [ref=e1398]: 5 items
+              - generic [ref=e1399]: ₹320
+            - generic [ref=e1400]:
+              - button "Accept" [active] [ref=e1401] [cursor=pointer]
+              - button "Edit" [ref=e1402] [cursor=pointer]
+              - button "📄 Invoice" [ref=e1403] [cursor=pointer]
+              - button "Reject" [ref=e1404] [cursor=pointer]
+          - generic [ref=e1405]:
+            - generic [ref=e1406]:
+              - generic [ref=e1407]:
+                - text: 2026-02-25T07:10:27.917Z
+                - generic [ref=e1408]: ORD-MM1P37M5
+                - generic [ref=e1409]:
+                  - strong
+                  - text: "-"
+              - generic [ref=e1410]: Pending
+            - generic [ref=e1411]:
+              - generic [ref=e1412]:
+                - img "Tomato" [ref=e1414]
+                - generic [ref=e1415]: Tomato
+                - generic [ref=e1416]: 3 kg
+                - generic [ref=e1417]: ₹5
+                - generic [ref=e1418]: ₹15
+              - generic [ref=e1419]:
+                - img "Onion" [ref=e1421]
+                - generic [ref=e1422]: Onion
+                - generic [ref=e1423]: 53 kg
+                - generic [ref=e1424]: ₹5
+                - generic [ref=e1425]: ₹265
+            - generic [ref=e1426]:
+              - generic [ref=e1427]: 2 items
+              - generic [ref=e1428]: ₹280
+            - generic [ref=e1429]:
+              - button "Accept" [ref=e1430] [cursor=pointer]
+              - button "Edit" [ref=e1431] [cursor=pointer]
+              - button "📄 Invoice" [ref=e1432] [cursor=pointer]
+              - button "Reject" [ref=e1433] [cursor=pointer]
+          - generic [ref=e1434]:
+            - generic [ref=e1435]:
+              - generic [ref=e1436]:
+                - text: 2026-02-25T05:33:48.689Z
+                - generic [ref=e1437]: ORD-MM1LMWWH
+                - generic [ref=e1438]:
+                  - strong
+                  - text: "-"
+              - generic [ref=e1439]: Pending
+            - generic [ref=e1440]:
+              - generic [ref=e1441]:
+                - img "Onion" [ref=e1443]
+                - generic [ref=e1444]: Onion
+                - generic [ref=e1445]: 50 kg
+                - generic [ref=e1446]: ₹5
+                - generic [ref=e1447]: ₹250
+              - generic [ref=e1448]:
+                - img "Green Chilli" [ref=e1450]
+                - generic [ref=e1451]: Green Chilli
+                - generic [ref=e1452]: 2 kg
+                - generic [ref=e1453]: ₹5
+                - generic [ref=e1454]: ₹10
+            - generic [ref=e1455]:
+              - generic [ref=e1456]: 2 items
+              - generic [ref=e1457]: ₹260
+            - generic [ref=e1458]:
+              - button "Accept" [ref=e1459] [cursor=pointer]
+              - button "Edit" [ref=e1460] [cursor=pointer]
+              - button "📄 Invoice" [ref=e1461] [cursor=pointer]
+              - button "Reject" [ref=e1462] [cursor=pointer]
+          - generic [ref=e1463]:
+            - generic [ref=e1464]:
+              - generic [ref=e1465]:
+                - text: 2026-02-25T05:22:19.490Z
+                - generic [ref=e1466]: ORD-MM1L8542
+                - generic [ref=e1467]:
+                  - strong
+                  - text: "-"
+              - generic [ref=e1468]: Pending
+            - generic [ref=e1469]:
+              - generic [ref=e1470]:
+                - img "Tomato" [ref=e1472]
+                - generic [ref=e1473]: Tomato
+                - generic [ref=e1474]: 5 kg
+                - generic [ref=e1475]: ₹5
+                - generic [ref=e1476]: ₹25
+              - generic [ref=e1477]:
+                - img "Onion" [ref=e1479]
+                - generic [ref=e1480]: Onion
+                - generic [ref=e1481]: 54 kg
+                - generic [ref=e1482]: ₹5
+                - generic [ref=e1483]: ₹270
+              - generic [ref=e1484]:
+                - img "Green Chilli" [ref=e1486]
+                - generic [ref=e1487]: Green Chilli
+                - generic [ref=e1488]: 1 kg
+                - generic [ref=e1489]: ₹5
+                - generic [ref=e1490]: ₹5
+            - generic [ref=e1492]: 0 items
+            - generic [ref=e1493]:
+              - button "Accept" [ref=e1494] [cursor=pointer]
+              - button "Edit" [ref=e1495] [cursor=pointer]
+              - button "📄 Invoice" [ref=e1496] [cursor=pointer]
+              - button "Reject" [ref=e1497] [cursor=pointer]
+          - generic [ref=e1498]:
+            - generic [ref=e1499]:
+              - generic [ref=e1500]:
+                - text: 2026-02-25T05:14:25.117Z
+                - generic [ref=e1501]: ORD-MM1KXZ32
+                - generic [ref=e1502]:
+                  - strong
+                  - text: "-"
+              - generic [ref=e1503]: Pending
+            - generic [ref=e1505]:
+              - img "Tomato" [ref=e1507]
+              - generic [ref=e1508]: Tomato
+              - generic [ref=e1509]: 1 kg
+              - generic [ref=e1510]: ₹5
+              - generic [ref=e1511]: ₹5
+            - generic [ref=e1513]: 0 items
+            - generic [ref=e1514]:
+              - button "Accept" [ref=e1515] [cursor=pointer]
+              - button "Edit" [ref=e1516] [cursor=pointer]
+              - button "📄 Invoice" [ref=e1517] [cursor=pointer]
+              - button "Reject" [ref=e1518] [cursor=pointer]
+          - generic [ref=e1519]:
+            - generic [ref=e1520]:
+              - generic [ref=e1521]:
+                - text: 24/2/2026, 11:25:34 am
+                - generic [ref=e1522]: ORD-1771912534844
+                - generic [ref=e1523]:
+                  - strong [ref=e1524]: NagRAJ BN
+                  - text: "- 8884412234"
+                - 'link "GQ47+P3 Mahadevpur, Telangana, India - Pincode: 508126" [ref=e1526] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=GQ47%2BP3%20Mahadevpur%2C%20Telangana%2C%20India%20-%20Pincode%3A%20508126
+                  - img [ref=e1527]
+                  - text: "GQ47+P3 Mahadevpur, Telangana, India - Pincode: 508126"
+              - generic [ref=e1530]: Fulfilled
+            - generic [ref=e1532]:
+              - img "Tomato" [ref=e1534]
+              - generic [ref=e1535]: Tomato
+              - generic [ref=e1536]: 10 kg
+              - generic [ref=e1537]: ₹30
+              - generic [ref=e1538]: ₹300
+            - generic [ref=e1539]:
+              - generic [ref=e1540]: 1 items
+              - generic [ref=e1541]: ₹300
+            - generic [ref=e1542]:
+              - button "📄 Invoice" [ref=e1543] [cursor=pointer]
+              - button "Edit" [ref=e1544] [cursor=pointer]
+          - generic [ref=e1545]:
+            - generic [ref=e1546]:
+              - generic [ref=e1547]:
+                - text: 23/2/2026, 11:33:59 am
+                - generic [ref=e1548]: ORD-1771826639514
+                - generic [ref=e1549]:
+                  - strong [ref=e1550]: Venu Gopal G
+                  - text: "- 7893009973"
+                - 'link "G98G+XWH, 12B, Venkatraya Nagar, Nizampet, Hyderabad, Telangana 500090, India - Pincode: 500090" [ref=e1552] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=G98G%2BXWH%2C%2012B%2C%20Venkatraya%20Nagar%2C%20Nizampet%2C%20Hyderabad%2C%20Telangana%20500090%2C%20India%20-%20Pincode%3A%20500090
+                  - img [ref=e1553]
+                  - text: "G98G+XWH, 12B, Venkatraya Nagar, Nizampet, Hyderabad, Telangana 500090, India - Pincode: 500090"
+              - generic [ref=e1556]: Rejected
+            - generic [ref=e1557]:
+              - generic [ref=e1558]:
+                - img "Tomato" [ref=e1560]
+                - generic [ref=e1561]: Tomato
+                - generic [ref=e1562]: 1 kg
+                - generic [ref=e1563]: ₹10
+                - generic [ref=e1564]: ₹10
+              - generic [ref=e1565]:
+                - img "Onion" [ref=e1567]
+                - generic [ref=e1568]: Onion
+                - generic [ref=e1569]: 1 kg
+                - generic [ref=e1570]: ₹13
+                - generic [ref=e1571]: ₹13
+              - generic [ref=e1572]:
+                - img "Potato" [ref=e1574]
+                - generic [ref=e1575]: Potato
+                - generic [ref=e1576]: 1 kg
+                - generic [ref=e1577]: ₹16
+                - generic [ref=e1578]: ₹16
+              - generic [ref=e1579]:
+                - generic [ref=e1581]: G
+                - generic [ref=e1582]: Green Chilli
+                - generic [ref=e1583]: 2 kg
+                - generic [ref=e1584]: ₹50
+                - generic [ref=e1585]: ₹100
+              - generic [ref=e1586]:
+                - img "Brinjal" [ref=e1588]
+                - generic [ref=e1589]: Brinjal
+                - generic [ref=e1590]: 1 kg
+                - generic [ref=e1591]: ₹20
+                - generic [ref=e1592]: ₹20
+              - generic [ref=e1593]:
+                - generic [ref=e1595]: Banana
+                - generic [ref=e1596]: 1 kg
+                - generic [ref=e1597]: ₹0
+                - generic [ref=e1598]: ₹0
+            - generic [ref=e1599]:
+              - generic [ref=e1600]: 6 items
+              - generic [ref=e1601]: ₹159
+          - generic [ref=e1602]:
+            - generic [ref=e1603]:
+              - generic [ref=e1604]:
+                - text: 23/2/2026, 11:09:56 am
+                - generic [ref=e1605]: ORD-1771825196781
+                - generic [ref=e1606]:
+                  - strong [ref=e1607]: K. Sowjanya
+                  - text: "- 9014628961"
+                - 'link "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118" [ref=e1609] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Prime%20Castle%20Apartment%2C%20Nizampet%20Rd%2C%20Bachupally%2C%20Hyderabad%2C%20Telangana%20500118%2C%20India%20-%20Pincode%3A%20500118
+                  - img [ref=e1610]
+                  - text: "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118"
+              - generic [ref=e1613]: Pending
+            - generic [ref=e1614]:
+              - generic [ref=e1615]:
+                - img "Tomato" [ref=e1617]
+                - generic [ref=e1618]: Tomato
+                - generic [ref=e1619]: 2 kg
+                - generic [ref=e1620]: ₹10
+                - generic [ref=e1621]: ₹20
+              - generic [ref=e1622]:
+                - img "Onion" [ref=e1624]
+                - generic [ref=e1625]: Onion
+                - generic [ref=e1626]: 2 kg
+                - generic [ref=e1627]: ₹13
+                - generic [ref=e1628]: ₹26
+              - generic [ref=e1629]:
+                - generic [ref=e1631]: G
+                - generic [ref=e1632]: Green Chilli
+                - generic [ref=e1633]: 1 kg
+                - generic [ref=e1634]: ₹50
+                - generic [ref=e1635]: ₹50
+              - generic [ref=e1636]:
+                - generic [ref=e1638]: L
+                - generic [ref=e1639]: Lady's Finger
+                - generic [ref=e1640]: 1 kg
+                - generic [ref=e1641]: ₹30
+                - generic [ref=e1642]: ₹30
+              - generic [ref=e1643]:
+                - img "Cabbage" [ref=e1645]
+                - generic [ref=e1646]: Cabbage
+                - generic [ref=e1647]: 1 piece
+                - generic [ref=e1648]: ₹10
+                - generic [ref=e1649]: ₹10
+              - generic [ref=e1650]:
+                - generic [ref=e1652]: C
+                - generic [ref=e1653]: Carrot
+                - generic [ref=e1654]: 2 kg
+                - generic [ref=e1655]: ₹30
+                - generic [ref=e1656]: ₹60
+              - generic [ref=e1657]:
+                - generic [ref=e1659]: S
+                - generic [ref=e1660]: Spinach
+                - generic [ref=e1661]: 3 bunch
+                - generic [ref=e1662]: ₹5
+                - generic [ref=e1663]: ₹15
+              - generic [ref=e1664]:
+                - generic [ref=e1666]: B
+                - generic [ref=e1667]: Bottle Gourd
+                - generic [ref=e1668]: 1 piece
+                - generic [ref=e1669]: ₹10
+                - generic [ref=e1670]: ₹10
+            - generic [ref=e1671]:
+              - generic [ref=e1672]: 8 items
+              - generic [ref=e1673]: ₹221
+            - generic [ref=e1674]:
+              - button "Accept" [ref=e1675] [cursor=pointer]
+              - button "Edit" [ref=e1676] [cursor=pointer]
+              - button "📄 Invoice" [ref=e1677] [cursor=pointer]
+              - button "Reject" [ref=e1678] [cursor=pointer]
+          - generic [ref=e1679]:
+            - generic [ref=e1680]:
+              - generic [ref=e1681]:
+                - text: 23/2/2026, 10:59:10 am
+                - generic [ref=e1682]: ORD-1771824550707
+                - generic [ref=e1683]:
+                  - strong [ref=e1684]: K. Sowjanya
+                  - text: "- 9014628961"
+                - 'link "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500090" [ref=e1686] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Prime%20Castle%20Apartment%2C%20Nizampet%20Rd%2C%20Bachupally%2C%20Hyderabad%2C%20Telangana%20500118%2C%20India%20-%20Pincode%3A%20500090
+                  - img [ref=e1687]
+                  - text: "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500090"
+              - generic [ref=e1690]: Pending
+            - generic [ref=e1691]:
+              - generic [ref=e1692]:
+                - img "Tomato" [ref=e1694]
+                - generic [ref=e1695]: Tomato
+                - generic [ref=e1696]: 11 kg
+                - generic [ref=e1697]: ₹10
+                - generic [ref=e1698]: ₹110
+              - generic [ref=e1699]:
+                - img "Onion" [ref=e1701]
+                - generic [ref=e1702]: Onion
+                - generic [ref=e1703]: 51 kg
+                - generic [ref=e1704]: ₹13
+                - generic [ref=e1705]: ₹663
+            - generic [ref=e1706]:
+              - generic [ref=e1707]: 2 items
+              - generic [ref=e1708]: ₹773
+            - generic [ref=e1709]:
+              - button "Accept" [ref=e1710] [cursor=pointer]
+              - button "Edit" [ref=e1711] [cursor=pointer]
+              - button "📄 Invoice" [ref=e1712] [cursor=pointer]
+              - button "Reject" [ref=e1713] [cursor=pointer]
+          - generic [ref=e1714]:
+            - generic [ref=e1715]:
+              - generic [ref=e1716]:
+                - text: 23/2/2026, 9:15:25 am
+                - generic [ref=e1717]: ORD-1771818325087
+                - generic [ref=e1718]:
+                  - strong [ref=e1719]: chakravarthi kanthati
+                  - text: "- 9182895565"
+                - 'link "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118" [ref=e1721] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Prime%20Castle%20Apartment%2C%20Nizampet%20Rd%2C%20Bachupally%2C%20Hyderabad%2C%20Telangana%20500118%2C%20India%20-%20Pincode%3A%20500118
+                  - img [ref=e1722]
+                  - text: "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118"
+              - generic [ref=e1725]: Accepted
+            - generic [ref=e1726]:
+              - generic [ref=e1727]:
+                - img "Potato" [ref=e1729]
+                - generic [ref=e1730]: Potato
+                - generic [ref=e1731]: 52 kg
+                - generic [ref=e1732]: ₹16
+                - generic [ref=e1733]: ₹832
+              - generic [ref=e1734]:
+                - generic [ref=e1736]: B
+                - generic [ref=e1737]: Brinjal
+                - generic [ref=e1738]: 25 kg
+                - generic [ref=e1739]: ₹20
+                - generic [ref=e1740]: ₹500
+            - generic [ref=e1741]:
+              - generic [ref=e1742]: 2 items
+              - generic [ref=e1743]: ₹1,332
+            - generic [ref=e1744]:
+              - button "Mark as Fulfilled" [ref=e1745] [cursor=pointer]
+              - button "📄 Invoice" [ref=e1746] [cursor=pointer]
+              - button "Edit" [ref=e1747] [cursor=pointer]
+          - generic [ref=e1748]:
+            - generic [ref=e1749]:
+              - generic [ref=e1750]:
+                - text: 23/2/2026, 9:05:12 am
+                - generic [ref=e1751]: ORD-1771817712474
+                - generic [ref=e1752]:
+                  - strong [ref=e1753]: NagRAJ BN
+                  - text: "- 7207610724"
+                - 'link "9R6Q+CV Abdulla Nagar, Telangana, India - Pincode: 508284" [ref=e1755] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=9R6Q%2BCV%20Abdulla%20Nagar%2C%20Telangana%2C%20India%20-%20Pincode%3A%20508284
+                  - img [ref=e1756]
+                  - text: "9R6Q+CV Abdulla Nagar, Telangana, India - Pincode: 508284"
+              - generic [ref=e1759]: Pending
+            - generic [ref=e1761]:
+              - img "Onion" [ref=e1763]
+              - generic [ref=e1764]: Onion
+              - generic [ref=e1765]: 50 kg
+              - generic [ref=e1766]: ₹13
+              - generic [ref=e1767]: ₹650
+            - generic [ref=e1768]:
+              - generic [ref=e1769]: 1 items
+              - generic [ref=e1770]: ₹650
+            - generic [ref=e1771]:
+              - button "Accept" [ref=e1772] [cursor=pointer]
+              - button "Edit" [ref=e1773] [cursor=pointer]
+              - button "📄 Invoice" [ref=e1774] [cursor=pointer]
+              - button "Reject" [ref=e1775] [cursor=pointer]
+          - generic [ref=e1776]:
+            - generic [ref=e1777]:
+              - generic [ref=e1778]:
+                - text: 23/2/2026, 9:03:44 am
+                - generic [ref=e1779]: ORD-1771817624051
+                - generic [ref=e1780]:
+                  - strong [ref=e1781]: NagRAJ BN
+                  - text: "- 8884412234"
+                - 'link "GQ47+P3 Mahadevpur, Telangana, India - Pincode: 508126" [ref=e1783] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=GQ47%2BP3%20Mahadevpur%2C%20Telangana%2C%20India%20-%20Pincode%3A%20508126
+                  - img [ref=e1784]
+                  - text: "GQ47+P3 Mahadevpur, Telangana, India - Pincode: 508126"
+              - generic [ref=e1787]: Pending
+            - generic [ref=e1789]:
+              - img "Tomato" [ref=e1791]
+              - generic [ref=e1792]: Tomato
+              - generic [ref=e1793]: 10 kg
+              - generic [ref=e1794]: ₹10
+              - generic [ref=e1795]: ₹100
+            - generic [ref=e1796]:
+              - generic [ref=e1797]: 1 items
+              - generic [ref=e1798]: ₹100
+            - generic [ref=e1799]:
+              - button "Accept" [ref=e1800] [cursor=pointer]
+              - button "Edit" [ref=e1801] [cursor=pointer]
+              - button "📄 Invoice" [ref=e1802] [cursor=pointer]
+              - button "Reject" [ref=e1803] [cursor=pointer]
+          - generic [ref=e1804]:
+            - generic [ref=e1805]:
+              - generic [ref=e1806]:
+                - text: 23/2/2026, 8:58:14 am
+                - generic [ref=e1807]: ORD-1771817294198
+                - generic [ref=e1808]:
+                  - strong [ref=e1809]: NagRAJ BN
+                  - text: "- 8884413346"
+                - 'link "9RQQ+2V Peddaravulapalle, Telangana, India - Pincode: 508284" [ref=e1811] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=9RQQ%2B2V%20Peddaravulapalle%2C%20Telangana%2C%20India%20-%20Pincode%3A%20508284
+                  - img [ref=e1812]
+                  - text: "9RQQ+2V Peddaravulapalle, Telangana, India - Pincode: 508284"
+              - generic [ref=e1815]: Rejected
+            - generic [ref=e1817]:
+              - img "Onion" [ref=e1819]
+              - generic [ref=e1820]: Onion
+              - generic [ref=e1821]: 50 kg
+              - generic [ref=e1822]: ₹13
+              - generic [ref=e1823]: ₹650
+            - generic [ref=e1824]:
+              - generic [ref=e1825]: 1 items
+              - generic [ref=e1826]: ₹650
+          - generic [ref=e1827]:
+            - generic [ref=e1828]:
+              - generic [ref=e1829]:
+                - text: 23/2/2026, 8:56:46 am
+                - generic [ref=e1830]: ORD-1771817206223
+                - generic [ref=e1831]:
+                  - strong [ref=e1832]: NagRAJ BN
+                  - text: "- 8888888880"
+                - 'link "34J2+7Q Jamastanpally, Telangana, India - Pincode: 508244" [ref=e1834] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=34J2%2B7Q%20Jamastanpally%2C%20Telangana%2C%20India%20-%20Pincode%3A%20508244
+                  - img [ref=e1835]
+                  - text: "34J2+7Q Jamastanpally, Telangana, India - Pincode: 508244"
+              - generic [ref=e1838]: Fulfilled
+            - generic [ref=e1840]:
+              - img "Onion" [ref=e1842]
+              - generic [ref=e1843]: Onion
+              - generic [ref=e1844]: 61 kg
+              - generic [ref=e1845]: ₹13
+              - generic [ref=e1846]: ₹793
+            - generic [ref=e1847]:
+              - generic [ref=e1848]: 1 items
+              - generic [ref=e1849]: ₹793
+            - generic [ref=e1850]:
+              - button "📄 Invoice" [ref=e1851] [cursor=pointer]
+              - button "Edit" [ref=e1852] [cursor=pointer]
+          - generic [ref=e1853]:
+            - generic [ref=e1854]:
+              - generic [ref=e1855]:
+                - text: 23/2/2026, 12:38:38 am
+                - generic [ref=e1856]: ORD-1771787318724
+                - generic [ref=e1857]:
+                  - strong [ref=e1858]: NagRAJ BN
+                  - text: "- 8884413346"
+                - 'link "8/11-180-269, Jawahar Nagar, Raichur, Karnataka 584102, India - Pincode: 584102" [ref=e1860] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=8%2F11-180-269%2C%20Jawahar%20Nagar%2C%20Raichur%2C%20Karnataka%20584102%2C%20India%20-%20Pincode%3A%20584102
+                  - img [ref=e1861]
+                  - text: "8/11-180-269, Jawahar Nagar, Raichur, Karnataka 584102, India - Pincode: 584102"
+              - generic [ref=e1864]: Rejected
+            - generic [ref=e1865]:
+              - generic [ref=e1866]:
+                - img "Tomato" [ref=e1868]
+                - generic [ref=e1869]: Tomato
+                - generic [ref=e1870]: 10 kg
+                - generic [ref=e1871]: ₹10
+                - generic [ref=e1872]: ₹100
+              - generic [ref=e1873]:
+                - img "Onion" [ref=e1875]
+                - generic [ref=e1876]: Onion
+                - generic [ref=e1877]: 50 kg
+                - generic [ref=e1878]: ₹13
+                - generic [ref=e1879]: ₹650
+              - generic [ref=e1880]:
+                - img "Potato" [ref=e1882]
+                - generic [ref=e1883]: Potato
+                - generic [ref=e1884]: 50 kg
+                - generic [ref=e1885]: ₹16
+                - generic [ref=e1886]: ₹800
+              - generic [ref=e1887]:
+                - generic [ref=e1889]: G
+                - generic [ref=e1890]: Green Chilli
+                - generic [ref=e1891]: 25 kg
+                - generic [ref=e1892]: ₹50
+                - generic [ref=e1893]: ₹1,250
+            - generic [ref=e1894]:
+              - generic [ref=e1895]: 4 items
+              - generic [ref=e1896]: ₹2800
+          - generic [ref=e1897]:
+            - generic [ref=e1898]:
+              - generic [ref=e1899]:
+                - text: 22/2/2026, 9:49:35 pm
+                - generic [ref=e1900]: ORD-1771777175183
+                - generic [ref=e1901]:
+                  - strong [ref=e1902]: chakravarthi kanthati
+                  - text: "- 9182895565"
+                - 'link "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118" [ref=e1904] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Prime%20Castle%20Apartment%2C%20Nizampet%20Rd%2C%20Bachupally%2C%20Hyderabad%2C%20Telangana%20500118%2C%20India%20-%20Pincode%3A%20500118
+                  - img [ref=e1905]
+                  - text: "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118"
+              - generic [ref=e1908]: Rejected
+            - generic [ref=e1909]:
+              - generic [ref=e1910]:
+                - img "Tomato" [ref=e1912]
+                - generic [ref=e1913]: Tomato
+                - generic [ref=e1914]: 14 kg
+                - generic [ref=e1915]: ₹10
+                - generic [ref=e1916]: ₹140
+              - generic [ref=e1917]:
+                - img "Onion" [ref=e1919]
+                - generic [ref=e1920]: Onion
+                - generic [ref=e1921]: 50 kg
+                - generic [ref=e1922]: ₹13
+                - generic [ref=e1923]: ₹650
+            - generic [ref=e1924]:
+              - generic [ref=e1925]: 2 items
+              - generic [ref=e1926]: ₹790
+          - generic [ref=e1927]:
+            - generic [ref=e1928]:
+              - generic [ref=e1929]:
+                - text: 22/2/2026, 9:42:15 pm
+                - generic [ref=e1930]: ORD-1771776735666
+                - generic [ref=e1931]:
+                  - strong [ref=e1932]: chakravarthi kanthati
+                  - text: "- 9182895565"
+                - 'link "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118" [ref=e1934] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Prime%20Castle%20Apartment%2C%20Nizampet%20Rd%2C%20Bachupally%2C%20Hyderabad%2C%20Telangana%20500118%2C%20India%20-%20Pincode%3A%20500118
+                  - img [ref=e1935]
+                  - text: "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118"
+              - generic [ref=e1938]: Rejected
+            - generic [ref=e1939]:
+              - generic [ref=e1940]:
+                - img "Tomato" [ref=e1942]
+                - generic [ref=e1943]: Tomato
+                - generic [ref=e1944]: 10 kg
+                - generic [ref=e1945]: ₹10
+                - generic [ref=e1946]: ₹100
+              - generic [ref=e1947]:
+                - img "Onion" [ref=e1949]
+                - generic [ref=e1950]: Onion
+                - generic [ref=e1951]: 50 kg
+                - generic [ref=e1952]: ₹13
+                - generic [ref=e1953]: ₹650
+              - generic [ref=e1954]:
+                - generic [ref=e1956]: G
+                - generic [ref=e1957]: Green Chilli
+                - generic [ref=e1958]: 25 kg
+                - generic [ref=e1959]: ₹50
+                - generic [ref=e1960]: ₹1,250
+            - generic [ref=e1961]:
+              - generic [ref=e1962]: 3 items
+              - generic [ref=e1963]: ₹2000
+          - generic [ref=e1964]:
+            - generic [ref=e1965]:
+              - generic [ref=e1966]:
+                - text: 22/2/2026, 9:27:34 pm
+                - generic [ref=e1967]: ORD-1771775854222
+                - generic [ref=e1968]:
+                  - strong [ref=e1969]: chakravarthi kanthati
+                  - text: "- 9182895565"
+                - 'link "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118" [ref=e1971] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Prime%20Castle%20Apartment%2C%20Nizampet%20Rd%2C%20Bachupally%2C%20Hyderabad%2C%20Telangana%20500118%2C%20India%20-%20Pincode%3A%20500118
+                  - img [ref=e1972]
+                  - text: "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118"
+              - generic [ref=e1975]: Fulfilled
+            - generic [ref=e1977]:
+              - img "Tomato" [ref=e1979]
+              - generic [ref=e1980]: Tomato
+              - generic [ref=e1981]: 10 kg
+              - generic [ref=e1982]: ₹10
+              - generic [ref=e1983]: ₹100
+            - generic [ref=e1984]:
+              - generic [ref=e1985]: 2 items
+              - generic [ref=e1986]: ₹100
+            - generic [ref=e1987]:
+              - button "📄 Invoice" [ref=e1988] [cursor=pointer]
+              - button "Edit" [ref=e1989] [cursor=pointer]
+          - generic [ref=e1990]:
+            - generic [ref=e1991]:
+              - generic [ref=e1992]:
+                - text: 22/2/2026, 8:59:26 pm
+                - generic [ref=e1993]: ORD-1771774166108
+                - generic [ref=e1994]:
+                  - strong [ref=e1995]: Test Client
+                  - text: "- 9999999999"
+                - 'link "Test Location - Pincode: 500001" [ref=e1997] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Test%20Location%20-%20Pincode%3A%20500001
+                  - img [ref=e1998]
+                  - text: "Test Location - Pincode: 500001"
+              - generic [ref=e2001]: Rejected
+            - generic [ref=e2002]:
+              - generic [ref=e2003]:
+                - img "Tomato" [ref=e2005]
+                - generic [ref=e2006]: Tomato
+                - generic [ref=e2007]: 10 kg
+                - generic [ref=e2008]: ₹10
+                - generic [ref=e2009]: ₹100
+              - generic [ref=e2010]:
+                - img "Onion" [ref=e2012]
+                - generic [ref=e2013]: Onion
+                - generic [ref=e2014]: 50 kg
+                - generic [ref=e2015]: ₹13
+                - generic [ref=e2016]: ₹650
+            - generic [ref=e2017]:
+              - generic [ref=e2018]: 2 items
+              - generic [ref=e2019]: ₹750
+          - generic [ref=e2020]:
+            - generic [ref=e2021]:
+              - generic [ref=e2022]:
+                - text: 22/2/2026, 6:36:02 pm
+                - generic [ref=e2023]: ORD-1771765562854
+                - generic [ref=e2024]:
+                  - strong [ref=e2025]: chakravarthi kanthati
+                  - text: "- 9182895565"
+                - 'link "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118" [ref=e2027] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Prime%20Castle%20Apartment%2C%20Nizampet%20Rd%2C%20Bachupally%2C%20Hyderabad%2C%20Telangana%20500118%2C%20India%20-%20Pincode%3A%20500118
+                  - img [ref=e2028]
+                  - text: "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118"
+              - generic [ref=e2031]: Fulfilled
+            - generic [ref=e2033]:
+              - generic [ref=e2035]: G
+              - generic [ref=e2036]: Green Chilli
+              - generic [ref=e2037]: 15 kg
+              - generic [ref=e2038]: ₹50
+              - generic [ref=e2039]: ₹750
+            - generic [ref=e2040]:
+              - generic [ref=e2041]: 1 items
+              - generic [ref=e2042]: ₹750
+            - generic [ref=e2043]:
+              - button "📄 Invoice" [ref=e2044] [cursor=pointer]
+              - button "Edit" [ref=e2045] [cursor=pointer]
+          - generic [ref=e2046]:
+            - generic [ref=e2047]:
+              - generic [ref=e2048]:
+                - text: 22/2/2026, 5:56:58 pm
+                - generic [ref=e2049]: ORD-1771763218885
+                - generic [ref=e2050]:
+                  - strong [ref=e2051]: chakravarthi kanthati
+                  - text: "- 9182895565"
+                - 'link "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118" [ref=e2053] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Prime%20Castle%20Apartment%2C%20Nizampet%20Rd%2C%20Bachupally%2C%20Hyderabad%2C%20Telangana%20500118%2C%20India%20-%20Pincode%3A%20500118
+                  - img [ref=e2054]
+                  - text: "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118"
+              - generic [ref=e2057]: Fulfilled
+            - generic [ref=e2058]:
+              - generic [ref=e2059]:
+                - generic [ref=e2061]: G
+                - generic [ref=e2062]: Green Chilli
+                - generic [ref=e2063]: 2 kg
+                - generic [ref=e2064]: ₹50
+                - generic [ref=e2065]: ₹100
+              - generic [ref=e2066]:
+                - img "Brinjal" [ref=e2068]
+                - generic [ref=e2069]: Brinjal
+                - generic [ref=e2070]: 1 kg
+                - generic [ref=e2071]: ₹20
+                - generic [ref=e2072]: ₹20
+              - generic [ref=e2073]:
+                - img "Cauliflower" [ref=e2075]
+                - generic [ref=e2076]: Cauliflower
+                - generic [ref=e2077]: 2 piece
+                - generic [ref=e2078]: ₹15
+                - generic [ref=e2079]: ₹30
+            - generic [ref=e2080]:
+              - generic [ref=e2081]: 3 items
+              - generic [ref=e2082]: ₹150
+            - generic [ref=e2083]:
+              - button "📄 Invoice" [ref=e2084] [cursor=pointer]
+              - button "Edit" [ref=e2085] [cursor=pointer]
+          - generic [ref=e2086]:
+            - generic [ref=e2087]:
+              - generic [ref=e2088]:
+                - text: 22/2/2026, 5:32:32 pm
+                - generic [ref=e2089]: ORD-1771761752286
+                - generic [ref=e2090]:
+                  - strong [ref=e2091]: chakravarthi kanthati
+                  - text: "- 9182895565"
+                - 'link "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118" [ref=e2093] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Prime%20Castle%20Apartment%2C%20Nizampet%20Rd%2C%20Bachupally%2C%20Hyderabad%2C%20Telangana%20500118%2C%20India%20-%20Pincode%3A%20500118
+                  - img [ref=e2094]
+                  - text: "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118"
+              - generic [ref=e2097]: Fulfilled
+            - generic [ref=e2099]:
+              - img "Potato" [ref=e2101]
+              - generic [ref=e2102]: Potato
+              - generic [ref=e2103]: 50 kg
+              - generic [ref=e2104]: ₹30
+              - generic [ref=e2105]: ₹1,500
+            - generic [ref=e2106]:
+              - generic [ref=e2107]: 1 items
+              - generic [ref=e2108]: ₹1500
+            - generic [ref=e2109]:
+              - button "📄 Invoice" [ref=e2110] [cursor=pointer]
+              - button "Edit" [ref=e2111] [cursor=pointer]
+          - generic [ref=e2112]:
+            - generic [ref=e2113]:
+              - generic [ref=e2114]:
+                - text: 22/2/2026, 5:30:58 pm
+                - generic [ref=e2115]: ORD-1771761658104
+                - generic [ref=e2116]:
+                  - strong [ref=e2117]: chakravarthi kanthati
+                  - text: "- 9182895565"
+                - 'link "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118" [ref=e2119] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Prime%20Castle%20Apartment%2C%20Nizampet%20Rd%2C%20Bachupally%2C%20Hyderabad%2C%20Telangana%20500118%2C%20India%20-%20Pincode%3A%20500118
+                  - img [ref=e2120]
+                  - text: "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118"
+              - generic [ref=e2123]: Fulfilled
+            - generic [ref=e2124]:
+              - generic [ref=e2125]:
+                - img "Onion" [ref=e2127]
+                - generic [ref=e2128]: Onion
+                - generic [ref=e2129]: 50 kg
+                - generic [ref=e2130]: ₹25
+                - generic [ref=e2131]: ₹1,250
+              - generic [ref=e2132]:
+                - img "Potato" [ref=e2134]
+                - generic [ref=e2135]: Potato
+                - generic [ref=e2136]: 50 kg
+                - generic [ref=e2137]: ₹30
+                - generic [ref=e2138]: ₹1,500
+            - generic [ref=e2139]:
+              - generic [ref=e2140]: 2 items
+              - generic [ref=e2141]: ₹2750
+            - generic [ref=e2142]:
+              - button "📄 Invoice" [ref=e2143] [cursor=pointer]
+              - button "Edit" [ref=e2144] [cursor=pointer]
+          - generic [ref=e2145]:
+            - generic [ref=e2146]:
+              - generic [ref=e2147]:
+                - text: 22/2/2026, 5:29:01 pm
+                - generic [ref=e2148]: ORD-1771761541076
+                - generic [ref=e2149]:
+                  - strong [ref=e2150]: chakravarthi kanthati
+                  - text: "- 9182895565"
+                - 'link "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118" [ref=e2152] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Prime%20Castle%20Apartment%2C%20Nizampet%20Rd%2C%20Bachupally%2C%20Hyderabad%2C%20Telangana%20500118%2C%20India%20-%20Pincode%3A%20500118
+                  - img [ref=e2153]
+                  - text: "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118"
+              - generic [ref=e2156]: Fulfilled
+            - generic [ref=e2157]:
+              - generic [ref=e2158]:
+                - img "Tomato" [ref=e2160]
+                - generic [ref=e2161]: Tomato
+                - generic [ref=e2162]: 100 kg
+                - generic [ref=e2163]: ₹35
+                - generic [ref=e2164]: ₹3,500
+              - generic [ref=e2165]:
+                - img "Onion" [ref=e2167]
+                - generic [ref=e2168]: Onion
+                - generic [ref=e2169]: 130 kg
+                - generic [ref=e2170]: ₹25
+                - generic [ref=e2171]: ₹3,250
+              - generic [ref=e2172]:
+                - img "Potato" [ref=e2174]
+                - generic [ref=e2175]: Potato
+                - generic [ref=e2176]: 350 kg
+                - generic [ref=e2177]: ₹30
+                - generic [ref=e2178]: ₹10,500
+            - generic [ref=e2179]:
+              - generic [ref=e2180]: 3 items
+              - generic [ref=e2181]: ₹17250
+            - generic [ref=e2182]:
+              - button "📄 Invoice" [ref=e2183] [cursor=pointer]
+              - button "Edit" [ref=e2184] [cursor=pointer]
+          - generic [ref=e2185]:
+            - generic [ref=e2186]:
+              - generic [ref=e2187]:
+                - text: 22/2/2026, 5:28:14 pm
+                - generic [ref=e2188]: ORD-1771761494980
+                - generic [ref=e2189]:
+                  - strong [ref=e2190]: Nagaraj
+                  - text: "- 9999999999"
+                - 'link "Test Location - Pincode: 500001" [ref=e2192] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Test%20Location%20-%20Pincode%3A%20500001
+                  - img [ref=e2193]
+                  - text: "Test Location - Pincode: 500001"
+              - generic [ref=e2196]: Rejected
+            - generic [ref=e2197]:
+              - generic [ref=e2198]:
+                - img "Tomato" [ref=e2200]
+                - generic [ref=e2201]: Tomato
+                - generic [ref=e2202]: 10 kg
+                - generic [ref=e2203]: ₹35
+                - generic [ref=e2204]: ₹350
+              - generic [ref=e2205]:
+                - img "Onion" [ref=e2207]
+                - generic [ref=e2208]: Onion
+                - generic [ref=e2209]: 50 kg
+                - generic [ref=e2210]: ₹25
+                - generic [ref=e2211]: ₹1,250
+              - generic [ref=e2212]:
+                - img "Potato" [ref=e2214]
+                - generic [ref=e2215]: Potato
+                - generic [ref=e2216]: 50 kg
+                - generic [ref=e2217]: ₹30
+                - generic [ref=e2218]: ₹1,500
+              - generic [ref=e2219]:
+                - generic [ref=e2221]: G
+                - generic [ref=e2222]: Green Chilli
+                - generic [ref=e2223]: 25 kg
+                - generic [ref=e2224]: ₹25
+                - generic [ref=e2225]: ₹625
+              - generic [ref=e2226]:
+                - generic [ref=e2228]: L
+                - generic [ref=e2229]: Lady's Finger
+                - generic [ref=e2230]: 30 kg
+                - generic [ref=e2231]: ₹25
+                - generic [ref=e2232]: ₹750
+              - generic [ref=e2233]:
+                - img "Brinjal" [ref=e2235]
+                - generic [ref=e2236]: Brinjal
+                - generic [ref=e2237]: 40 kg
+                - generic [ref=e2238]: ₹65
+                - generic [ref=e2239]: ₹2,600
+              - generic [ref=e2240]:
+                - img "Cauliflower" [ref=e2242]
+                - generic [ref=e2243]: Cauliflower
+                - generic [ref=e2244]: 20 piece
+                - generic [ref=e2245]: ₹30
+                - generic [ref=e2246]: ₹600
+              - generic [ref=e2247]:
+                - img "Cabbage" [ref=e2249]
+                - generic [ref=e2250]: Cabbage
+                - generic [ref=e2251]: 20 piece
+                - generic [ref=e2252]: ₹24
+                - generic [ref=e2253]: ₹480
+              - generic [ref=e2254]:
+                - generic [ref=e2256]: C
+                - generic [ref=e2257]: Carrot
+                - generic [ref=e2258]: 25 kg
+                - generic [ref=e2259]: ₹36
+                - generic [ref=e2260]: ₹900
+            - generic [ref=e2261]:
+              - generic [ref=e2262]: 9 items
+              - generic [ref=e2263]: ₹9055
+          - generic [ref=e2264]:
+            - generic [ref=e2265]:
+              - generic [ref=e2266]:
+                - text: 22/2/2026, 5:11:19 pm
+                - generic [ref=e2267]: ORD-1771760479610
+                - generic [ref=e2268]:
+                  - strong [ref=e2269]: chakravarthi kanthati
+                  - text: "- 9182895565"
+                - 'link "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118" [ref=e2271] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Prime%20Castle%20Apartment%2C%20Nizampet%20Rd%2C%20Bachupally%2C%20Hyderabad%2C%20Telangana%20500118%2C%20India%20-%20Pincode%3A%20500118
+                  - img [ref=e2272]
+                  - text: "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118"
+              - generic [ref=e2275]: Fulfilled
+            - generic [ref=e2277]:
+              - img "Tomato" [ref=e2279]
+              - generic [ref=e2280]: Tomato
+              - generic [ref=e2281]: 100 kg
+              - generic [ref=e2282]: ₹100
+              - generic [ref=e2283]: ₹10,000
+            - generic [ref=e2284]:
+              - generic [ref=e2285]: 1 items
+              - generic [ref=e2286]: ₹10000
+            - generic [ref=e2287]:
+              - button "📄 Invoice" [ref=e2288] [cursor=pointer]
+              - button "Edit" [ref=e2289] [cursor=pointer]
+          - generic [ref=e2290]:
+            - generic [ref=e2291]:
+              - generic [ref=e2292]:
+                - text: 22/2/2026, 5:10:20 pm
+                - generic [ref=e2293]: ORD-1771760420612
+                - generic [ref=e2294]:
+                  - strong [ref=e2295]: chakravarthi kanthati
+                  - text: "- 9182895565"
+                - 'link "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118" [ref=e2297] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Prime%20Castle%20Apartment%2C%20Nizampet%20Rd%2C%20Bachupally%2C%20Hyderabad%2C%20Telangana%20500118%2C%20India%20-%20Pincode%3A%20500118
+                  - img [ref=e2298]
+                  - text: "Prime Castle Apartment, Nizampet Rd, Bachupally, Hyderabad, Telangana 500118, India - Pincode: 500118"
+              - generic [ref=e2301]: Fulfilled
+            - generic [ref=e2303]:
+              - img "Tomato" [ref=e2305]
+              - generic [ref=e2306]: Tomato
+              - generic [ref=e2307]: 100 kg
+              - generic [ref=e2308]: ₹100
+              - generic [ref=e2309]: ₹10,000
+            - generic [ref=e2310]:
+              - generic [ref=e2311]: 1 items
+              - generic [ref=e2312]: ₹10000
+            - generic [ref=e2313]:
+              - button "📄 Invoice" [ref=e2314] [cursor=pointer]
+              - button "Edit" [ref=e2315] [cursor=pointer]
+          - generic [ref=e2316]:
+            - generic [ref=e2317]:
+              - generic [ref=e2318]:
+                - text: 22/2/2026, 3:17:00 pm
+                - generic [ref=e2319]: ORD-1771753620908
+                - generic [ref=e2320]:
+                  - strong [ref=e2321]: Test Client
+                  - text: "- 9999999999"
+                - 'link "Test Location - Pincode: 500001" [ref=e2323] [cursor=pointer]':
+                  - /url: https://maps.google.com/?q=Test%20Location%20-%20Pincode%3A%20500001
+                  - img [ref=e2324]
+                  - text: "Test Location - Pincode: 500001"
+              - generic [ref=e2327]: Fulfilled
+            - generic [ref=e2329]:
+              - img "Tomato" [ref=e2331]
+              - generic [ref=e2332]: Tomato
+              - generic [ref=e2333]: 100 kg
+              - generic [ref=e2334]: ₹30
+              - generic [ref=e2335]: ₹3,000
+            - generic [ref=e2336]:
+              - generic [ref=e2337]: 1 items
+              - generic [ref=e2338]: ₹3000
+            - generic [ref=e2339]:
+              - button "📄 Invoice" [ref=e2340] [cursor=pointer]
+              - button "Edit" [ref=e2341] [cursor=pointer]
+  - button "⚙️" [ref=e33] [cursor=pointer]
+  - link "Order via WhatsApp" [ref=e36] [cursor=pointer]:
+    - /url: https://wa.me/91XXXXXXXXXX?text=Hi%20KKR%20Groceries%2C%20I%20want%20to%20place%20a%20wholesale%20order
+    - img [ref=e37]
+  - contentinfo [ref=e39]:
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - heading "🥬 KKR Groceries" [level=3] [ref=e42]
+        - paragraph [ref=e43]: Hyderabad’s trusted B2B vegetable wholesale partner. Fresh produce from APMC markets to hotels, restaurants, and retailers.
+      - generic [ref=e44]:
+        - heading "📞 Contact" [level=3] [ref=e45]
+        - paragraph [ref=e46]: "📱 Phone: +91 91828 95565"
+        - paragraph [ref=e47]: "📧 Email: kanthati.chakri@gmail.com"
+        - paragraph [ref=e48]: 📍 Hyderabad, Telangana
+        - paragraph [ref=e49]: "⏰ Hours: 4:00 AM - 8:00 PM"
+      - generic [ref=e50]:
+        - heading "🔗 Quick Links" [level=3] [ref=e51]
+        - paragraph [ref=e52]:
+          - link "Daily Essentials" [ref=e53] [cursor=pointer]:
+            - /url: "#"
+        - paragraph [ref=e54]:
+          - link "High Rotation" [ref=e55] [cursor=pointer]:
+            - /url: "#"
+        - paragraph [ref=e56]:
+          - link "Regional Specials" [ref=e57] [cursor=pointer]:
+            - /url: "#"
+    - generic [ref=e58]: © 2026 KKR Groceries. All rights reserved. | B2B Wholesale Platform

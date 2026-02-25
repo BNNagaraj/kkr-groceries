@@ -1,0 +1,58 @@
+/**
+ * Toast Notification Styles
+ */
+
+.toast-container {
+    position: fixed;
+    top: calc(var(--header-height) + 10px);
+    right: 1rem;
+    z-index: 3000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.toast {
+    padding: 0.75rem 1.25rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: white;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    animation: toastIn 0.3s ease-out, toastOut 0.3s ease-in forwards;
+    animation-delay: 0s, 2.5s;
+    max-width: 320px;
+}
+
+.toast.success {
+    background: linear-gradient(135deg, #059669, #047857);
+}
+
+.toast.error {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.toast.info {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+@keyframes toastIn {
+    from {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes toastOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}

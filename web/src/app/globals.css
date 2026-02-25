@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #059669;
+  --color-primary-dark: #064e3b;
+  --color-accent: #f97316;
+  --color-gold: #fbbf24;
+  --color-danger: #ef4444;
+  --color-success: #10b981;
+
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-telugu: var(--font-noto-telugu), sans-serif;
+}
+
+@layer base {
+  :root {
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --header-height: 70px;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    padding-bottom: calc(80px + var(--safe-area-bottom));
+  }
+}
+
+/* Base utility overrides that map directly to the old app.css behavior */
+@layer utilities {
+  .text-shadow {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  }
+
+  .glass-card {
+    @apply bg-white/95 backdrop-blur-md rounded-2xl shadow-sm border border-slate-100;
+  }
+
+  /* Force scrollbar hiding for clean lists */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* End of globals.css */

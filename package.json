@@ -6,9 +6,21 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "test": "vitest",
+        "test:ui": "vitest --ui",
+        "test:coverage": "vitest --coverage",
+        "test:run": "vitest run",
+        "mcp:setup": "node scripts/setup-mcp.js",
+        "mcp:logs": "powershell -Command \"Get-Content -Path ~/.firebase-mcp/debug.log -Wait\"",
+        "mcp:test": "node scripts/test-mcp.js",
+        "mcp:connect": "npx -y @gannonh/firebase-mcp"
     },
     "devDependencies": {
-        "vite": "^6.0.0"
+        "@gannonh/firebase-mcp": "^1.4.9",
+        "@vitest/ui": "^4.0.18",
+        "jsdom": "^28.1.0",
+        "vite": "^6.0.0",
+        "vitest": "^4.0.18"
     }
 }

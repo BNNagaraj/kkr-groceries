@@ -22,5 +22,10 @@ Thumbs.db
 *.log
 
 # IDE
-.vscode/
 .idea/
+# Allow VS Code MCP config but ignore other settings
+.vscode/*
+!.vscode/mcp.json
+
+# Firebase service account (sensitive)
+.firebase/serviceAccountKey.json

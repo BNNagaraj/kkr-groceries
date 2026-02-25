@@ -1,6 +1,6 @@
 import { state, products } from '../store.js';
 import { getSellingPrice } from '../services/apmc.js';
-import { renderProducts } from './products.js';
+import { renderProducts, updateProductUI } from './products.js';
 import { showToast } from '../utils/dom.js';
 import { openAuthModal } from '../services/auth.js';
 
@@ -18,10 +18,16 @@ export function updateUI() {
         el.textContent = '\u20B9' + total.toLocaleString('en-IN');
         el.classList.toggle('show', total > 0);
     }
+    
+    // Render mobile cart bar only (no expand functionality)
+    renderMobileCartBar();
 }
 
 export function validateCart() {
-    return Object.values(state.cart).every(i => i.qty >= i.moq);
+    return Object.values(state.cart).every(i => {
+        const moqRequired = i.moqRequired !== false;
+        return moqRequired ? i.qty >= i.moq : i.qty >= 1;
+    });
 }
 
 export function handleAddClick(id) {
@@ -34,22 +40,34 @@ export function handleAddClick(id) {
     if (!p) return;
 
     const sp = getSellingPrice(p);
-    state.cart[id] = { ...p, price: sp, qty: p.moq };
-    showToast(`Added ${p.name} (\u00D7${p.moq})`, 'success');
+    const moqRequired = p.moqRequired !== false;
+    const initialQty = moqRequired ? p.moq : 1;
+    state.cart[id] = { ...p, price: sp, qty: initialQty };
+    showToast(`Added ${p.name} (\u00d7${initialQty})`, 'success');
     updateUI();
-    renderProducts(state.currentCategory);
+    updateProductUI(id);
 }
 
 export function updateQty(id, change) {
     if (!state.cart[id]) return;
-    const nq = state.cart[id].qty + change;
-    if (nq < state.cart[id].moq) {
-        showToast(`Min order: ${state.cart[id].moq} ${state.cart[id].unit}`, 'error');
+    const item = state.cart[id];
+    const nq = item.qty + change;
+    const moqRequired = item.moqRequired !== false;
+    const minQty = moqRequired ? item.moq : 1;
+    
+    if (nq < minQty) {
+        if (moqRequired) {
+            showToast(`Min order: ${item.moq} ${item.unit}`, 'error');
+        } else {
+            // If MOQ not required, remove item when going below 1
+            delete state.cart[id];
+            showToast('Item removed', 'info');
+        }
         return;
     }
-    state.cart[id].qty = nq;
+    item.qty = nq;
     updateUI();
-    renderProducts(state.currentCategory);
+    updateProductUI(id);
 }
 
 export function handleQtyChange(id, value) {
@@ -57,23 +75,30 @@ export function handleQtyChange(id, value) {
     const p = products.find(x => x.id === id);
     if (!p) return;
 
+    const moqRequired = p.moqRequired !== false;
+    const minQty = moqRequired ? p.moq : 1;
+
     if (qty <= 0) {
         delete state.cart[id];
-    } else if (qty < p.moq) {
+    } else if (qty < minQty && moqRequired) {
         showToast(`Set to minimum: ${p.moq} ${p.unit}`, 'info');
         state.cart[id] = { ...p, price: getSellingPrice(p), qty: p.moq };
+    } else if (qty < minQty && !moqRequired) {
+        // If MOQ not required, remove when below 1
+        delete state.cart[id];
+        showToast('Item removed', 'info');
     } else {
         state.cart[id] = { ...p, price: getSellingPrice(p), qty };
     }
     updateUI();
-    renderProducts(state.currentCategory);
+    updateProductUI(id);
 }
 
 export function removeItem(id) {
     delete state.cart[id];
     showToast('Item removed', 'info');
     updateUI();
-    renderProducts(state.currentCategory);
+    updateProductUI(id);
 }
 
 // Global Event Delegation Helper mapping clicks on the grid
@@ -93,4 +118,97 @@ export function onProductGridClick(e) {
 export function onProductQtyChange(e) {
     const i = e.target.closest('input[data-action="set-qty"]');
     if (i) handleQtyChange(Number(i.dataset.productId), i.value);
+}
+
+// Handle direct quantity input change from enquiry modal
+export function handleCartQtyChange(productId, value) {
+    const qty = parseInt(value, 10) || 0;
+    const item = state.cart[productId];
+    if (!item) return;
+    
+    if (qty <= 0) {
+        removeCartItem(productId);
+        return;
+    }
+    
+    if (qty < item.moq) {
+        showToast(`Minimum order quantity is ${item.moq} ${item.unit}`, 'warning');
+        item.qty = item.moq;
+    } else {
+        item.qty = qty;
+    }
+    
+    updateUI();
+    updateProductUI(productId);
+    
+    // Refresh enquiry modal
+    const enquiryModal = document.getElementById('enquiryModal');
+    if (enquiryModal && enquiryModal.style.display === 'flex') {
+        import('./enquiry.js').then(m => m.openEnquiryModal());
+    }
+}
+
+// Mobile Cart Bar - Simple summary only
+export function renderMobileCartBar() {
+    const existing = document.getElementById('mobileCartBar');
+    if (existing) existing.remove();
+    
+    const items = Object.values(state.cart);
+    if (items.length === 0) return;
+    
+    const totalItems = items.reduce((sum, item) => sum + item.qty, 0);
+    const totalValue = items.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    
+    const bar = document.createElement('div');
+    bar.id = 'mobileCartBar';
+    bar.className = 'mobile-cart-bar';
+    bar.innerHTML = `
+        <div class="cart-summary">
+            <span class="item-count">${totalItems} item${totalItems > 1 ? 's' : ''}</span>
+            <span class="total-price">₹${totalValue.toLocaleString('en-IN')}</span>
+        </div>
+        <button class="btn-view-cart" onclick="openEnquiryModal()">
+            View Cart →
+        </button>
+    `;
+    document.body.appendChild(bar);
+}
+
+// Cart item management for enquiry modal
+export function adjustCartItem(productId, delta) {
+    const item = state.cart[productId];
+    if (!item) return;
+    
+    const product = products.find(p => p.id === productId);
+    const newQty = item.qty + delta;
+    
+    if (newQty < item.moq && delta < 0) {
+        delete state.cart[productId];
+        showToast(`${product.name} removed from cart`, 'info');
+    } else {
+        item.qty = newQty;
+    }
+    
+    updateUI();
+    updateProductUI(productId);
+    
+    // Refresh enquiry modal if open
+    const enquiryModal = document.getElementById('enquiryModal');
+    if (enquiryModal && enquiryModal.style.display === 'flex') {
+        import('./enquiry.js').then(m => m.openEnquiryModal());
+    }
+}
+
+export function removeCartItem(productId) {
+    const product = products.find(p => p.id === productId);
+    delete state.cart[productId];
+    showToast(`${product?.name || 'Item'} removed from cart`, 'info');
+    updateUI();
+    updateProductUI(productId);
+    
+    // Refresh enquiry modal if open
+    const enquiryModal = document.getElementById('enquiryModal');
+    if (enquiryModal && enquiryModal.style.display === 'flex') {
+        import('./enquiry.js').then(m => m.openEnquiryModal());
+    }
 }

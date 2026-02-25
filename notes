@@ -1,0 +1,30 @@
+3. Necessary Architectural Improvements for Enterprise Deployment
+To scale from a structural MVP to a robust, maintainable, production-ready system, the following improvements are strongly recommended:
+
+1. Migrate to a Frontend UI Framework (React/Next.js or Vue)
+Current Issue: Mixing raw HTML string concatenation with complex JS logic (
+admin.js
+ strings are massive) makes the app extremely prone to XSS (Cross-Site Scripting) vulnerabilities, is difficult to maintain, and complicates state management algorithms. Fix: Adopting React or Vue will componentize the UI, manage the lifecycles gracefully, heavily mitigate XSS, and allow for much faster developer iteration.
+
+2. Move from CDN Scripts to NPM Packages
+Current Issue: The Firebase SDKs and Chart.js are loaded globally via <script> tags in 
+index.html
+. Fix: Install dependencies via NPM (npm install firebase) and let Vite bundle them natively. This enables features like tree-shaking (removing unused Firebase code) which vastly reduces the load time of the initial JavaScript bundle on mobile connections.
+
+3. Implement Static Storage for External Images
+Current Issue: Hotlinking high-resolution external images from Wikipedia or Unsplash causes the browser to block them locally or on restricted domains (yielding ERR_BLOCKED_BY_ORB or CORS errors). Fix: Create a process that downloads the external images, resizes/compresses them uniformly to WEBP formats, and uploads them to the internal Firebase Storage bucket. The app should only serve images from its own domain.
+
+4. Centralize the Backend (Deprecate Apps Script)
+Current Issue: Having Cloud Functions handling Orders while Apps Script handles Enquiries creates a split, fragmented backend footprint characterized by different deployment pipelines, log structures, and auth layers. Fix: Port the Google Apps Script 
+doPost
+ functionality into a new Firebase Cloud Function (submitEnquiry). The cloud function can still talk to Google Sheets via the googleapis library if the Sheet is mandatory, but centralizing the logic improves security.
+
+5. Transition to TypeScript
+Current Issue: A global JavaScript state where an orderItem floats around without shape guarantees leads to runtime crashes (e.g. attempting to do math on a string ID). Fix: Introducing TypeScript interfaces for 
+Product
+, CartItem, and 
+Order
+ ensures that developers catch typing errors immediately in the IDE, drastically decreasing production bugs.
+
+6. Improve Firestore Data Rules
+Current Issue: Security rules are fairly broad. While submitOrder is locked down, read operations have minimal throttling. A malicious actor could repeatedly poll the products listener. Fix: Enforce stricter API restrictions in the GCP Console, tighten Firestore wildcard rules, and implement App Check to ensure only your authorized frontend domain can communicate with the backend.

@@ -1,21 +1,134 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        request.auth.token.email in [
+          'raju2uraju@gmail.com', 
+          'kanthati.chakri@gmail.com'
+        ];
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function validString(value, minLen, maxLen) {
+      return value is string && 
+        value.size() >= minLen && 
+        value.size() <= maxLen;
+    }
+    
+    function validNumber(value, min, max) {
+      return value is number && 
+        value >= min && 
+        value <= max;
+    }
+    
+    function validTimestamp() {
+      return request.time <= request.time + duration.value(0, "s");
+    }
+
+    // Settings collection
     match /settings/{doc} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow write: if isAdmin();
     }
-    match /orders/{orderId} {
-      allow create: if request.auth != null;
-      allow read: if request.auth != null && (request.auth.token.admin == true || resource.data.userId == request.auth.uid);
-      allow update: if request.auth != null && request.auth.token.admin == true;
-    }
-    match /users/{userId}/addresses/{addrId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
+    
+    // Products collection
     match /products/{productId} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      
+      allow create: if isAdmin() && 
+        validString(request.resource.data.name, 1, 100) &&
+        validString(request.resource.data.unit, 1, 20) &&
+        validNumber(request.resource.data.moq, 1, 10000) &&
+        validNumber(request.resource.data.price, 0, 100000);
+      
+      allow update: if isAdmin() && 
+        validString(request.resource.data.name, 1, 100) &&
+        validString(request.resource.data.unit, 1, 20) &&
+        validNumber(request.resource.data.moq, 1, 10000) &&
+        validNumber(request.resource.data.price, 0, 100000);
+      
+      allow delete: if isAdmin();
+    }
+    
+    // Orders collection
+    match /orders/{orderId} {
+      // Read: Admin can read all, users can read their own
+      allow read: if isAdmin() || 
+        (isAuthenticated() && resource.data.userId == request.auth.uid);
+      
+      // Create: Allow authenticated users to create their own orders
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.userId &&
+        request.resource.data.keys().hasAll(['userId', 'items', 'total', 'address', 'createdAt']) &&
+        request.resource.data.items is list &&
+        request.resource.data.items.size() > 0 &&
+        request.resource.data.total is number &&
+        request.resource.data.total > 0;
+      
+      // Update: Admin can update status, user cannot modify after creation
+      allow update: if isAdmin() && 
+        request.resource.data.keys().hasOnly(['status', 'updatedAt', 'revisedAcceptedCart', 'revisedFulfilledCart', 'orderSummary', 'totalValue', 'productCount']) &&
+        request.resource.data.status in ['Pending', 'Accepted', 'Fulfilled', 'Rejected'];
+      
+      // Delete: Only admin
+      allow delete: if isAdmin();
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      
+      // Addresses subcollection
+      match /addresses/{addressId} {
+        allow read, write: if isOwner(userId) &&
+          validString(request.resource.data.name, 2, 50) &&
+          validString(request.resource.data.phone, 10, 10) &&
+          validString(request.resource.data.loc, 10, 200) &&
+          validString(request.resource.data.pin, 6, 6);
+      }
+    }
+    
+    // Mail collection (for email extension)
+    match /mail/{mailId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isAdmin();
+    }
+    
+    // Pending orders for offline sync
+    match /pendingOrders/{orderId} {
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.userId;
+      allow read, update, delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Analytics/Stats (admin only)
+    match /stats/{statId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+    
+    // Audit logs (admin only)
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+    }
+    
+    // Presence/Online status
+    match /presence/{userId} {
+      allow read: if isAdmin();
+      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if false;
     }
   }
 }

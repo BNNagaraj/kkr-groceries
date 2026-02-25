@@ -1,0 +1,75 @@
+/**
+ * CSS Variables and Custom Properties
+ */
+
+:root {
+    /* Brand Colors */
+    --primary: #059669;
+    --primary-dark: #064e3b;
+    --primary-light: #047857;
+    --accent: #f97316;
+    --accent-dark: #ea580c;
+    --gold: #fbbf24;
+    --danger: #ef4444;
+    
+    /* Neutral Colors */
+    --bg: #f8fafc;
+    --bg-white: #ffffff;
+    --text-primary: #1e293b;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --text-light: #94a3b8;
+    --border-color: #e2e8f0;
+    --border-light: #f1f5f9;
+    
+    /* Semantic Colors */
+    --success-bg: #f0fdf4;
+    --success-text: #059669;
+    --info-bg: #eff6ff;
+    --info-text: #2563eb;
+    --warning-bg: #fef3c7;
+    --warning-text: #d97706;
+    --error-bg: #fef2f2;
+    --error-text: #ef4444;
+    
+    /* Layout */
+    --header-height: 70px;
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --max-width: 1400px;
+    
+    /* Spacing */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+    
+    /* Border Radius */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-full: 9999px;
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 25px rgba(0, 0, 0, 0.15);
+    --shadow-primary: 0 4px 15px rgba(5, 150, 105, 0.3);
+    
+    /* Typography */
+    --font-sans: 'Outfit', 'Noto Sans Telugu', sans-serif;
+    --font-telugu: 'Noto Sans Telugu', sans-serif;
+    
+    /* Transitions */
+    --transition-fast: 0.15s ease;
+    --transition-base: 0.2s ease;
+    --transition-slow: 0.3s ease;
+    
+    /* Z-index scale */
+    --z-dropdown: 100;
+    --z-sticky: 100;
+    --z-modal: 200;
+    --z-toast: 300;
+    --z-tooltip: 400;
+}

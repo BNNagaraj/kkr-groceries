@@ -1,0 +1,575 @@
+/**
+ * Cart and Quantity Control Styles
+ */
+
+.qty-controls {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    background: #f0fdf4;
+    padding: 0.5rem;
+    border-radius: 10px;
+    border: 2px solid var(--primary);
+    width: 100%;
+}
+
+.qty-controls.active {
+    display: flex;
+    animation: slideIn 0.2s;
+}
+
+.qty-controls.error {
+    border-color: var(--danger);
+    background: #fef2f2;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.qty-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.qty-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: var(--primary);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.qty-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.qty-input {
+    width: 50px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    text-align: center;
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: #0f172a;
+    font-family: inherit;
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+}
+
+.moq-label {
+    font-size: 0.7rem;
+    color: var(--danger);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.unit-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.remove-btn {
+    font-size: 0.75rem;
+    color: #ef4444;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    padding: 0.25rem;
+}
+
+/* Selected Items in Modal */
+.selected-items {
+    background: #f0fdf4;
+    border: 2px dashed var(--primary);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.selected-items h4 {
+    color: #064e3b;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.item-row {
+    background: white;
+    padding: 0.75rem;
+    border-radius: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid var(--primary);
+}
+
+.item-row.moq-warning {
+    border-left-color: var(--danger);
+    background: #fef2f2;
+}
+
+.item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+}
+
+.item-name {
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 0.95rem;
+}
+
+.item-qty {
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.item-price {
+    color: #059669;
+    font-weight: 800;
+    font-size: 1rem;
+    text-align: right;
+}
+
+/* Enquiry Items Table */
+.enquiry-items-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.enquiry-items-table thead {
+    background: var(--primary);
+    color: white;
+}
+
+.enquiry-items-table th {
+    padding: 0.75rem 0.5rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
+.enquiry-items-table th:last-child {
+    text-align: center;
+    width: 40px;
+}
+
+.enquiry-items-table td {
+    padding: 0.75rem 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+}
+
+.enquiry-items-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.enquiry-product {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.enquiry-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid #e2e8f0;
+}
+
+.enquiry-item-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.enquiry-item-fallback {
+    width: 100%;
+    height: 100%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #64748b;
+    background: #f1f5f9;
+}
+
+.enquiry-product-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.enquiry-name {
+    font-weight: 600;
+    color: #0f172a;
+    font-size: 0.95rem;
+}
+
+.enquiry-telugu {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.enquiry-items-table .moq-warning {
+    color: #dc2626;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.qty-cell {
+    width: 110px;
+}
+
+.unit-cell {
+    text-align: center;
+    color: #64748b;
+    font-size: 0.9rem;
+    font-weight: 500;
+    width: 60px;
+}
+
+.enquiry-qty-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.enquiry-qty-controls .qty-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: var(--primary);
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+.enquiry-qty-controls .qty-btn:hover:not(:disabled) {
+    background: var(--primary);
+    color: white;
+}
+
+.enquiry-qty-controls .qty-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.enquiry-qty-controls .qty-input {
+    width: 50px;
+    height: 28px;
+    text-align: center;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.price-cell, .total-cell {
+    font-family: 'Segoe UI', monospace;
+    font-weight: 600;
+    color: #059669;
+}
+
+.total-cell {
+    font-weight: 700;
+}
+
+.action-cell {
+    text-align: center;
+}
+
+.action-cell .remove-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: #fee2e2;
+    color: #dc2626;
+    font-size: 1.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.action-cell .remove-btn:hover {
+    background: #dc2626;
+    color: white;
+}
+
+.enquiry-items-table tfoot {
+    background: #f0fdf4;
+}
+
+.grand-total-row td {
+    padding: 1rem 0.5rem;
+    font-size: 1.1rem;
+    border-top: 2px solid var(--primary);
+}
+
+.grand-total-row strong {
+    color: #064e3b;
+}
+
+/* Mobile responsive table */
+@media (max-width: 640px) {
+    .enquiry-items-table {
+        font-size: 0.85rem;
+    }
+    
+    .enquiry-thumb {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .enquiry-name {
+        font-size: 0.9rem;
+    }
+    
+    .enquiry-telugu {
+        display: none;
+    }
+    
+    .qty-cell {
+        width: 100px;
+    }
+    
+    .enquiry-qty-controls .qty-input {
+        width: 40px;
+    }
+}
+
+/* Mobile Cart Bar - Simple */
+.mobile-cart-bar {
+    position: fixed;
+    bottom: calc(20px + var(--safe-area-bottom, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 2rem);
+    max-width: 400px;
+    background: white;
+    border-radius: 50px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 998;
+    animation: slideUpCart 0.3s ease;
+    border: 2px solid var(--primary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+}
+
+@keyframes slideUpCart {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.mobile-cart-bar .cart-summary {
+    display: flex;
+    flex-direction: column;
+}
+
+.mobile-cart-bar .item-count {
+    font-size: 0.75rem;
+    color: var(--text-light);
+}
+
+.mobile-cart-bar .total-price {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.mobile-cart-bar .btn-view-cart {
+    padding: 0.5rem 1.25rem;
+    border-radius: 25px;
+    font-weight: 600;
+    background: var(--primary);
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.mobile-cart-bar .btn-view-cart:hover {
+    background: var(--primary-dark);
+}
+
+/* Hide mobile cart bar when enquiry modal is open */
+#enquiryModal[style*="flex"] ~ .mobile-cart-bar,
+.modal-overlay.active ~ .mobile-cart-bar {
+    display: none !important;
+}
+
+@media (min-width: 641px) {
+    .mobile-cart-bar {
+        display: none !important;
+    }
+}
+
+/* Inline Quantity Controls in Enquiry Modal */
+.item-qty-control {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+}
+
+.qty-btn-sm {
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border-color);
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
+}
+
+.qty-btn-sm:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.qty-btn-sm:hover:not(:disabled) {
+    background: var(--bg);
+    border-color: var(--primary);
+}
+
+.qty-input-sm {
+    width: 45px;
+    height: 24px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0;
+    -moz-appearance: textfield;
+}
+
+.qty-input-sm::-webkit-outer-spin-button,
+.qty-input-sm::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.qty-input-sm:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.1);
+}
+
+.item-qty-control .unit-label {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    margin-left: 0.25rem;
+}
+
+.moq-warning-text {
+    font-size: 0.7rem;
+    color: var(--danger);
+    margin-top: 0.25rem;
+    font-weight: 600;
+}
+
+.remove-item-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: none;
+    background: #fee2e2;
+    color: #dc2626;
+    cursor: pointer;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    margin-top: 0.25rem;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.remove-item-btn:hover {
+    opacity: 1;
+    background: #fecaca;
+}

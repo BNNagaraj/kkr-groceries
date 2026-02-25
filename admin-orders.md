@@ -1,0 +1,312 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]: 🥬
+        - generic [ref=e6]:
+          - heading "KKR Groceries" [level=1] [ref=e7]
+          - generic [ref=e8]: Hyderabad Wholesale
+      - generic [ref=e9]:
+        - generic [ref=e12]: Live APMC
+        - img "N" [ref=e346] [cursor=pointer]
+        - button "Send Order Request" [ref=e14] [cursor=pointer]:
+          - generic [ref=e15]: Send Order Request
+  - main [ref=e16]:
+    - generic [ref=e17]:
+      - generic [ref=e18]: 📦
+      - generic [ref=e19]: "B2B Wholesale Only: Minimum Order Quantities (MOQ) Apply"
+    - generic [ref=e21]:
+      - button "All Items" [ref=e22] [cursor=pointer]
+      - button "Daily Essentials" [ref=e23] [cursor=pointer]
+      - button "High Rotation" [ref=e24] [cursor=pointer]
+      - button "Regional Specials" [ref=e25] [cursor=pointer]
+    - generic [ref=e27]:
+      - textbox "Search products" [ref=e28]:
+        - /placeholder: Search vegetables... (English, Telugu, Hindi)
+      - generic [ref=e29]: 🔍
+    - generic [ref=e30]:
+      - combobox "Sort products" [ref=e32] [cursor=pointer]:
+        - option "\\ud83d\\udd25 Popular" [selected]
+        - 'option "\\u20b9 Price: Low to High"'
+        - 'option "\\u20b9 Price: High to Low"'
+        - option "A-Z Name"
+      - generic [ref=e56]: 13 products
+    - generic [ref=e57]:
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - generic [ref=e60]: 🔥
+          - img "Tomato" [ref=e61]
+          - generic: ✔
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - heading "Tomato" [level=3] [ref=e65]
+            - generic [ref=e66]:
+              - generic [ref=e67]: టమాటో
+              - generic [ref=e68]: Tamatar
+            - generic [ref=e69]:
+              - generic [ref=e70]: ✅
+              - generic [ref=e71]: No MOQ required
+          - generic [ref=e72]:
+            - generic [ref=e73]: ₹5
+            - generic [ref=e74]: /kg
+        - button "Add + Any qty" [ref=e76] [cursor=pointer]:
+          - generic [ref=e77]: Add +
+          - generic [ref=e78]: Any qty
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - generic [ref=e81]: 🔥
+          - img "Onion" [ref=e82]
+          - generic: ✔
+        - generic [ref=e84]:
+          - generic [ref=e85]:
+            - heading "Onion" [level=3] [ref=e86]
+            - generic [ref=e87]:
+              - generic [ref=e88]: ఉల్లిపాయ
+              - generic [ref=e89]: Pyaz
+            - generic [ref=e90]:
+              - generic [ref=e91]: ⚠️
+              - generic [ref=e92]: "Min: 50 kg"
+          - generic [ref=e93]:
+            - generic [ref=e94]: ₹5
+            - generic [ref=e95]: /kg
+        - button "Add + Min 50" [ref=e97] [cursor=pointer]:
+          - generic [ref=e98]: Add +
+          - generic [ref=e99]: Min 50
+      - generic [ref=e100]:
+        - generic [ref=e101]:
+          - generic [ref=e102]: 🔥
+          - img "Green Chilli" [ref=e103]
+          - generic: ✔
+        - generic [ref=e105]:
+          - generic [ref=e106]:
+            - heading "Green Chilli" [level=3] [ref=e107]
+            - generic [ref=e108]:
+              - generic [ref=e109]: పచ్చి మిర్చి
+              - generic [ref=e110]: Hari Mirch
+            - generic [ref=e111]:
+              - generic [ref=e112]: ✅
+              - generic [ref=e113]: No MOQ required
+          - generic [ref=e114]:
+            - generic [ref=e115]: ₹5
+            - generic [ref=e116]: /kg
+        - button "Add + Any qty" [ref=e118] [cursor=pointer]:
+          - generic [ref=e119]: Add +
+          - generic [ref=e120]: Any qty
+      - generic [ref=e121]:
+        - generic [ref=e122]:
+          - img "Potato" [ref=e123]
+          - generic: ✔
+        - generic [ref=e125]:
+          - generic [ref=e126]:
+            - heading "Potato" [level=3] [ref=e127]
+            - generic [ref=e128]:
+              - generic [ref=e129]: బంగాళాదుంప
+              - generic [ref=e130]: Aloo
+            - generic [ref=e131]:
+              - generic [ref=e132]: ✅
+              - generic [ref=e133]: No MOQ required
+          - generic [ref=e134]:
+            - generic [ref=e135]: ₹5
+            - generic [ref=e136]: /kg
+        - button "Add + Any qty" [ref=e138] [cursor=pointer]:
+          - generic [ref=e139]: Add +
+          - generic [ref=e140]: Any qty
+      - generic [ref=e141]:
+        - generic [ref=e142]:
+          - img "Lady's Finger" [ref=e143]
+          - generic: ✔
+        - generic [ref=e145]:
+          - generic [ref=e146]:
+            - heading "Lady's Finger" [level=3] [ref=e147]
+            - generic [ref=e148]:
+              - generic [ref=e149]: బెండకాయ
+              - generic [ref=e150]: Bhindi
+            - generic [ref=e151]:
+              - generic [ref=e152]: ✅
+              - generic [ref=e153]: No MOQ required
+          - generic [ref=e154]:
+            - generic [ref=e155]: ₹5
+            - generic [ref=e156]: /kg
+        - button "Add + Any qty" [ref=e158] [cursor=pointer]:
+          - generic [ref=e159]: Add +
+          - generic [ref=e160]: Any qty
+      - generic [ref=e161]:
+        - generic [ref=e162]:
+          - img "Brinjal" [ref=e163]
+          - generic: ✔
+        - generic [ref=e165]:
+          - generic [ref=e166]:
+            - heading "Brinjal" [level=3] [ref=e167]
+            - generic [ref=e168]:
+              - generic [ref=e169]: వంకాయ
+              - generic [ref=e170]: Baingan
+            - generic [ref=e171]:
+              - generic [ref=e172]: ✅
+              - generic [ref=e173]: No MOQ required
+          - generic [ref=e174]:
+            - generic [ref=e175]: ₹5
+            - generic [ref=e176]: /kg
+        - button "Add + Any qty" [ref=e178] [cursor=pointer]:
+          - generic [ref=e179]: Add +
+          - generic [ref=e180]: Any qty
+      - generic [ref=e181]:
+        - generic [ref=e182]:
+          - generic [ref=e183]: ❄️
+          - img "Cauliflower" [ref=e184]
+          - generic: ✔
+        - generic [ref=e186]:
+          - generic [ref=e187]:
+            - heading "Cauliflower" [level=3] [ref=e188]
+            - generic [ref=e189]:
+              - generic [ref=e190]: పులవర్‌
+              - generic [ref=e191]: Phool Gobi
+            - generic [ref=e192]:
+              - generic [ref=e193]: ✅
+              - generic [ref=e194]: No MOQ required
+          - generic [ref=e195]:
+            - generic [ref=e196]: ₹5
+            - generic [ref=e197]: /piece
+        - button "Add + Any qty" [ref=e199] [cursor=pointer]:
+          - generic [ref=e200]: Add +
+          - generic [ref=e201]: Any qty
+      - generic [ref=e202]:
+        - generic [ref=e203]:
+          - img "Cabbage" [ref=e204]
+          - generic: ✔
+        - generic [ref=e206]:
+          - generic [ref=e207]:
+            - heading "Cabbage" [level=3] [ref=e208]
+            - generic [ref=e209]:
+              - generic [ref=e210]: క్యాబేజీ
+              - generic [ref=e211]: Patta Gobi
+            - generic [ref=e212]:
+              - generic [ref=e213]: ✅
+              - generic [ref=e214]: No MOQ required
+          - generic [ref=e215]:
+            - generic [ref=e216]: ₹5
+            - generic [ref=e217]: /piece
+        - button "Add + Any qty" [ref=e219] [cursor=pointer]:
+          - generic [ref=e220]: Add +
+          - generic [ref=e221]: Any qty
+      - generic [ref=e222]:
+        - generic [ref=e223]:
+          - img "Carrot" [ref=e224]
+          - generic: ✔
+        - generic [ref=e226]:
+          - generic [ref=e227]:
+            - heading "Carrot" [level=3] [ref=e228]
+            - generic [ref=e229]:
+              - generic [ref=e230]: క్యారెట్
+              - generic [ref=e231]: Gajar
+            - generic [ref=e232]:
+              - generic [ref=e233]: ✅
+              - generic [ref=e234]: No MOQ required
+          - generic [ref=e235]:
+            - generic [ref=e236]: ₹5
+            - generic [ref=e237]: /kg
+        - button "Add + Any qty" [ref=e239] [cursor=pointer]:
+          - generic [ref=e240]: Add +
+          - generic [ref=e241]: Any qty
+      - generic [ref=e242]:
+        - generic [ref=e243]:
+          - generic [ref=e244]: ❄️
+          - img "Spinach" [ref=e245]
+          - generic: ✔
+        - generic [ref=e247]:
+          - generic [ref=e248]:
+            - heading "Spinach" [level=3] [ref=e249]
+            - generic [ref=e250]:
+              - generic [ref=e251]: పాలకూర
+              - generic [ref=e252]: Palak
+            - generic [ref=e253]:
+              - generic [ref=e254]: ✅
+              - generic [ref=e255]: No MOQ required
+          - generic [ref=e256]:
+            - generic [ref=e257]: ₹5
+            - generic [ref=e258]: /bunch
+        - button "Add + Any qty" [ref=e260] [cursor=pointer]:
+          - generic [ref=e261]: Add +
+          - generic [ref=e262]: Any qty
+      - generic [ref=e263]:
+        - generic [ref=e264]:
+          - img "Bottle Gourd" [ref=e265]
+          - generic: ✔
+        - generic [ref=e267]:
+          - generic [ref=e268]:
+            - heading "Bottle Gourd" [level=3] [ref=e269]
+            - generic [ref=e270]:
+              - generic [ref=e271]: సొరకాయ
+              - generic [ref=e272]: Lauki
+            - generic [ref=e273]:
+              - generic [ref=e274]: ✅
+              - generic [ref=e275]: No MOQ required
+          - generic [ref=e276]:
+            - generic [ref=e277]: ₹5
+            - generic [ref=e278]: /piece
+        - button "Add + Any qty" [ref=e280] [cursor=pointer]:
+          - generic [ref=e281]: Add +
+          - generic [ref=e282]: Any qty
+      - generic [ref=e283]:
+        - generic [ref=e284]:
+          - img "Ridge Gourd" [ref=e285]
+          - generic: ✔
+        - generic [ref=e287]:
+          - generic [ref=e288]:
+            - heading "Ridge Gourd" [level=3] [ref=e289]
+            - generic [ref=e290]:
+              - generic [ref=e291]: బీరకాయ
+              - generic [ref=e292]: Turiya
+            - generic [ref=e293]:
+              - generic [ref=e294]: ✅
+              - generic [ref=e295]: No MOQ required
+          - generic [ref=e296]:
+            - generic [ref=e297]: ₹5
+            - generic [ref=e298]: /kg
+        - button "Add + Any qty" [ref=e300] [cursor=pointer]:
+          - generic [ref=e301]: Add +
+          - generic [ref=e302]: Any qty
+      - generic [ref=e303]:
+        - generic [ref=e304]:
+          - img "Banana" [ref=e305]
+          - generic: ✔
+        - generic [ref=e307]:
+          - generic [ref=e308]:
+            - heading "Banana" [level=3] [ref=e309]
+            - generic [ref=e310]:
+              - generic [ref=e311]: ✅
+              - generic [ref=e312]: No MOQ required
+          - generic [ref=e313]:
+            - generic [ref=e314]: ₹5
+            - generic [ref=e315]: /kg
+        - button "Add + Any qty" [ref=e317] [cursor=pointer]:
+          - generic [ref=e318]: Add +
+          - generic [ref=e319]: Any qty
+  - button "⚙️" [ref=e347] [cursor=pointer]
+  - link "Order via WhatsApp" [ref=e33] [cursor=pointer]:
+    - /url: https://wa.me/91XXXXXXXXXX?text=Hi%20KKR%20Groceries%2C%20I%20want%20to%20place%20a%20wholesale%20order
+    - img [ref=e34]
+  - contentinfo [ref=e36]:
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - heading "🥬 KKR Groceries" [level=3] [ref=e39]
+        - paragraph [ref=e40]: Hyderabad’s trusted B2B vegetable wholesale partner. Fresh produce from APMC markets to hotels, restaurants, and retailers.
+      - generic [ref=e41]:
+        - heading "📞 Contact" [level=3] [ref=e42]
+        - paragraph [ref=e43]: "📱 Phone: +91 91828 95565"
+        - paragraph [ref=e44]: "📧 Email: kanthati.chakri@gmail.com"
+        - paragraph [ref=e45]: 📍 Hyderabad, Telangana
+        - paragraph [ref=e46]: "⏰ Hours: 4:00 AM - 8:00 PM"
+      - generic [ref=e47]:
+        - heading "🔗 Quick Links" [level=3] [ref=e48]
+        - paragraph [ref=e49]:
+          - link "Daily Essentials" [ref=e50] [cursor=pointer]:
+            - /url: "#"
+        - paragraph [ref=e51]:
+          - link "High Rotation" [ref=e52] [cursor=pointer]:
+            - /url: "#"
+        - paragraph [ref=e53]:
+          - link "Regional Specials" [ref=e54] [cursor=pointer]:
+            - /url: "#"
+    - generic [ref=e55]: © 2026 KKR Groceries. All rights reserved. | B2B Wholesale Platform
+  - iframe [ref=e344]:
+    
