@@ -244,6 +244,11 @@ export async function submitEnquiryForm(event) {
 
     try {
         const totalAmount = items.reduce((s, i) => s + i.price * i.qty, 0);
+        // Get additional user details for the order
+        const user = state.currentUser;
+        const userDisplayName = user?.displayName || user?.name || '';
+        const userPhone = user?.phoneNumber || '';
+        
         const orderData = {
             items: items.map(i => ({
                 name: i.name,
@@ -266,8 +271,14 @@ export async function submitEnquiryForm(event) {
             totalValue: '₹' + totalAmount.toLocaleString('en-IN'),
             productCount: items.length,
             address: address,
-            userId: state.currentUser?.uid,
-            userEmail: state.currentUser?.email,
+            location: address, // For Google Maps link
+            pincode: pincode,  // Separate pincode field
+            // Buyer details for admin display
+            customerName: userDisplayName,
+            phone: userPhone,
+            userId: user?.uid,
+            userEmail: user?.email,
+            userPhone: userPhone,
             timestamp: new Date().toISOString()
         };
 
