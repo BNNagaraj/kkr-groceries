@@ -117,17 +117,80 @@ export function closeAuthModal() {
 }
 
 /**
- * Sign in with Google
+ * Show authentication loading overlay
+ */
+function showAuthLoading() {
+    const existingOverlay = document.getElementById('authLoadingOverlay');
+    if (existingOverlay) return;
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'authLoadingOverlay';
+    overlay.innerHTML = `
+        <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="background:white;padding:2rem;border-radius:16px;text-align:center;max-width:320px;width:90%;">
+                <div style="width:60px;height:60px;margin:0 auto 1rem;border:4px solid #e2e8f0;border-top:4px solid #059669;border-radius:50%;animation:spin 1s linear infinite;"></div>
+                <h3 style="margin:0 0 0.5rem;color:#1e293b;font-size:1.1rem;">Connecting...</h3>
+                <p style="margin:0;color:#64748b;font-size:0.9rem;">Please wait while we securely connect to Google</p>
+                <div style="margin-top:1rem;height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden;">
+                    <div style="height:100%;width:0%;background:#059669;animation:progress 2s ease-in-out infinite;"></div>
+                </div>
+            </div>
+        </div>
+        <style>
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            @keyframes progress { 0% { width: 0%; } 50% { width: 70%; } 100% { width: 100%; } }
+        </style>
+    `;
+    document.body.appendChild(overlay);
+}
+
+/**
+ * Hide authentication loading overlay
+ */
+function hideAuthLoading() {
+    const overlay = document.getElementById('authLoadingOverlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+/**
+ * Sign in with Google using redirect (cleaner UX - no popup address bar)
  * @returns {Promise<void>}
  */
 export async function signInWithGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
     try {
-        await auth.signInWithPopup(provider);
-        closeAuthModal();
-        showToast('Signed in successfully!', 'success');
+        // Show loading overlay immediately
+        showAuthLoading();
+        
+        // Use redirect flow instead of popup for cleaner UX
+        await auth.signInWithRedirect(provider);
+        // Page will redirect to Google, then back to app
     } catch (err) {
+        hideAuthLoading();
         logError(err, 'signInWithGoogle', true);
+    }
+}
+
+/**
+ * Handle redirect result after Google sign-in
+ * Call this on app init to check for redirect result
+ */
+export async function handleAuthRedirect() {
+    try {
+        const result = await auth.getRedirectResult();
+        if (result.user) {
+            // User successfully signed in via redirect
+            hideAuthLoading();
+            closeAuthModal();
+            showToast('Signed in successfully!', 'success');
+        }
+    } catch (err) {
+        hideAuthLoading();
+        if (err.code !== 'auth/redirect-cancelled-by-user') {
+            logError(err, 'handleAuthRedirect', true);
+        }
     }
 }
 
