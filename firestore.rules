@@ -8,11 +8,7 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return isAuthenticated() && 
-        request.auth.token.email.lower() in [
-          'raju2uraju@gmail.com', 
-          'kanthati.chakri@gmail.com'
-        ];
+      return isAuthenticated() && request.auth.token.admin == true;
     }
     
     function isOwner(userId) {
@@ -29,10 +25,6 @@ service cloud.firestore {
       return value is number && 
         value >= min && 
         value <= max;
-    }
-    
-    function validTimestamp() {
-      return request.time <= request.time + duration.value(0, "s");
     }
 
     // Settings collection
@@ -75,7 +67,7 @@ service cloud.firestore {
         request.resource.data.total is number &&
         request.resource.data.total > 0;
       
-      // Update: Admin can update status and timestamps, user cannot modify after creation
+      // Update: Admin can update status and timestamps
       allow update: if isAdmin() && 
         request.resource.data.keys().hasOnly(['status', 'updatedAt', 'placedAt', 'acceptedAt', 'shippedAt', 'deliveredAt', 'fulfilledAt', 'rejectedAt', 'revisedAcceptedCart', 'revisedFulfilledCart', 'orderSummary', 'totalValue', 'productCount', 'customerName', 'phone', 'userPhone', 'location', 'pincode', 'userEmail']) &&
         request.resource.data.status in ['Pending', 'Accepted', 'Fulfilled', 'Rejected'];
