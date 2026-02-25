@@ -14,7 +14,7 @@ console.warn = function(...args) {
 
 import { db } from './services/firebase.js';
 import { state, loadProducts, ADMIN_EMAILS } from './store.js';
-import { setupAuthListener, openAuthModal, closeAuthModal, signInWithGoogle, signOutUser, sendOTP, verifyOTP, handleAuthRedirect } from './services/auth.js';
+import { setupAuthListener, openAuthModal, closeAuthModal, signInWithGoogle, signOutUser, sendOTP, verifyOTP } from './services/auth.js';
 import { generateAPMCPrices } from './services/apmc.js';
 import { renderProducts, handleSearch, filterCategory, renderSkeletonCards, setSort, openImageZoom, closeImageZoom } from './components/products.js';
 import { updateUI, onProductGridClick, onProductQtyChange, adjustCartItem, removeCartItem, handleCartQtyChange } from './components/cart.js';
@@ -49,9 +49,6 @@ import { initRouter, router } from './router.js';
 
 // Initialize global error handlers
 initErrorHandlers();
-
-// Handle Google auth redirect result (if user just came back from Google sign-in)
-handleAuthRedirect();
 
 // Initialize router
 initRouter({
