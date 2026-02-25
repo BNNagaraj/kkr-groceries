@@ -75,9 +75,9 @@ service cloud.firestore {
         request.resource.data.total is number &&
         request.resource.data.total > 0;
       
-      // Update: Admin can update status, user cannot modify after creation
+      // Update: Admin can update status and timestamps, user cannot modify after creation
       allow update: if isAdmin() && 
-        request.resource.data.keys().hasOnly(['status', 'updatedAt', 'revisedAcceptedCart', 'revisedFulfilledCart', 'orderSummary', 'totalValue', 'productCount']) &&
+        request.resource.data.keys().hasOnly(['status', 'updatedAt', 'placedAt', 'acceptedAt', 'shippedAt', 'deliveredAt', 'fulfilledAt', 'rejectedAt', 'revisedAcceptedCart', 'revisedFulfilledCart', 'orderSummary', 'totalValue', 'productCount', 'customerName', 'phone', 'userPhone', 'location', 'pincode', 'userEmail']) &&
         request.resource.data.status in ['Pending', 'Accepted', 'Fulfilled', 'Rejected'];
       
       // Delete: Only admin
