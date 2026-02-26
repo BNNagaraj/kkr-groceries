@@ -715,25 +715,59 @@ export async function adminAddProduct() {
 }
 
 /**
- * Upgrade default product images
+ * Reliable Wikipedia image URLs for products
+ */
+const RELIABLE_IMAGES = {
+    'Tomato': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tomato_je.jpg/640px-Tomato_je.jpg',
+    'Onion': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Onions_-_-varieties.jpg/640px-Onions_-_varieties.jpg',
+    'Potato': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Potato_basket.jpg/640px-Potato_basket.jpg',
+    'Green Chilli': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Green_Pepper.jpg/640px-Green_Pepper.jpg',
+    'Lady\'s Finger': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Okra_%28Abelmoschus_esculentus%29_2.jpg/640px-Okra_%28Abelmoschus_esculentus%29_2.jpg',
+    'Okra': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Okra_%28Abelmoschus_esculentus%29_2.jpg/640px-Okra_%28Abelmoschus_esculentus%29_2.jpg',
+    'Brinjal': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/Solanum_melongena_24_08_2012_%28%C3%81%E2%80%99%29.jpg/640px-Solanum_melongena_24_08_2012_%28%C3%81%E2%80%99%29.jpg',
+    'Cauliflower': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Cauliflower_heart.jpg/640px-Cauliflower_heart.jpg',
+    'Cabbage': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Cabbage_in_the_market.jpg/640px-Cabbage_in_the_market.jpg',
+    'Carrot': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Carrots_in_bunch.jpg/640px-Carrots_in_bunch.jpg',
+    'Spinach': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Spinach_leaves_%28Spinacia_oleracea%29.jpg/640px-Spinach_leaves_%28Spinacia_oleracea%29.jpg',
+    'Bottle Gourd': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/Lagenaria_siceraria_-_calabash_-_01.jpg/640px-Lagenaria_siceraria_-_calabash_-_01.jpg',
+    'Ridge Gourd': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Ridge_gourd_or_ribbed_luffa_Luffa_acutangula.jpg/640px-Ridge_gourd_or_ribbed_luffa_Luffa_acutangula.jpg',
+    'Banana': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Bananas.jpg/640px-Bananas.jpg'
+};
+
+const DEFAULT_PLACEHOLDER = 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Vegetable_icon.svg/640px-Vegetable_icon.svg.png';
+
+/**
+ * Check if an image URL is broken (known problematic URLs)
+ */
+function isBrokenImage(imageUrl) {
+    if (!imageUrl) return true;
+    
+    // Known broken patterns
+    const brokenPatterns = [
+        'photo-1604568102377-f273edcfebbc',
+        'photo-1596639556108-7a544df8bb3f',
+        'Green_chilli_closeup.jpg',
+        'Okra_%28Abelmoschus_esculentus%29_%283%29',
+        'Vegetable-Ede-carrot.jpg',
+        'Spinach_leaves.jpg/220px',
+        'Bottle_gourd.jpg/220px'
+    ];
+    
+    return brokenPatterns.some(pattern => imageUrl.includes(pattern));
+}
+
+/**
+ * Upgrade default product images - fixes broken images and updates to reliable URLs
  */
 export async function adminUpgradeDefaultImages() {
-    const defaultImages = {
-        1: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=800&q=80",
-        2: "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=800&q=80",
-        3: "https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=800&q=80",
-        4: "https://images.unsplash.com/photo-1596639556108-7a544df8bb3f?w=800&q=80",
-        5: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Okra_Abelmoschus_esculentus.jpg/800px-Okra_Abelmoschus_esculentus.jpg",
-        6: "https://images.unsplash.com/photo-1604568102377-f273edcfebbc?w=800&q=80",
-        7: "https://images.unsplash.com/photo-1568584711462-24cc6ad04aa6?w=800&q=80",
-        8: "https://images.unsplash.com/photo-1597362925123-77861d3bfac1?w=800&q=80",
-        9: "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=800&q=80",
-        10: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=800&q=80",
-        11: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Bottle_gourd.jpg/800px-Bottle_gourd.jpg",
-        12: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/Luffa_aegyptiaca_fruit.jpg/800px-Luffa_aegyptiaca_fruit.jpg"
-    };
-
-    const productsToUpdate = products.filter(p => defaultImages[p.id] && (!p.image || p.image.includes('unsplash') || p.image.includes('wikimedia')));
+    // Find products with broken or missing images
+    const productsToUpdate = products.filter(p => {
+        const needsUpdate = !p.image || 
+                           p.image.trim() === '' || 
+                           isBrokenImage(p.image) ||
+                           (p.image.includes('unsplash.com') && !p.image.includes('wikipedia'));
+        return needsUpdate && RELIABLE_IMAGES[p.name];
+    });
     
     if (productsToUpdate.length === 0) {
         if (typeof window.showToast === 'function') {
@@ -742,22 +776,25 @@ export async function adminUpgradeDefaultImages() {
         return;
     }
 
-    if (!confirm(`Upgrade images for ${productsToUpdate.length} products?`)) return;
+    if (!confirm(`Fix images for ${productsToUpdate.length} products using reliable Wikipedia sources?`)) return;
 
     try {
         const batch = db.batch();
+        let updateCount = 0;
         
         productsToUpdate.forEach(p => {
+            const newImage = RELIABLE_IMAGES[p.name] || DEFAULT_PLACEHOLDER;
             const docRef = db.collection('products').doc(p.id.toString());
-            batch.update(docRef, { image: defaultImages[p.id] });
-            p.image = defaultImages[p.id];
+            batch.update(docRef, { image: newImage });
+            p.image = newImage;
+            updateCount++;
         });
 
         await batch.commit();
         renderPricesTab();
         
         if (typeof window.showToast === 'function') {
-            window.showToast(`Upgraded ${productsToUpdate.length} product images!`, 'success');
+            window.showToast(`Fixed ${updateCount} product images!`, 'success');
         }
     } catch (e) {
         logError(e, 'adminUpgradeDefaultImages', true);

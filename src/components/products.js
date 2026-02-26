@@ -175,8 +175,12 @@ export function renderProducts(category) {
         const apmcP = state.apmcPrices ? state.apmcPrices.find(a => a.commodity === product.name) : null;
 
         const hasImg = product.image && product.image.trim() !== '';
+        // Use a data-src pattern to handle broken images gracefully
         const imgHtml = hasImg
-            ? `<img src="${product.image}" alt="${product.name}" loading="lazy" onclick="window.openImageZoom('${product.image}', '${product.name}')" style="cursor:zoom-in" onerror="this.classList.add('error');this.nextElementSibling.style.display='flex'">
+            ? `<img src="${product.image}" alt="${product.name}" loading="lazy" 
+                onclick="window.openImageZoom('${product.image}', '${product.name}')" 
+                style="cursor:zoom-in" 
+                onerror="this.style.display='none'; this.parentElement.querySelector('.img-fallback').style.display='flex';">
                <span class="img-fallback" style="display:none">${product.name[0]}</span>`
             : `<span class="img-fallback" style="display:flex">${product.name[0]}</span>`;
         
