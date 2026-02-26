@@ -17,6 +17,12 @@ let originalCartData = [];
 // Filter state
 let adminOrderFilterState = 'all';
 
+// Pagination state
+const ORDERS_PER_PAGE = 50;
+let lastOrderDoc = null;
+let hasMoreOrders = true;
+let isLoadingOrders = false;
+
 /**
  * Format timestamp for display (handles Firestore timestamps and ISO strings)
  * @param {any} timestamp - Firestore timestamp or ISO string
@@ -90,31 +96,60 @@ export async function renderOrdersTab() {
     const tab = document.getElementById('adminOrdersTab');
     if (!tab) return;
 
-    let orders = [];
+    // Show loading state
+    if (isLoadingOrders) return;
+    isLoadingOrders = true;
+    
+    // Check if we need to reset pagination
+    const shouldReset = !lastOrderDoc;
+    
+    let orders = shouldReset ? [] : [...currentAdminOrders];
+    
     try {
-        const snap = await db.collection('orders').orderBy('createdAt', 'desc').get();
-        orders = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+        // Build query with pagination - limit to recent orders for performance
+        let query = db.collection('orders')
+            .orderBy('createdAt', 'desc')
+            .limit(ORDERS_PER_PAGE);
+        
+        // Add pagination cursor if loading more
+        if (lastOrderDoc) {
+            query = query.startAfter(lastOrderDoc);
+        }
+        
+        const snap = await query.get();
+        
+        // Update pagination state
+        hasMoreOrders = snap.docs.length === ORDERS_PER_PAGE;
+        lastOrderDoc = snap.docs[snap.docs.length - 1] || null;
+        
+        const newOrders = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+        orders = shouldReset ? newOrders : [...orders, ...newOrders];
+        
     } catch (e) {
-        // Fallback without ordering if index doesn't exist
+        console.warn('[Orders] Query failed, trying fallback:', e.message);
+        // Fallback: fetch without ordering
         try {
-            const snap = await db.collection('orders').get();
+            const snap = await db.collection('orders').limit(ORDERS_PER_PAGE).get();
             orders = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+            // Sort client-side
             orders.sort((a, b) => {
-                const tA = a.createdAt ? a.createdAt.toMillis() : 0;
-                const tB = b.createdAt ? b.createdAt.toMillis() : 0;
+                const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime();
+                const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
                 return tB - tA;
             });
+            hasMoreOrders = false;
         } catch (e2) {
             logError(e2, 'renderOrdersTab - fallback query');
         }
     }
-
+    
+    isLoadingOrders = false;
     currentAdminOrders = orders;
     const filterState = adminOrderFilterState;
 
     let h = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
         <h3 style="margin:0;color:#1e293b;font-size:1.1rem">Order Management</h3>
-        <select id="adminOrderFilterSelect" onchange="window.adminOrderFilterState = this.value; window.renderOrdersTab()" style="padding:0.4rem;border-radius:6px;border:1px solid #cbd5e1;font-size:0.9rem">
+        <select id="adminOrderFilterSelect" onchange="window.adminOrderFilterState = this.value; window.resetAndLoadOrders()" style="padding:0.4rem;border-radius:6px;border:1px solid #cbd5e1;font-size:0.9rem">
             <option value="all" ${filterState === 'all' ? 'selected' : ''}>All Orders</option>
             <option value="today" ${filterState === 'today' ? 'selected' : ''}>Today</option>
             <option value="week" ${filterState === 'week' ? 'selected' : ''}>This Week</option>
@@ -249,8 +284,25 @@ export async function renderOrdersTab() {
             ${actions}
         </div>`;
     }).join('');
+    
+    // Add Load More button if there are more orders
+    if (hasMoreOrders && filterState === 'all') {
+        h += `<div style="text-align:center;margin-top:1.5rem;padding:1rem">
+            <button class="btn btn-secondary" onclick="window.loadMoreOrders()" ${isLoadingOrders ? 'disabled' : ''}>
+                ${isLoadingOrders ? '⏳ Loading...' : '📥 Load More Orders'}
+            </button>
+        </div>`;
+    }
 
     tab.innerHTML = h;
+}
+
+/**
+ * Load more orders for pagination
+ */
+export async function loadMoreOrders() {
+    if (isLoadingOrders || !hasMoreOrders) return;
+    await renderOrdersTab();
 }
 
 /**
@@ -670,4 +722,21 @@ async function sendModificationNotification(orderId, userId, changes) {
     } catch (e) {
         logError(e, 'sendModificationNotification');
     }
+}
+
+
+/**
+ * Reset pagination and load orders from start
+ */
+export function resetAndLoadOrders() {
+    lastOrderDoc = null;
+    hasMoreOrders = true;
+    currentAdminOrders = [];
+    renderOrdersTab();
+}
+
+// Expose to window
+if (typeof window !== 'undefined') {
+    window.loadMoreOrders = loadMoreOrders;
+    window.resetAndLoadOrders = resetAndLoadOrders;
 }

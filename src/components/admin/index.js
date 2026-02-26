@@ -9,7 +9,7 @@ import { logError } from '../../utils/errorHandler.js';
 
 // Import sub-modules
 import { renderPricesTab, adminExportProductsCSV, adminExportProductsExcel, adminSaveAllProducts, adminDeleteProduct, adminAddProduct, adminUpgradeDefaultImages, handleProductSearch, handleCategoryFilter, clearProductFilters, toggleAllMoq, toggleProductMoq } from './prices.js';
-import { renderOrdersTab, adminUpdateOrderStatus, adminEditOrder, recalcEditOrder, closeEditOrderModal, saveEditedOrder, adminDownloadInvoice, adminCancelModification } from './orders.js';
+import { renderOrdersTab, adminUpdateOrderStatus, adminEditOrder, recalcEditOrder, closeEditOrderModal, saveEditedOrder, adminDownloadInvoice, adminCancelModification, loadMoreOrders, resetAndLoadOrders } from './orders.js';
 import { renderStatsTab, cleanupCharts } from './stats.js';
 import { adminUploadImage, cropAndUploadImage, closeCropperModal, initCropperKeyboardShortcuts, triggerFileInput } from './images.js';
 import { renderMapsTab, saveAdminMapSettings } from './maps.js';
@@ -110,6 +110,8 @@ export {
     saveEditedOrder,
     adminDownloadInvoice,
     adminCancelModification,
+    loadMoreOrders,
+    resetAndLoadOrders,
     
     // Stats
     renderStatsTab,

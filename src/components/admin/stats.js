@@ -78,7 +78,11 @@ export async function renderStatsTab() {
     let orders = [];
     let onlineUsers = [];
     try {
-        const snap = await db.collection('orders').get();
+        // Limit to last 500 orders for performance
+        const snap = await db.collection('orders')
+            .orderBy('createdAt', 'desc')
+            .limit(500)
+            .get();
         orders = snap.docs.map(d => d.data());
         cachedOrders = orders;
         
