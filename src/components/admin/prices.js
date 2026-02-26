@@ -4,7 +4,6 @@
  */
 
 import { db, auth, functions } from '../../services/firebase.js';
-import { httpsCallable } from 'firebase/functions';
 import { state, products } from '../../store.js';
 import { escapeHTML, showToast } from '../../utils/dom.js';
 import { validateProduct } from '../../utils/validation.js';
@@ -819,7 +818,7 @@ export async function refreshAdminClaim() {
         showToast('Refreshing admin status...', 'info');
         
         // Call the cloud function to set admin claim
-        const setAdminClaim = httpsCallable(functions, 'setAdminClaim');
+        const setAdminClaim = functions.httpsCallable('setAdminClaim');
         const result = await setAdminClaim({ 
             email: user.email, 
             admin: true 
