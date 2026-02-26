@@ -80,11 +80,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize update checking
     addUpdateNotificationStyles();
     initUpdateNotification();
+    
+    // Version check for new deployments
     initVersionCheck((newVersion, currentVersion) => {
         showUpdateNotification(newVersion, currentVersion);
     });
+    
+    // Service Worker update check
     initServiceWorkerUpdateCheck(() => {
-        showUpdateNotification('New Service Worker', 'Previous');
+        // Only show if version check hasn't already shown notification
+        showUpdateNotification('Service Worker', 'Previous');
     });
 });
 

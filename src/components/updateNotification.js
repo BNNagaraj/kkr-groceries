@@ -5,6 +5,7 @@
 import { reloadPage } from '../utils/versionCheck.js';
 
 let notificationElement = null;
+let isNotificationShown = false;
 
 /**
  * Initialize the update notification system
@@ -31,6 +32,7 @@ export function initUpdateNotification() {
     
     // Add event listeners
     document.getElementById('update-now-btn').addEventListener('click', () => {
+        hideUpdateNotification();
         reloadPage();
     });
     
@@ -43,9 +45,14 @@ export function initUpdateNotification() {
  * Show update notification
  */
 export function showUpdateNotification(newVersion, currentVersion) {
+    // Prevent showing notification if already shown
+    if (isNotificationShown) return;
+    
     if (!notificationElement) {
         initUpdateNotification();
     }
+    
+    isNotificationShown = true;
     
     const textEl = notificationElement.querySelector('.update-text');
     if (textEl && newVersion && currentVersion) {
@@ -67,6 +74,7 @@ export function hideUpdateNotification() {
     if (notificationElement) {
         notificationElement.style.display = 'none';
     }
+    isNotificationShown = false;
 }
 
 /**

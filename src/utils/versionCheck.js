@@ -8,6 +8,7 @@ const VERSION_CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
 
 let updateCallback = null;
 let checkInterval = null;
+let updateShown = false; // Track if update notification is already shown
 
 /**
  * Initialize version checking
@@ -34,6 +35,9 @@ export function initVersionCheck(onUpdate) {
  * Check if a new version is available
  */
 async function checkForUpdates() {
+    // Skip if update notification is already shown
+    if (updateShown) return;
+    
     try {
         // Add cache-busting query param
         const response = await fetch(`/version.json?t=${Date.now()}`, {
@@ -46,11 +50,17 @@ async function checkForUpdates() {
         const data = await response.json();
         const serverVersion = data.version;
         
-        if (serverVersion && serverVersion !== APP_VERSION) {
-            console.log(`[Version Check] Update available: ${APP_VERSION} → ${serverVersion}`);
-            if (updateCallback) {
-                updateCallback(serverVersion, APP_VERSION);
-            }
+        // Validate versions - skip if either is invalid or they match
+        if (!serverVersion || !APP_VERSION) return;
+        if (serverVersion === APP_VERSION) return;
+        if (serverVersion === 'dev' || APP_VERSION === 'dev') return;
+        
+        // Mark update as shown to prevent repeated notifications
+        updateShown = true;
+        
+        console.log(`[Version Check] Update available: ${APP_VERSION} → ${serverVersion}`);
+        if (updateCallback) {
+            updateCallback(serverVersion, APP_VERSION);
         }
     } catch (error) {
         // Silently fail - don't break the app
@@ -81,6 +91,13 @@ export function stopVersionCheck() {
         clearInterval(checkInterval);
         checkInterval = null;
     }
+}
+
+/**
+ * Reset update shown flag (call after page reload)
+ */
+export function resetUpdateShown() {
+    updateShown = false;
 }
 
 /**
