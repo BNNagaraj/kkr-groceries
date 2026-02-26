@@ -3,9 +3,9 @@ import { getSellingPrice } from '../services/apmc.js';
 
 // Sort options
 export const SORT_OPTIONS = {
-    popular: { label: '\ud83d\udd25 Popular', fn: (a, b) => (b.hot ? 1 : 0) - (a.hot ? 1 : 0) },
-    'price-low': { label: '\u20b9 Price: Low to High', fn: (a, b) => getSellingPrice(a) - getSellingPrice(b) },
-    'price-high': { label: '\u20b9 Price: High to Low', fn: (a, b) => getSellingPrice(b) - getSellingPrice(a) },
+    popular: { label: 'Popular', fn: (a, b) => (b.hot ? 1 : 0) - (a.hot ? 1 : 0) },
+    'price-low': { label: 'Price: Low to High', fn: (a, b) => getSellingPrice(a) - getSellingPrice(b) },
+    'price-high': { label: 'Price: High to Low', fn: (a, b) => getSellingPrice(b) - getSellingPrice(a) },
     name: { label: 'A-Z Name', fn: (a, b) => a.name.localeCompare(b.name) }
 };
 
