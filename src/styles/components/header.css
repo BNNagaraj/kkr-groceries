@@ -193,7 +193,7 @@
     box-shadow: var(--shadow-lg);
     min-width: 200px;
     overflow: hidden;
-    z-index: 1500;
+    z-index: 3500;
     margin-top: 0.5rem;
 }
 

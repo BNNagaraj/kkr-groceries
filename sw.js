@@ -67,6 +67,12 @@ self.addEventListener('fetch', (event) => {
     if (isFirebaseRequest(url.href)) {
         return;
     }
+    
+    // Skip non-GET requests (POST, PUT, DELETE, etc.)
+    // Cache API only supports GET requests
+    if (request.method !== 'GET') {
+        return;
+    }
 
     // Navigation requests - Network first
     if (request.mode === 'navigate') {
