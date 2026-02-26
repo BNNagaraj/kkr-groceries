@@ -1522,7 +1522,7 @@
             }
 
             .main-container {
-                padding: calc(var(--header-height) + 130px) 1.5rem 2rem
+                padding: calc(var(--header-height) + 20px) 1.5rem 2rem
             }
 
             .brand-text h1 {
@@ -1585,6 +1585,6 @@
             }
 
             .main-container {
-                padding: calc(var(--header-height) + 140px) 2rem 2rem
+                padding: calc(var(--header-height) + 30px) 2rem 2rem
             }
         }
