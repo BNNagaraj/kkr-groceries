@@ -3,7 +3,8 @@
  * Provides offline support, caching, and background sync
  */
 
-const CACHE_NAME = 'kkr-groceries-v2';
+const CACHE_VERSION = 'v2'; // Update this when making significant changes
+const CACHE_NAME = `kkr-groceries-${CACHE_VERSION}-${new Date().toISOString().slice(0,10)}`;
 const STATIC_ASSETS = [
     '/index.html',
     '/manifest.json',

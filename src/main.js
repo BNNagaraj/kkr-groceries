@@ -18,6 +18,8 @@ import { setupAuthListener, openAuthModal, closeAuthModal, signInWithGoogle, sig
 import { generateAPMCPrices } from './services/apmc.js';
 import { renderProducts, handleSearch, filterCategory, renderSkeletonCards, setSort, openImageZoom, closeImageZoom } from './components/products.js';
 import { updateUI, onProductGridClick, onProductQtyChange, adjustCartItem, removeCartItem, handleCartQtyChange } from './components/cart.js';
+import { initVersionCheck, initServiceWorkerUpdateCheck } from './utils/versionCheck.js';
+import { showUpdateNotification, addUpdateNotificationStyles, initUpdateNotification } from './components/updateNotification.js';
 import { openEnquiryModal, closeEnquiryModal, submitEnquiryForm } from './components/enquiry.js';
 import { 
     toggleAdmin, switchAdminTab, renderApmcTab, adminUpdateOrderStatus, 
@@ -73,6 +75,16 @@ document.addEventListener('DOMContentLoaded', () => {
     loadProducts(db, () => {
         renderProducts(state.currentCategory);
         updateUI();
+    });
+    
+    // Initialize update checking
+    addUpdateNotificationStyles();
+    initUpdateNotification();
+    initVersionCheck((newVersion, currentVersion) => {
+        showUpdateNotification(newVersion, currentVersion);
+    });
+    initServiceWorkerUpdateCheck(() => {
+        showUpdateNotification('New Service Worker', 'Previous');
     });
 });
 
