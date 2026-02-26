@@ -2,6 +2,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
+const { getAuth } = require("firebase-admin/auth");
 
 initializeApp();
 const db = getFirestore();
@@ -191,6 +192,83 @@ exports.submitOrder = onCall(async (request) => {
     throw new HttpsError(
       error.code || "internal", 
       error.message || "An error occurred while saving the order."
+    );
+  }
+});
+
+/**
+ * Set admin claim for a user
+ * Only callable by existing admins (using email verification)
+ */
+exports.setAdminClaim = onCall(async (request) => {
+  try {
+    // Verify the caller is an authorized admin
+    const callerEmail = request.auth?.token?.email;
+    const authorizedAdmins = ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com'];
+    
+    if (!callerEmail || !authorizedAdmins.includes(callerEmail.toLowerCase())) {
+      throw new HttpsError('permission-denied', 'Only authorized admins can set admin claims.');
+    }
+
+    const { email, admin = true } = request.data;
+    
+    if (!email) {
+      throw new HttpsError('invalid-argument', 'Email is required.');
+    }
+
+    // Get user by email
+    let user;
+    try {
+      user = await getAuth().getUserByEmail(email);
+    } catch (userError) {
+      throw new HttpsError('not-found', `User with email ${email} not found.`);
+    }
+
+    // Set custom claim
+    await getAuth().setCustomUserClaims(user.uid, { admin });
+    
+    console.log(`Admin claim set for user ${email} (${user.uid}): admin=${admin}`);
+    
+    return { 
+      success: true, 
+      message: `Admin claim ${admin ? 'set' : 'removed'} for ${email}`,
+      uid: user.uid
+    };
+    
+  } catch (error) {
+    console.error('Error in setAdminClaim:', error);
+    throw new HttpsError(
+      error.code || 'internal', 
+      error.message || 'Failed to set admin claim'
+    );
+  }
+});
+
+/**
+ * Get user claims (for debugging)
+ */
+exports.getUserClaims = onCall(async (request) => {
+  try {
+    const { email } = request.data;
+    
+    if (!email) {
+      throw new HttpsError('invalid-argument', 'Email is required.');
+    }
+
+    const user = await getAuth().getUserByEmail(email);
+    
+    return {
+      email: user.email,
+      uid: user.uid,
+      customClaims: user.customClaims || {},
+      isAdmin: user.customClaims?.admin === true
+    };
+    
+  } catch (error) {
+    console.error('Error in getUserClaims:', error);
+    throw new HttpsError(
+      error.code || 'internal',
+      error.message || 'Failed to get user claims'
     );
   }
 });
