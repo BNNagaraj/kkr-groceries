@@ -3,9 +3,10 @@
  * Handles product pricing, MOQ, and visibility settings
  */
 
-import { db } from '../../services/firebase.js';
+import { db, auth, functions } from '../../services/firebase.js';
+import { httpsCallable } from 'firebase/functions';
 import { state, products } from '../../store.js';
-import { escapeHTML } from '../../utils/dom.js';
+import { escapeHTML, showToast } from '../../utils/dom.js';
 import { validateProduct } from '../../utils/validation.js';
 import { logError } from '../../utils/errorHandler.js';
 import { initImageUpload } from './images.js';
@@ -49,6 +50,9 @@ export function renderPricesTab() {
             </button>
             <button class="btn btn-purple" onclick="window.adminUpgradeDefaultImages()" title="Upgrade to high-res images">
                 📸 Upgrade Images
+            </button>
+            <button class="btn btn-orange" onclick="window.refreshAdminClaim()" title="Refresh admin permissions">
+                🔑 Refresh Admin
             </button>
         </div>
     </div>
@@ -801,6 +805,44 @@ export async function adminUpgradeDefaultImages() {
     }
 }
 
+/**
+ * Refresh admin claim for current user
+ */
+export async function refreshAdminClaim() {
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            showToast('Please sign in first', 'error');
+            return;
+        }
+        
+        showToast('Refreshing admin status...', 'info');
+        
+        // Call the cloud function to set admin claim
+        const setAdminClaim = httpsCallable(functions, 'setAdminClaim');
+        const result = await setAdminClaim({ 
+            email: user.email, 
+            admin: true 
+        });
+        
+        console.log('Admin claim result:', result.data);
+        
+        // Force token refresh
+        await user.getIdToken(true);
+        
+        showToast('✅ Admin status refreshed! Please reload the page.', 'success');
+        
+        // Reload after 2 seconds
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+        
+    } catch (e) {
+        console.error('Error refreshing admin claim:', e);
+        showToast(`Failed: ${e.message}`, 'error');
+    }
+}
+
 // Expose functions to window
 if (typeof window !== 'undefined') {
     window.handleProductSearch = handleProductSearch;
@@ -808,4 +850,5 @@ if (typeof window !== 'undefined') {
     window.clearProductFilters = clearProductFilters;
     window.toggleAllMoq = toggleAllMoq;
     window.toggleProductMoq = toggleProductMoq;
+    window.refreshAdminClaim = refreshAdminClaim;
 }
