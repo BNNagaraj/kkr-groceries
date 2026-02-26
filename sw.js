@@ -58,19 +58,28 @@ function isImageRequest(url) {
     return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url);
 }
 
+// Helper: Check if response is cacheable
+function isCacheableResponse(response) {
+    // Don't cache opaque responses (CORS errors) or error responses
+    return response && 
+           response.status === 200 && 
+           response.type !== 'opaque' &&
+           response.type !== 'error';
+}
+
 // Fetch: network-first for HTML, cache-first for assets
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
 
-    // Skip Firebase requests - let them go directly
-    if (isFirebaseRequest(url.href)) {
-        return;
-    }
-    
-    // Skip non-GET requests (POST, PUT, DELETE, etc.)
+    // IMPORTANT: Only handle GET requests
     // Cache API only supports GET requests
     if (request.method !== 'GET') {
+        return;
+    }
+
+    // Skip Firebase/Google requests - let them go directly
+    if (isFirebaseRequest(url.href)) {
         return;
     }
 
@@ -79,16 +88,17 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(request)
                 .then((response) => {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => {
-                        cache.put(request, clone);
-                    });
+                    if (isCacheableResponse(response)) {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put(request, clone);
+                        });
+                    }
                     return response;
                 })
                 .catch(() => {
                     return caches.match(request).then(cached => {
                         if (cached) return cached;
-                        // Return offline page if available
                         return caches.match('/index.html');
                     });
                 })
@@ -102,21 +112,23 @@ self.addEventListener('fetch', (event) => {
             caches.match(request).then((cached) => {
                 if (cached) return cached;
                 
-                return fetch(request).then((response) => {
-                    if (response.ok) {
-                        const clone = response.clone();
-                        caches.open(CACHE_NAME).then((cache) => {
-                            cache.put(request, clone);
+                return fetch(request, { mode: 'no-cors' })
+                    .then((response) => {
+                        // Only cache same-origin or CORS-enabled images
+                        if (response.type === 'basic' || (response.type === 'cors' && response.ok)) {
+                            const clone = response.clone();
+                            caches.open(CACHE_NAME).then((cache) => {
+                                cache.put(request, clone);
+                            });
+                        }
+                        return response;
+                    })
+                    .catch(() => {
+                        return new Response('Image not available', {
+                            status: 404,
+                            headers: { 'Content-Type': 'text/plain' }
                         });
-                    }
-                    return response;
-                }).catch(() => {
-                    // Return a fallback image or placeholder
-                    return new Response('Image not available', {
-                        status: 404,
-                        headers: { 'Content-Type': 'text/plain' }
                     });
-                });
             })
         );
         return;
@@ -127,10 +139,12 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(request)
                 .then(response => {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then(cache => {
-                        cache.put(request, clone);
-                    });
+                    if (isCacheableResponse(response)) {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then(cache => {
+                            cache.put(request, clone);
+                        });
+                    }
                     return response;
                 })
                 .catch(() => caches.match(request))
@@ -138,20 +152,24 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Default: Cache first
-    event.respondWith(
-        caches.match(request).then((cached) => {
-            return cached || fetch(request).then((response) => {
-                if (response.ok) {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => {
-                        cache.put(request, clone);
-                    });
-                }
-                return response;
-            });
-        })
-    );
+    // Default: Cache first for same-origin only
+    // Skip external URLs to avoid CORS issues
+    if (url.origin === self.location.origin) {
+        event.respondWith(
+            caches.match(request).then((cached) => {
+                return cached || fetch(request).then((response) => {
+                    if (isCacheableResponse(response)) {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put(request, clone);
+                        });
+                    }
+                    return response;
+                });
+            })
+        );
+    }
+    // For external non-image requests, just fetch without caching
 });
 
 // Background Sync: Queue failed orders
@@ -200,14 +218,12 @@ self.addEventListener('notificationclick', (event) => {
 
     event.waitUntil(
         clients.matchAll({ type: 'window' }).then((clientList) => {
-            // Focus existing window if open
             for (const client of clientList) {
                 if (client.url.includes(self.location.origin) && 'focus' in client) {
                     client.navigate(url);
                     return client.focus();
                 }
             }
-            // Open new window
             if (clients.openWindow) {
                 return clients.openWindow(url);
             }
@@ -233,7 +249,6 @@ async function syncPendingOrders() {
                 if (response.ok) {
                     await removePendingOrder(order.id);
                     
-                    // Notify user of successful sync
                     self.registration.showNotification('Order Synced', {
                         body: `Order ${order.id} has been submitted successfully`,
                         icon: '/icon-192x192.png'

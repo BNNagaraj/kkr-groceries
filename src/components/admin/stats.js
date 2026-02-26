@@ -84,12 +84,21 @@ export async function renderStatsTab() {
         
         // Fetch online users (active in last 5 minutes)
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-        const presenceSnap = await db.collection('presence')
-            .where('lastSeen', '>=', fiveMinutesAgo)
-            .where('status', '==', 'online')
-            .get();
-        onlineUsers = presenceSnap.docs.map(d => d.data());
-        cachedOnlineUsers = onlineUsers;
+        try {
+            const presenceSnap = await db.collection('presence')
+                .where('lastSeen', '>=', fiveMinutesAgo)
+                .where('status', '==', 'online')
+                .get();
+            onlineUsers = presenceSnap.docs.map(d => d.data());
+            cachedOnlineUsers = onlineUsers;
+        } catch (presenceErr) {
+            // Log presence error separately - index may be missing
+            if (presenceErr.code === 'failed-precondition') {
+                console.warn('[Stats] Firestore index missing for presence query. Online users count will be unavailable.');
+            } else {
+                logError(presenceErr, 'renderStatsTab-presence');
+            }
+        }
     } catch (e) {
         logError(e, 'renderStatsTab');
     }
