@@ -718,26 +718,14 @@ export async function adminAddProduct() {
 }
 
 /**
- * Reliable Wikipedia image URLs for products
+ * Product images - Use Firebase Storage URLs after uploading
  */
 const RELIABLE_IMAGES = {
-    'Tomato': 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tomato_je.jpg/640px-Tomato_je.jpg',
-    'Onion': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Onions_-_-varieties.jpg/640px-Onions_-_varieties.jpg',
-    'Potato': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Potato_basket.jpg/640px-Potato_basket.jpg',
-    'Green Chilli': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Green_Pepper.jpg/640px-Green_Pepper.jpg',
-    'Lady\'s Finger': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Okra_%28Abelmoschus_esculentus%29_2.jpg/640px-Okra_%28Abelmoschus_esculentus%29_2.jpg',
-    'Okra': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Okra_%28Abelmoschus_esculentus%29_2.jpg/640px-Okra_%28Abelmoschus_esculentus%29_2.jpg',
-    'Brinjal': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/Solanum_melongena_24_08_2012_%28%C3%81%E2%80%99%29.jpg/640px-Solanum_melongena_24_08_2012_%28%C3%81%E2%80%99%29.jpg',
-    'Cauliflower': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Cauliflower_heart.jpg/640px-Cauliflower_heart.jpg',
-    'Cabbage': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Cabbage_in_the_market.jpg/640px-Cabbage_in_the_market.jpg',
-    'Carrot': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Carrots_in_bunch.jpg/640px-Carrots_in_bunch.jpg',
-    'Spinach': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Spinach_leaves_%28Spinacia_oleracea%29.jpg/640px-Spinach_leaves_%28Spinacia_oleracea%29.jpg',
-    'Bottle Gourd': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/Lagenaria_siceraria_-_calabash_-_01.jpg/640px-Lagenaria_siceraria_-_calabash_-_01.jpg',
-    'Ridge Gourd': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Ridge_gourd_or_ribbed_luffa_Luffa_acutangula.jpg/640px-Ridge_gourd_or_ribbed_luffa_Luffa_acutangula.jpg',
-    'Banana': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Bananas.jpg/640px-Bananas.jpg'
+    // Add your Firebase Storage URLs here after uploading images
+    // Example: 'Tomato': 'https://firebasestorage.googleapis.com/v0/b/your-bucket.appspot.com/o/products%2Ftomato.jpg?alt=media'
 };
 
-const DEFAULT_PLACEHOLDER = 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Vegetable_icon.svg/640px-Vegetable_icon.svg.png';
+const DEFAULT_PLACEHOLDER = '/images/default-product.svg'; // Local placeholder or null
 
 /**
  * Check if an image URL is broken (known problematic URLs)
@@ -768,7 +756,7 @@ export async function adminUpgradeDefaultImages() {
         const needsUpdate = !p.image || 
                            p.image.trim() === '' || 
                            isBrokenImage(p.image) ||
-                           (p.image.includes('unsplash.com') && !p.image.includes('wikipedia'));
+                           false; // Manual upload only - no auto image updates
         return needsUpdate && RELIABLE_IMAGES[p.name];
     });
     
@@ -779,7 +767,7 @@ export async function adminUpgradeDefaultImages() {
         return;
     }
 
-    if (!confirm(`Fix images for ${productsToUpdate.length} products using reliable Wikipedia sources?`)) return;
+    if (!confirm(`Fix images for ${productsToUpdate.length} products?\n\nPlease upload images manually to Firebase Storage first.`)) return;
 
     try {
         const batch = db.batch();

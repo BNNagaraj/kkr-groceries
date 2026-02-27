@@ -833,14 +833,14 @@ export async function adminUpgradeDefaultImages() {
         2: "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=800&q=80",
         3: "https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=800&q=80",
         4: "https://images.unsplash.com/photo-1596639556108-7a544df8bb3f?w=800&q=80",
-        5: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Okra_Abelmoschus_esculentus.jpg/800px-Okra_Abelmoschus_esculentus.jpg",
+        5: "https://images.unsplash.com/photo-1502741338009-cac2772e18bc?w=800&q=80",
         6: "https://images.unsplash.com/photo-1604568102377-f273edcfebbc?w=800&q=80",
         7: "https://images.unsplash.com/photo-1568584711462-24cc6ad04aa6?w=800&q=80",
         8: "https://images.unsplash.com/photo-1597362925123-77861d3bfac1?w=800&q=80",
         9: "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=800&q=80",
         10: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=800&q=80",
-        11: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Bottle_gourd.jpg/800px-Bottle_gourd.jpg",
-        12: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/Luffa_aegyptiaca_fruit.jpg/800px-Luffa_aegyptiaca_fruit.jpg"
+        11: null,
+        12: null
     };
 
     try {
