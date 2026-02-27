@@ -13,8 +13,10 @@
         "test:run": "vitest run",
         "mcp:setup": "node scripts/setup-mcp.js",
         "mcp:logs": "powershell -Command \"Get-Content -Path ~/.firebase-mcp/debug.log -Wait\"",
-        "mcp:test": "node scripts/test-mcp.js",
-        "mcp:connect": "npx -y @gannonh/firebase-mcp"
+        "mcp:test": "node scripts/test-firebase-mcp.cjs",
+        "mcp:connect": "npx -y @gannonh/firebase-mcp",
+        "admin:check": "node scripts/check-admin-permissions.cjs",
+        "admin:set": "node scripts/set-admin.cjs"
     },
     "devDependencies": {
         "@gannonh/firebase-mcp": "^1.4.9",

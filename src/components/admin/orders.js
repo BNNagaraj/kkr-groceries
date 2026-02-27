@@ -317,6 +317,37 @@ export async function adminUpdateOrderStatus(id, newStatus) {
         renderOrdersTab();
     } catch (e) {
         logError(e, 'adminUpdateOrderStatus', true);
+        
+        // Handle permission errors with helpful message
+        if (e.code === 'permission-denied' || e.message?.includes('Missing or insufficient permissions')) {
+            const user = window.firebase?.auth().currentUser;
+            if (user) {
+                const adminEmails = [
+                    'raju2uraju@gmail.com',
+                    'kanthati.chakri@gmail.com',
+                    'nagaraj.b@swastikinfralogics.com'
+                ];
+                
+                if (adminEmails.includes(user.email?.toLowerCase())) {
+                    if (window.showToast) {
+                        window.showToast('Admin permissions not detected. Please sign out and sign back in to refresh your access.', 'error', 5000);
+                    }
+                    
+                    // Show relogin prompt
+                    setTimeout(() => {
+                        if (confirm('Your admin permissions need to be refreshed. Sign out now?')) {
+                            window.firebase.auth().signOut().then(() => {
+                                window.location.href = '/?message=Please sign in again to update your permissions';
+                            });
+                        }
+                    }, 100);
+                } else {
+                    if (window.showToast) {
+                        window.showToast('You do not have permission to update orders.', 'error');
+                    }
+                }
+            }
+        }
     }
 }
 

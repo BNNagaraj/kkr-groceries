@@ -2,55 +2,59 @@
 
 This project uses [Firebase MCP](https://github.com/gannonh/firebase-mcp) to enable AI assistants to interact with Firebase services directly.
 
-## ⚡ Quick Setup
+## ✅ Current Status
 
-### 1. Generate Service Account Key
+**Last verified:** 2026-02-26
 
-The Firebase MCP server requires a service account key with admin privileges.
+| Component | Status |
+|-----------|--------|
+| Service Account Key | ✅ Configured |
+| Firestore Connection | ✅ Working |
+| Storage Connection | ✅ Working |
+| Auth Connection | ✅ Working |
 
-```bash
-# Run setup wizard
-npm run mcp:setup
-```
+## ⚡ Quick Start
 
-Or manually:
-
-1. Go to [Firebase Console → Service Accounts](https://console.firebase.google.com/project/kkr-groceries-02/settings/serviceaccounts)
-2. Click **"Generate new private key"**
-3. Save the JSON file to `.firebase/serviceAccountKey.json`
-
-### 2. Test Connection
+### 1. Verify Setup
 
 ```bash
 npm run mcp:test
 ```
 
-### 3. View Logs (if needed)
+This will test the connection and list your Firestore collections.
+
+### 2. Manual Connection (for debugging)
 
 ```bash
-npm run mcp:logs
+npm run mcp:connect
 ```
 
-## Configuration
+## 🔧 Configuration
+
+### Service Account Key
+
+The service account key is already configured at:
+```
+.firebase/serviceAccountKey.json
+```
+
+If you need to regenerate it:
+1. Go to [Firebase Console → Service Accounts](https://console.firebase.google.com/project/kkr-groceries-02/settings/serviceaccounts)
+2. Click **"Generate new private key"**
+3. Save the JSON file to `.firebase/serviceAccountKey.json`
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SERVICE_ACCOUNT_KEY_PATH` | Path to service account JSON | `.firebase/serviceAccountKey.json` |
-| `FIREBASE_STORAGE_BUCKET` | Firebase Storage bucket | `kkr-groceries-02.firebasestorage.app` |
-| `DEBUG_LOG_FILE` | Enable debug logging | `true` |
+| Variable | Value |
+|----------|-------|
+| `SERVICE_ACCOUNT_KEY_PATH` | `D:/AI/kkr-groceries-02/.firebase/serviceAccountKey.json` |
+| `FIREBASE_STORAGE_BUCKET` | `kkr-groceries-02.firebasestorage.app` |
+| `DEBUG_LOG_FILE` | `true` |
 
 ### IDE Configuration
 
 #### Cursor IDE
 Config: `.cursor/mcp.json`
-
-#### VS Code  
-Config: `.vscode/mcp.json`
-
-#### Claude Desktop (macOS/Linux)
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -59,7 +63,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "command": "npx",
       "args": ["-y", "@gannonh/firebase-mcp"],
       "env": {
-        "SERVICE_ACCOUNT_KEY_PATH": "/absolute/path/to/kkr-groceries-02/.firebase/serviceAccountKey.json",
+        "SERVICE_ACCOUNT_KEY_PATH": "D:/AI/kkr-groceries-02/.firebase/serviceAccountKey.json",
         "FIREBASE_STORAGE_BUCKET": "kkr-groceries-02.firebasestorage.app"
       }
     }
@@ -67,7 +71,26 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-## Available MCP Tools
+#### VS Code  
+Config: `.vscode/mcp.json`
+
+```json
+{
+  "servers": {
+    "firebase-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@gannonh/firebase-mcp"],
+      "env": {
+        "SERVICE_ACCOUNT_KEY_PATH": "D:/AI/kkr-groceries-02/.firebase/serviceAccountKey.json",
+        "FIREBASE_STORAGE_BUCKET": "kkr-groceries-02.firebasestorage.app"
+      }
+    }
+  }
+}
+```
+
+## 🛠️ Available Tools
 
 ### Firestore Tools
 
@@ -96,7 +119,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 |------|-------------|
 | `auth_get_user` | Get user by ID or email |
 
-## Usage Examples
+## 💡 Usage Examples
 
 ### Query Orders
 
@@ -131,16 +154,22 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 "Find user by email raju@example.com"
 ```
 
-## Troubleshooting
+## 🔍 Troubleshooting
 
-### Debug Logs
+### Test Connection
+
+```bash
+node scripts/test-firebase-mcp.cjs
+```
+
+### View Logs
 
 ```bash
 # View logs in real-time
 npm run mcp:logs
 ```
 
-Logs are also saved to: `~/.firebase-mcp/debug.log`
+Or check the log file: `debug.log` (in project root)
 
 ### Common Issues
 
@@ -160,27 +189,27 @@ Logs are also saved to: `~/.firebase-mcp/debug.log`
 - Service account needs `Firebase Admin` role
 - Go to Firebase Console → IAM & Admin → Service Accounts
 
-### Test All Tools
+### Debug Mode
 
-Ask your AI assistant:
-```
-"Please test all Firebase MCP tools and list my Firestore collections"
-```
+Set `DEBUG_LOG_FILE=true` to enable detailed logging.
 
-## Security Notes
+## 🔒 Security Notes
 
 - ✅ Service account key is in `.firebase/` which is gitignored
 - ✅ Never commit `serviceAccountKey.json` to Git
 - ✅ Service account has admin privileges - keep it secure
 - ✅ Use environment-specific service accounts for production
 
-## Project Info
+## 📊 Project Info
 
-- **Project ID:** `kkr-groceries-02`
-- **Storage Bucket:** `kkr-groceries-02.firebasestorage.app`
-- **Region:** `asia-south1`
+| Property | Value |
+|----------|-------|
+| **Project ID** | `kkr-groceries-02` |
+| **Storage Bucket** | `kkr-groceries-02.firebasestorage.app` |
+| **Region** | `asia-south1` |
+| **Collections** | `mail`, `orders`, `presence`, `products`, `settings`, `users` |
 
-## Additional Resources
+## 📚 Additional Resources
 
 - [Firebase MCP GitHub](https://github.com/gannonh/firebase-mcp)
 - [Firebase Documentation](https://firebase.google.com/docs)
