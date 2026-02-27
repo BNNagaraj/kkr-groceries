@@ -11,7 +11,7 @@ service cloud.firestore {
       // Check custom claim OR admin email list (fallback)
       return isAuthenticated() && (
         request.auth.token.admin == true ||
-        request.auth.token.email.lower() in ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com', 'nagaraj.b@swastikinfralogics.com']
+        request.auth.token.email.lower() in ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com']
       );
     }
     
