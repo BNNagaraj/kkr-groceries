@@ -72,9 +72,7 @@ service cloud.firestore {
         request.resource.data.total > 0;
       
       // Update: Admin can update status and timestamps
-      allow update: if isAdmin() && 
-        request.resource.data.keys().hasOnly(['status', 'updatedAt', 'placedAt', 'acceptedAt', 'shippedAt', 'deliveredAt', 'fulfilledAt', 'rejectedAt', 'revisedAcceptedCart', 'revisedFulfilledCart', 'orderSummary', 'totalValue', 'productCount', 'customerName', 'phone', 'userPhone', 'location', 'pincode', 'userEmail']) &&
-        request.resource.data.status in ['Pending', 'Accepted', 'Fulfilled', 'Rejected'];
+      allow update: if isAdmin();
       
       // Delete: Only admin
       allow delete: if isAdmin();
