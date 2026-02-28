@@ -4,6 +4,7 @@ import React, { useState, memo } from "react";
 import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Flame, LeafyGreen } from "lucide-react";
+import { motion } from "framer-motion";
 
 // Independent component that uses Context, preventing the parent ProductCard from re-rendering
 const CartControls = memo(function CartControls({ product }: { product: Product }) {
@@ -47,7 +48,12 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
     const [imgError, setImgError] = useState(false);
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow">
+        <motion.div
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow"
+        >
             <div className="p-3 flex items-start gap-4 flex-grow">
                 <div className="w-[70px] h-[70px] rounded-xl flex-shrink-0 bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden relative">
                     {product.image && !imgError ? (
@@ -111,6 +117,6 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
             <div className="px-3 pb-3">
                 <CartControls product={product} />
             </div>
-        </div>
+        </motion.div>
     );
 });

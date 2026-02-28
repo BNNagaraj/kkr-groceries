@@ -33,6 +33,7 @@ export const metadata: Metadata = {
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppProvider } from "@/contexts/AppContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Toaster } from "@/components/ui/sonner";
 
 export default function RootLayout({
   children,
@@ -51,6 +52,7 @@ export default function RootLayout({
             </ErrorBoundary>
           </AppProvider>
         </AuthProvider>
+        <Toaster position="top-center" richColors closeButton />
       </body>
     </html>
   );

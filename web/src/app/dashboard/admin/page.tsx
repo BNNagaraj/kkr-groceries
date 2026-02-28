@@ -11,6 +11,20 @@ import Image from "next/image";
 import { Settings, PackageSearch, Activity, ArrowLeft, LogOut, Save, Upload, Loader2, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import OrdersTab from "@/components/admin/OrdersTab";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function AdminDashboard() {
     const { currentUser, isAdmin, loading: authLoading } = useAuth();
@@ -23,6 +37,7 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [uploadingId, setUploadingId] = useState<number | null>(null);
+    const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploadTargetId = useRef<number | null>(null);
 
@@ -43,7 +58,7 @@ export default function AdminDashboard() {
     };
 
     const handleSaveAllProducts = async () => {
-        if (!confirm("Save all product changes to live database?")) return;
+        setConfirmSaveOpen(false);
         setLoading(true);
         try {
             const batch = [];
@@ -51,10 +66,10 @@ export default function AdminDashboard() {
                 batch.push(setDoc(doc(db, "products", p.id.toString()), p, { merge: true }));
             }
             await Promise.all(batch);
-            alert("All products have been updated successfully!");
+            toast.success("All products have been updated successfully!");
         } catch (e) {
             console.error(e);
-            alert("Error saving products.");
+            toast.error("Error saving products. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -71,11 +86,11 @@ export default function AdminDashboard() {
         if (!file || productId === null) return;
 
         if (!file.type.startsWith("image/")) {
-            alert("Please select an image file.");
+            toast.error("Please select an image file.");
             return;
         }
         if (file.size > 10 * 1024 * 1024) {
-            alert("Image must be under 10MB.");
+            toast.error("Image must be under 10MB.");
             return;
         }
 
@@ -98,10 +113,11 @@ export default function AdminDashboard() {
                 setEditingProducts(prev =>
                     prev.map(p => p.id === productId ? { ...p, image: result.data.url } : p)
                 );
+                toast.success("Image uploaded successfully!");
             }
         } catch (err) {
             console.error("Image upload failed:", err);
-            alert("Image upload failed. Please try again.");
+            toast.error("Image upload failed. Please try again.");
         } finally {
             setUploadingId(null);
             if (fileInputRef.current) fileInputRef.current.value = "";
@@ -128,6 +144,24 @@ export default function AdminDashboard() {
                 className="hidden"
                 onChange={onFileSelected}
             />
+
+            {/* Save Confirmation Dialog */}
+            <AlertDialog open={confirmSaveOpen} onOpenChange={setConfirmSaveOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Save all product changes?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will update {editingProducts.length} products in the live database. Customers will see these changes immediately.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleSaveAllProducts}>
+                            Save to Live Catalog
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             {/* Sidebar */}
             <div className="w-full md:w-64 bg-slate-900 text-slate-300 border-r border-slate-800 shrink-0 flex flex-col">
@@ -185,31 +219,30 @@ export default function AdminDashboard() {
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                                 <div className="flex items-center gap-4">
                                     <label className="font-bold text-slate-700">Global Margin %:</label>
-                                    <input
+                                    <Input
                                         type="number"
                                         value={globalCommission}
                                         onChange={(e) => setGlobalCommission(Number(e.target.value))}
-                                        className="w-20 px-3 py-1.5 border border-slate-300 rounded text-center focus:ring-2 focus:ring-emerald-500 outline-none"
+                                        className="w-20 text-center"
                                     />
                                 </div>
                                 <div className="flex gap-2 items-center">
                                     <div className="relative">
                                         <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input
+                                        <Input
                                             type="text"
                                             placeholder="Search products..."
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none w-48"
+                                            className="pl-8 w-48"
                                         />
                                     </div>
-                                    <button
-                                        onClick={handleSaveAllProducts}
+                                    <Button
+                                        onClick={() => setConfirmSaveOpen(true)}
                                         disabled={loading}
-                                        className="flex items-center gap-2 bg-[#064e3b] hover:bg-[#065f46] text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors disabled:opacity-50"
                                     >
                                         <Save className="w-4 h-4" /> Save Live Catalog
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
 

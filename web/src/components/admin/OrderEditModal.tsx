@@ -1,10 +1,21 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { X, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { Order, OrderCartItem } from "@/types/order";
 import { updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { toast } from "sonner";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface EditItem {
   name: string;
@@ -108,33 +119,25 @@ export default function OrderEditModal({ order, onClose, onSave }: Props) {
       await onSave(order.id, proposedCart, changes, order.userId);
     } catch (e) {
       console.error("Failed to save edited order:", e);
-      alert("Failed to save changes.");
+      toast.error("Failed to save changes.");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent showCloseButton className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200">
-          <div>
-            <h3 className="text-lg font-bold text-slate-800">Edit Order</h3>
-            <div className="flex items-center gap-3 mt-0.5">
-              <span className="font-mono text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-semibold">
-                {order.orderId || order.id}
-              </span>
-              <span className="text-xs text-slate-500">Status: {order.status || "Pending"}</span>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-slate-500" />
-          </button>
-        </div>
+        <DialogHeader className="p-4 border-b border-slate-200">
+          <DialogTitle>Edit Order</DialogTitle>
+          <DialogDescription>
+            <span className="font-mono text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-semibold">
+              {order.orderId || order.id}
+            </span>
+            <span className="ml-2">Status: {order.status || "Pending"}</span>
+          </DialogDescription>
+        </DialogHeader>
 
         {/* Table */}
         <div className="flex-1 overflow-auto p-4">
@@ -260,23 +263,16 @@ export default function OrderEditModal({ order, onClose, onSave }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-          >
+        <DialogFooter className="p-4 border-t border-slate-200">
+          <Button variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-[#064e3b] hover:bg-[#065f46] text-white rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
-          >
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
             <Send className="w-4 h-4" />
             {saving ? "Sending..." : "Send Changes to Buyer"}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

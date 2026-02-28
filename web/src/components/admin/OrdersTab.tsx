@@ -24,13 +24,16 @@ import {
   XCircle,
   Pencil,
   FileText,
-  ChevronDown,
   MapPin,
   Clock,
 } from "lucide-react";
 import { Order, OrderStatus, STATUS_TIMESTAMP_FIELDS, OrderCartItem } from "@/types/order";
 import { downloadInvoice } from "@/lib/invoice";
 import OrderEditModal from "./OrderEditModal";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const ORDERS_PER_PAGE = 50;
 const DAY = 86400000;
@@ -112,12 +115,12 @@ function StatusTimeline({ order }: { order: Order }) {
   return <div className="mt-1.5 flex flex-wrap gap-1 items-center">{renderedSteps}</div>;
 }
 
-function statusColor(status: OrderStatus, hasPendingMod: boolean): string {
-  if (status === "Fulfilled") return "bg-emerald-100 text-emerald-800";
-  if (status === "Accepted") return "bg-blue-100 text-blue-800";
-  if (status === "Rejected") return "bg-red-100 text-red-800";
-  if (hasPendingMod) return "bg-orange-100 text-orange-800";
-  return "bg-amber-100 text-amber-800";
+function statusBadgeVariant(status: OrderStatus, hasPendingMod: boolean): "default" | "secondary" | "destructive" | "outline" {
+  if (status === "Fulfilled") return "default";
+  if (status === "Accepted") return "secondary";
+  if (status === "Rejected") return "destructive";
+  if (hasPendingMod) return "outline";
+  return "outline";
 }
 
 export default function OrdersTab() {
@@ -174,6 +177,7 @@ export default function OrdersTab() {
         setHasMore(false);
       } catch (e2) {
         console.error("[Orders] Fallback failed:", e2);
+        toast.error("Failed to load orders.");
       }
     } finally {
       setLoading(false);
@@ -204,9 +208,12 @@ export default function OrdersTab() {
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
       );
+      toast.success(`Order ${newStatus.toLowerCase()} successfully.`);
     } catch (e) {
       console.error("Failed to update status:", e);
-      alert("Failed to update order status. You may need to sign out and back in to refresh admin permissions.");
+      toast.error("Failed to update order status.", {
+        description: "You may need to sign out and back in to refresh admin permissions.",
+      });
     }
   };
 
@@ -224,9 +231,10 @@ export default function OrdersTab() {
             : o
         )
       );
+      toast.success("Modification cancelled.");
     } catch (e) {
       console.error("Failed to cancel modification:", e);
-      alert("Failed to cancel modification.");
+      toast.error("Failed to cancel modification.");
     }
   };
 
@@ -292,6 +300,7 @@ export default function OrdersTab() {
       )
     );
     setEditingOrder(null);
+    toast.success("Changes sent to buyer for approval.");
   };
 
   // Date filtering
@@ -319,13 +328,14 @@ export default function OrdersTab() {
           <LayoutDashboard className="w-6 h-6 text-slate-400" /> Order Management
           <span className="text-sm font-normal text-slate-400">({filteredOrders.length})</span>
         </h2>
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => loadOrders(true)}
           disabled={loading}
-          className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Date Filter Chips */}
@@ -336,7 +346,7 @@ export default function OrdersTab() {
             onClick={() => setDateFilter(f.key)}
             className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
               dateFilter === f.key
-                ? "bg-[#064e3b] text-white"
+                ? "bg-primary text-primary-foreground"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
@@ -375,18 +385,13 @@ export default function OrdersTab() {
                       <span className="font-mono text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-semibold">
                         {o.orderId || o.id}
                       </span>
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${statusColor(
-                          o.status || "Pending",
-                          hasPendingMod
-                        )}`}
-                      >
+                      <Badge variant={statusBadgeVariant(o.status || "Pending", hasPendingMod)}>
                         {statusText}
-                      </span>
+                      </Badge>
                       {hasPendingMod && (
-                        <span className="text-[11px] text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded">
+                        <Badge variant="outline" className="text-orange-600 border-orange-200 bg-orange-50">
                           Waiting for buyer approval
-                        </span>
+                        </Badge>
                       )}
                     </div>
                     <div className="text-sm text-slate-500 mb-0.5">
@@ -458,81 +463,48 @@ export default function OrdersTab() {
                 <div className="flex flex-wrap gap-2">
                   {hasPendingMod ? (
                     <>
-                      <button
-                        onClick={() => handleCancelModification(o.id)}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors"
-                      >
+                      <Button variant="destructive" size="sm" onClick={() => handleCancelModification(o.id)}>
                         <XCircle className="w-3.5 h-3.5" /> Cancel Changes
-                      </button>
-                      <button
-                        onClick={() => downloadInvoice(o)}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-sky-500 text-white rounded-lg text-xs font-semibold hover:bg-sky-600 transition-colors"
-                      >
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => downloadInvoice(o)}>
                         <FileText className="w-3.5 h-3.5" /> Invoice
-                      </button>
+                      </Button>
                     </>
                   ) : o.status === "Pending" || !o.status ? (
                     <>
-                      <button
-                        onClick={() => handleStatusChange(o.id, "Accepted")}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition-colors"
-                      >
+                      <Button size="sm" onClick={() => handleStatusChange(o.id, "Accepted")} className="bg-blue-500 hover:bg-blue-600">
                         <CheckCircle2 className="w-3.5 h-3.5" /> Accept
-                      </button>
-                      <button
-                        onClick={() => setEditingOrder(o)}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition-colors"
-                      >
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingOrder(o)} className="text-amber-600 border-amber-300 hover:bg-amber-50">
                         <Pencil className="w-3.5 h-3.5" /> Edit
-                      </button>
-                      <button
-                        onClick={() => downloadInvoice(o)}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-sky-500 text-white rounded-lg text-xs font-semibold hover:bg-sky-600 transition-colors"
-                      >
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => downloadInvoice(o)}>
                         <FileText className="w-3.5 h-3.5" /> Invoice
-                      </button>
-                      <button
-                        onClick={() => handleStatusChange(o.id, "Rejected")}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors"
-                      >
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleStatusChange(o.id, "Rejected")}>
                         <XCircle className="w-3.5 h-3.5" /> Reject
-                      </button>
+                      </Button>
                     </>
                   ) : o.status === "Accepted" ? (
                     <>
-                      <button
-                        onClick={() => handleStatusChange(o.id, "Fulfilled")}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-xs font-semibold hover:bg-emerald-600 transition-colors"
-                      >
+                      <Button size="sm" onClick={() => handleStatusChange(o.id, "Fulfilled")}>
                         <CheckCircle2 className="w-3.5 h-3.5" /> Fulfill
-                      </button>
-                      <button
-                        onClick={() => downloadInvoice(o)}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-sky-500 text-white rounded-lg text-xs font-semibold hover:bg-sky-600 transition-colors"
-                      >
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => downloadInvoice(o)}>
                         <FileText className="w-3.5 h-3.5" /> Invoice
-                      </button>
-                      <button
-                        onClick={() => setEditingOrder(o)}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition-colors"
-                      >
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingOrder(o)} className="text-amber-600 border-amber-300 hover:bg-amber-50">
                         <Pencil className="w-3.5 h-3.5" /> Edit
-                      </button>
+                      </Button>
                     </>
                   ) : o.status === "Fulfilled" ? (
                     <>
-                      <button
-                        onClick={() => downloadInvoice(o)}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-sky-500 text-white rounded-lg text-xs font-semibold hover:bg-sky-600 transition-colors"
-                      >
+                      <Button size="sm" variant="secondary" onClick={() => downloadInvoice(o)}>
                         <FileText className="w-3.5 h-3.5" /> Invoice
-                      </button>
-                      <button
-                        onClick={() => setEditingOrder(o)}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-semibold hover:bg-amber-600 transition-colors"
-                      >
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingOrder(o)} className="text-amber-600 border-amber-300 hover:bg-amber-50">
                         <Pencil className="w-3.5 h-3.5" /> Edit
-                      </button>
+                      </Button>
                     </>
                   ) : null}
                 </div>
@@ -544,14 +516,14 @@ export default function OrdersTab() {
       {/* Load More */}
       {!loading && hasMore && dateFilter === "all" && (
         <div className="text-center pt-4">
-          <button
+          <Button
+            variant="secondary"
             onClick={() => loadOrders(false)}
             disabled={loadingMore}
-            className="flex items-center gap-2 mx-auto px-6 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
             {loadingMore ? "Loading..." : "Load More Orders"}
-          </button>
+          </Button>
         </div>
       )}
 
