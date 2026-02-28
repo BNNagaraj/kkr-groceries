@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Image from "next/image";
 import { Send } from "lucide-react";
 import { Order, OrderCartItem } from "@/types/order";
 import { updateDoc, doc } from "firebase/firestore";
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/button";
 interface EditItem {
   name: string;
   unit: string;
+  image?: string;
   originalQty: number;
   originalPrice: number;
   acceptedQty: number;
@@ -52,6 +54,7 @@ export default function OrderEditModal({ order, onClose, onSave }: Props) {
       return {
         name: item.name,
         unit: item.unit,
+        image: item.image,
         originalQty: item.qty,
         originalPrice: item.price,
         acceptedQty: acItem.qty,
@@ -103,6 +106,7 @@ export default function OrderEditModal({ order, onClose, onSave }: Props) {
             qty,
             price,
             unit: item.unit,
+            image: item.image,
           });
 
           if (qty !== item.originalQty) {
@@ -166,10 +170,30 @@ export default function OrderEditModal({ order, onClose, onSave }: Props) {
 
                 return (
                   <tr key={idx} className="border-b border-slate-100">
-                    {/* Item name */}
+                    {/* Item name + image */}
                     <td className="py-3 px-3">
-                      <div className="font-semibold text-slate-800">{item.name}</div>
-                      <div className="text-xs text-slate-400">{item.unit}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded bg-slate-50 border border-slate-100 overflow-hidden relative shrink-0 flex items-center justify-center">
+                          {item.image ? (
+                            <Image
+                              src={item.image}
+                              alt={item.name}
+                              fill
+                              sizes="32px"
+                              className="object-cover"
+                              unoptimized={item.image.includes("unsplash.com")}
+                            />
+                          ) : (
+                            <span className="text-xs font-bold text-slate-300">
+                              {item.name?.[0] || "?"}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-slate-800">{item.name}</div>
+                          <div className="text-xs text-slate-400">{item.unit}</div>
+                        </div>
+                      </div>
                     </td>
 
                     {/* Original (read-only) */}

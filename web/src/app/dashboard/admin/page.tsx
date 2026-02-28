@@ -11,6 +11,7 @@ import Image from "next/image";
 import { Settings, PackageSearch, Activity, ArrowLeft, LogOut, Save, Upload, Loader2, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import OrdersTab from "@/components/admin/OrdersTab";
+import AdminAnalytics from "@/components/admin/AdminAnalytics";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -356,12 +357,7 @@ export default function AdminDashboard() {
 
                     {activeTab === "orders" && <OrdersTab />}
 
-                    {activeTab === "stats" && (
-                        <div className="text-center py-20 bg-white rounded-2xl border border-slate-100">
-                            <h3 className="text-xl font-bold text-slate-800">Advanced Analytics</h3>
-                            <p className="text-slate-500 mt-2">Analytics will be available in a future phase.</p>
-                        </div>
-                    )}
+                    {activeTab === "stats" && <AdminAnalytics />}
                 </div>
             </div>
         </div>

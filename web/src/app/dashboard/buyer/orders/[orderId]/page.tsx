@@ -262,14 +262,36 @@ export default function OrderDetailPage() {
               <div className="bg-white rounded-xl p-4 mb-4 border border-amber-100">
                 <h3 className="text-sm font-bold text-slate-700 mb-2">Proposed Items:</h3>
                 <div className="space-y-2">
-                  {mod.proposedCart.map((item, idx) => (
-                    <div key={idx} className="flex justify-between text-sm">
-                      <span className="text-slate-700">{item.name}</span>
-                      <span className="text-slate-500">
-                        {item.qty} {item.unit} × ₹{item.price} = <span className="font-semibold text-slate-800">₹{(item.qty * item.price).toLocaleString("en-IN")}</span>
-                      </span>
-                    </div>
-                  ))}
+                  {mod.proposedCart.map((item, idx) => {
+                    const currentItem = cart.find((ci) => ci.name === item.name);
+                    const qtyChanged = currentItem && currentItem.qty !== item.qty;
+                    const priceChanged = currentItem && currentItem.price !== item.price;
+
+                    return (
+                      <div key={idx} className="flex justify-between text-sm">
+                        <span className="text-slate-700">{item.name}</span>
+                        <span className="text-slate-500">
+                          {qtyChanged && (
+                            <span className="line-through text-slate-400 mr-1">{currentItem.qty}</span>
+                          )}
+                          <span className={qtyChanged ? "bg-yellow-100 rounded px-0.5" : ""}>
+                            {item.qty}
+                          </span>
+                          {" "}{item.unit} ×{" "}
+                          {priceChanged && (
+                            <span className="line-through text-slate-400 mr-1">₹{currentItem.price}</span>
+                          )}
+                          <span className={priceChanged ? "bg-yellow-100 rounded px-0.5" : ""}>
+                            ₹{item.price}
+                          </span>
+                          {" = "}
+                          <span className="font-semibold text-slate-800">
+                            ₹{(item.qty * item.price).toLocaleString("en-IN")}
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  })}
                   <div className="border-t border-slate-100 pt-2 flex justify-between font-bold">
                     <span>New Total</span>
                     <span>{mod.proposedTotalValue}</span>
@@ -361,6 +383,12 @@ export default function OrderDetailPage() {
           <div className="space-y-3">
             {cart.map((item: OrderCartItem, idx: number) => {
               const amount = item.qty * item.price;
+              const origItem = order.originalCart
+                ? order.originalCart.find((oi) => oi.name === item.name)
+                : undefined;
+              const qtyChanged = origItem && origItem.qty !== item.qty;
+              const priceChanged = origItem && origItem.price !== item.price;
+
               return (
                 <div key={idx} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
                   <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden relative shrink-0 flex items-center justify-center">
@@ -373,7 +401,19 @@ export default function OrderDetailPage() {
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-slate-800 text-sm">{item.name}</div>
                     <div className="text-xs text-slate-500">
-                      {item.qty} {item.unit} × ₹{item.price}
+                      {qtyChanged && (
+                        <span className="line-through text-slate-400 mr-1">{origItem.qty}</span>
+                      )}
+                      <span className={qtyChanged ? "bg-yellow-100 rounded px-0.5" : ""}>
+                        {item.qty} {item.unit}
+                      </span>
+                      {" × "}
+                      {priceChanged && (
+                        <span className="line-through text-slate-400 mr-1">₹{origItem.price}</span>
+                      )}
+                      <span className={priceChanged ? "bg-yellow-100 rounded px-0.5" : ""}>
+                        ₹{item.price}
+                      </span>
                     </div>
                   </div>
                   <div className="font-bold text-slate-800 text-sm">

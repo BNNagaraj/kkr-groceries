@@ -16,6 +16,7 @@ import {
   deleteField,
   addDoc,
 } from "firebase/firestore";
+import Image from "next/image";
 import {
   LayoutDashboard,
   RefreshCw,
@@ -365,16 +366,44 @@ export default function OrdersTab() {
                   <div className="space-y-1">
                     {cart.map((item, idx) => {
                       const amount = (item.qty || 0) * (item.price || 0);
+                      const origItem = o.originalCart
+                        ? o.originalCart.find((oi: OrderCartItem) => oi.name === item.name)
+                        : undefined;
+                      const qtyChanged = origItem && origItem.qty !== item.qty;
+                      const priceChanged = origItem && origItem.price !== item.price;
+
                       return (
                         <div
                           key={idx}
                           className="flex items-center justify-between text-sm py-1 border-b border-slate-50 last:border-0"
                         >
+                          <div className="w-8 h-8 rounded bg-slate-50 border border-slate-100 overflow-hidden relative shrink-0 flex items-center justify-center mr-2">
+                            {item.image ? (
+                              <Image
+                                src={item.image}
+                                alt={item.name}
+                                fill
+                                sizes="32px"
+                                className="object-cover"
+                                unoptimized={item.image.includes("unsplash.com")}
+                              />
+                            ) : (
+                              <span className="text-xs font-bold text-slate-300">
+                                {item.name?.[0] || "?"}
+                              </span>
+                            )}
+                          </div>
                           <span className="text-slate-700 font-medium flex-1">{item.name}</span>
-                          <span className="text-slate-500 w-20 text-right">
+                          <span className={`w-24 text-right ${qtyChanged ? "bg-yellow-100 rounded px-1" : "text-slate-500"}`}>
+                            {qtyChanged && (
+                              <span className="line-through text-slate-400 mr-1 text-xs">{origItem.qty}</span>
+                            )}
                             {item.qty} {item.unit}
                           </span>
-                          <span className="text-slate-500 w-16 text-right">
+                          <span className={`w-20 text-right ${priceChanged ? "bg-yellow-100 rounded px-1" : "text-slate-500"}`}>
+                            {priceChanged && (
+                              <span className="line-through text-slate-400 mr-1 text-xs">&#8377;{origItem.price}</span>
+                            )}
                             &#8377;{item.price}
                           </span>
                           <span className="text-slate-800 font-semibold w-20 text-right">
