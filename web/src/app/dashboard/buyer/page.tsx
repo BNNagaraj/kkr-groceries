@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, lazy, Suspense } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc } from "firebase/firestore";
@@ -22,8 +22,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-/* Lazy-load chart components to reduce initial bundle (~60KB savings) */
-const OverviewCharts = lazy(() => import("@/components/OverviewCharts"));
+import OverviewCharts from "@/components/OverviewCharts";
 
 interface Address {
     id: string;
@@ -31,6 +30,20 @@ interface Address {
     phone: string;
     loc: string;
     pin: string;
+}
+
+/** Safely extract a numeric value from totalValue (can be string "₹1,234" or number 1234 in Firestore) */
+function parseTotal(v: unknown): number {
+    if (typeof v === "number") return v;
+    if (typeof v === "string") return parseInt(v.replace(/[^0-9]/g, "") || "0", 10);
+    return 0;
+}
+
+/** Display totalValue safely — handles both string "₹1,234" and number 1234 from Firestore */
+function displayTotal(v: unknown): string {
+    if (typeof v === "number") return `₹${v.toLocaleString("en-IN")}`;
+    if (typeof v === "string") return v;
+    return "₹0";
 }
 
 function statusBadgeVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
@@ -112,7 +125,7 @@ export default function BuyerDashboard() {
     }
 
     // Calculate Overview Stats
-    const totalSpent = orders.reduce((acc, o) => acc + parseInt(o.totalValue?.replace(/[^0-9]/g, "") || "0", 10), 0);
+    const totalSpent = orders.reduce((acc, o) => acc + parseTotal(o.totalValue), 0);
 
     const pop: Record<string, number> = {};
     const spentByDate: Record<string, number> = {};
@@ -126,7 +139,7 @@ export default function BuyerDashboard() {
         }
         if (o.timestamp) {
             const d = o.timestamp.split(",")[0];
-            const v = parseInt(o.totalValue?.replace(/[^0-9]/g, "") || "0", 10);
+            const v = parseTotal(o.totalValue);
             spentByDate[d] = (spentByDate[d] || 0) + v;
         }
     });
@@ -156,13 +169,11 @@ export default function BuyerDashboard() {
                     </div>
 
                     {orders.length > 0 ? (
-                        <Suspense fallback={<div className="h-[300px] flex items-center justify-center text-slate-400 animate-pulse">Loading charts...</div>}>
-                            <OverviewCharts
-                                recentDates={recentDates}
-                                spentByDate={spentByDate}
-                                topItems={topItems}
-                            />
-                        </Suspense>
+                        <OverviewCharts
+                            recentDates={recentDates}
+                            spentByDate={spentByDate}
+                            topItems={topItems}
+                        />
                     ) : (
                         <div className="text-center py-12 bg-white rounded-2xl border border-slate-100">
                             <span className="text-4xl block mb-2">📊</span>
@@ -210,7 +221,7 @@ export default function BuyerDashboard() {
                                 <div className="flex justify-between items-center mt-3 pt-1">
                                     <span className="text-sm font-medium text-slate-500">{o.productCount || 0} items</span>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-lg font-bold text-slate-800">{o.totalValue}</span>
+                                        <span className="text-lg font-bold text-slate-800">{displayTotal(o.totalValue)}</span>
                                         <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
                                     </div>
                                 </div>
