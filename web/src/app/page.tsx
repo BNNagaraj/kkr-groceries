@@ -45,7 +45,7 @@ export default function Home() {
     <div className="min-h-screen pb-20">
       <Header onOpenCart={() => setCartOpen(true)} />
 
-      <main className="max-w-[1400px] mx-auto px-4 mt-[90px]">
+      <main id="main-content" className="max-w-[1400px] mx-auto px-4 mt-[90px]">
         {/* Market Status Banner */}
         <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-6 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
@@ -69,7 +69,8 @@ export default function Home() {
           <div className="relative w-full md:w-96 shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
-              type="text"
+              type="search"
+              aria-label="Search vegetables"
               placeholder="Search vegetables in English/Telugu/Hindi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -77,10 +78,12 @@ export default function Home() {
             />
           </div>
 
-          <div className="flex gap-2 overflow-x-auto w-full pb-2 no-scrollbar scroll-smooth">
+          <div className="flex gap-2 overflow-x-auto w-full pb-2 no-scrollbar scroll-smooth" role="tablist" aria-label="Product categories">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.id}
+                role="tab"
+                aria-selected={activeCategory === cat.id}
                 onClick={() => setActiveCategory(cat.id)}
                 className={`px-5 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all ${activeCategory === cat.id
                     ? "bg-[#064e3b] text-white shadow-md shadow-emerald-900/20"

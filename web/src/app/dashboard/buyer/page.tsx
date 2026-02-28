@@ -1,22 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc } from "firebase/firestore";
 import Link from "next/link";
 import { Package, MapPin, Trash2, LogOut, ArrowLeft, BarChart2, ChevronRight } from "lucide-react";
-import {
-    Chart as ChartJS,
-    CategoryScale,
-    LinearScale,
-    BarElement,
-    Title,
-    Tooltip,
-    Legend,
-    ArcElement,
-} from 'chart.js';
-import { Bar, Pie } from 'react-chartjs-2';
 import { Order } from "@/types/order";
 import { toast } from "sonner";
 
@@ -33,15 +22,8 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-ChartJS.register(
-    CategoryScale,
-    LinearScale,
-    BarElement,
-    Title,
-    Tooltip,
-    Legend,
-    ArcElement
-);
+/* Lazy-load chart components to reduce initial bundle (~60KB savings) */
+const OverviewCharts = lazy(() => import("@/components/OverviewCharts"));
 
 interface Address {
     id: string;
@@ -111,7 +93,7 @@ export default function BuyerDashboard() {
             setAddresses(prev => prev.filter(a => a.id !== deleteTarget));
             toast.success("Address deleted.");
         } catch (e) {
-            console.error(e);
+            console.error("[Dashboard] Failed to delete address:", e);
             toast.error("Failed to delete address.");
         } finally {
             setDeleteTarget(null);
@@ -174,38 +156,13 @@ export default function BuyerDashboard() {
                     </div>
 
                     {orders.length > 0 ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-[300px]">
-                                <h3 className="font-bold mb-4 text-slate-800">Recent Spending</h3>
-                                <Bar
-                                    data={{
-                                        labels: recentDates,
-                                        datasets: [{
-                                            label: "Spend (₹)",
-                                            data: recentDates.map(d => spentByDate[d]),
-                                            backgroundColor: "#3b82f6",
-                                            borderRadius: 4
-                                        }]
-                                    }}
-                                    options={{ maintainAspectRatio: false }}
-                                />
-                            </div>
-                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-[300px] flex flex-col">
-                                <h3 className="font-bold mb-4 text-slate-800">Top Items</h3>
-                                <div className="flex-1 min-h-0 flex items-center justify-center">
-                                    <Pie
-                                        data={{
-                                            labels: topItems.map(x => x[0]),
-                                            datasets: [{
-                                                data: topItems.map(x => x[1]),
-                                                backgroundColor: ["#10b981", "#f59e0b", "#ef4444"]
-                                            }]
-                                        }}
-                                        options={{ maintainAspectRatio: false }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                        <Suspense fallback={<div className="h-[300px] flex items-center justify-center text-slate-400 animate-pulse">Loading charts...</div>}>
+                            <OverviewCharts
+                                recentDates={recentDates}
+                                spentByDate={spentByDate}
+                                topItems={topItems}
+                            />
+                        </Suspense>
                     ) : (
                         <div className="text-center py-12 bg-white rounded-2xl border border-slate-100">
                             <span className="text-4xl block mb-2">📊</span>

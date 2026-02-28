@@ -125,7 +125,7 @@ export default function OrderDetailPage() {
       );
       toast.success("Modification approved.");
     } catch (e) {
-      console.error(e);
+      console.error("[Order] Failed to approve modification:", e);
       toast.error("Failed to approve modification.");
     } finally {
       setActionLoading(false);
@@ -157,7 +157,7 @@ export default function OrderDetailPage() {
       );
       toast.success("Modification rejected.");
     } catch (e) {
-      console.error(e);
+      console.error("[Order] Failed to reject modification:", e);
       toast.error("Failed to reject modification.");
     } finally {
       setActionLoading(false);

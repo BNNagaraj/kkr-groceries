@@ -68,7 +68,7 @@ export default function AdminDashboard() {
             await Promise.all(batch);
             toast.success("All products have been updated successfully!");
         } catch (e) {
-            console.error(e);
+            console.error("[Admin] Failed to save products:", e);
             toast.error("Error saving products. Please try again.");
         } finally {
             setLoading(false);

@@ -67,7 +67,7 @@ export function EnquiryModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 onClose();
             }, 3000);
         } catch (err: unknown) {
-            console.error(err);
+            console.error("[Enquiry] Failed to send:", err);
             toast.error("Failed to send enquiry", {
                 description: "Please try again or contact us directly.",
             });

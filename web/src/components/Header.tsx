@@ -20,7 +20,7 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
 
     return (
         <>
-            <header className="fixed top-0 left-0 right-0 h-[70px] bg-gradient-to-br from-[#064e3b] to-[#065f46] text-white z-50 shadow-md">
+            <header role="banner" className="fixed top-0 left-0 right-0 h-[70px] bg-gradient-to-br from-[#064e3b] to-[#065f46] text-white z-50 shadow-md">
                 <div className="max-w-[1400px] mx-auto h-full px-4 flex justify-between items-center">
                     {/* Brand */}
                     <Link href="/" className="flex items-center gap-2">
@@ -53,6 +53,8 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                         <div className="relative">
                             <button
                                 onClick={() => setMenuOpen(!menuOpen)}
+                                aria-label="User menu"
+                                aria-expanded={menuOpen}
                                 className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
                             >
                                 <User className="w-5 h-5" />
@@ -88,7 +90,14 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                         <div className="px-4 py-3">
                                             <p className="text-xs text-slate-500 mb-2">Sign in to save addresses and view past orders.</p>
                                             <button
-                                                onClick={() => {/* TODO: Auth Flow */ }}
+                                                onClick={() => {
+                                                    import("@/lib/firebase").then(({ auth }) => {
+                                                        import("firebase/auth").then(({ GoogleAuthProvider, signInWithPopup }) => {
+                                                            signInWithPopup(auth, new GoogleAuthProvider()).catch(() => {});
+                                                        });
+                                                    });
+                                                    setMenuOpen(false);
+                                                }}
                                                 className="w-full bg-[#064e3b] text-white rounded-lg py-2 text-sm font-semibold hover:bg-[#065f46]"
                                             >
                                                 Login / Sign Up
@@ -101,11 +110,12 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
 
                         <button
                             onClick={onOpenCart}
+                            aria-label={`Shopping cart${cartItemCount > 0 ? `, ${cartItemCount} items` : ""}`}
                             className="w-10 h-10 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center relative transition-colors shadow-sm"
                         >
                             <ShoppingCart className="w-5 h-5" />
                             {cartItemCount > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold border-2 border-[#064e3b]">
+                                <span aria-hidden="true" className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold border-2 border-[#064e3b]">
                                     {cartItemCount}
                                 </span>
                             )}

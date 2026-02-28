@@ -109,7 +109,7 @@ export function CartDrawer({
                 onClose();
             }
         } catch (err: unknown) {
-            console.error(err);
+            console.error("[Cart] Failed to submit order:", err);
             const message = err instanceof Error ? err.message : "Unknown error occurred";
             toast.error("Failed to submit order", { description: message });
         } finally {
