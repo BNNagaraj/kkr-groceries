@@ -1,13 +1,16 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppStore, Product } from "@/contexts/AppContext";
-import { db } from "@/lib/firebase";
-import { collection, query, getDocs, orderBy, updateDoc, doc, setDoc } from "firebase/firestore";
+import { db, functions } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import Link from "next/link";
-import { Settings, PackageSearch, Activity, LayoutDashboard, ArrowLeft, LogOut, Save, Download } from "lucide-react";
+import Image from "next/image";
+import { Settings, PackageSearch, Activity, ArrowLeft, LogOut, Save, Upload, Loader2, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
+import OrdersTab from "@/components/admin/OrdersTab";
 
 export default function AdminDashboard() {
     const { currentUser, isAdmin, loading: authLoading } = useAuth();
@@ -15,13 +18,13 @@ export default function AdminDashboard() {
     const router = useRouter();
 
     const [activeTab, setActiveTab] = useState<"prices" | "orders" | "stats">("prices");
-
-    // Local state for editing products before saving
     const [editingProducts, setEditingProducts] = useState<Product[]>([]);
     const [globalCommission, setGlobalCommission] = useState(15);
-
-    const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [uploadingId, setUploadingId] = useState<number | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const uploadTargetId = useRef<number | null>(null);
 
     useEffect(() => {
         if (!authLoading && (!currentUser || !isAdmin)) {
@@ -30,35 +33,12 @@ export default function AdminDashboard() {
     }, [currentUser, isAdmin, authLoading, router]);
 
     useEffect(() => {
-        // Clone products for local admin editing
         if (products.length > 0) {
             setEditingProducts(JSON.parse(JSON.stringify(products)));
         }
     }, [products]);
 
-    const loadOrders = async () => {
-        setLoading(true);
-        try {
-            const snap = await getDocs(query(collection(db, "orders"), orderBy("createdAt", "desc")));
-            setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        } catch (e) {
-            // Fallback
-            const snap = await getDocs(collection(db, "orders"));
-            const data = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
-            data.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-            setOrders(data);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (isAdmin && activeTab === "orders") {
-            loadOrders();
-        }
-    }, [isAdmin, activeTab]);
-
-    const handleProductChange = (id: number, field: keyof Product, value: any) => {
+    const handleProductChange = (id: number, field: keyof Product, value: string | number | boolean) => {
         setEditingProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
     };
 
@@ -80,15 +60,59 @@ export default function AdminDashboard() {
         }
     };
 
-    const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    const handleImageUpload = (productId: number) => {
+        uploadTargetId.current = productId;
+        fileInputRef.current?.click();
+    };
+
+    const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        const productId = uploadTargetId.current;
+        if (!file || productId === null) return;
+
+        if (!file.type.startsWith("image/")) {
+            alert("Please select an image file.");
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            alert("Image must be under 10MB.");
+            return;
+        }
+
+        setUploadingId(productId);
         try {
-            await updateDoc(doc(db, "orders", orderId), { status: newStatus });
-            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-        } catch (e) {
-            console.error(e);
-            alert("Failed to update status");
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+
+            const uploadFn = httpsCallable<
+                { productId: string; base64Image: string },
+                { success: boolean; url: string }
+            >(functions, "uploadProductImage");
+            const result = await uploadFn({ productId: productId.toString(), base64Image: base64 });
+
+            if (result.data.success && result.data.url) {
+                setEditingProducts(prev =>
+                    prev.map(p => p.id === productId ? { ...p, image: result.data.url } : p)
+                );
+            }
+        } catch (err) {
+            console.error("Image upload failed:", err);
+            alert("Image upload failed. Please try again.");
+        } finally {
+            setUploadingId(null);
+            if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
+
+    const filteredProducts = editingProducts.filter(p => {
+        if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
+        return p.name.toLowerCase().includes(q) || p.telugu?.toLowerCase().includes(q) || p.id.toString().includes(q);
+    });
 
     if (authLoading || (!currentUser || !isAdmin)) {
         return <div className="min-h-screen flex items-center justify-center p-8">Loading Admin Area...</div>;
@@ -96,6 +120,15 @@ export default function AdminDashboard() {
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+            {/* Hidden file input for image upload */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onFileSelected}
+            />
+
             {/* Sidebar */}
             <div className="w-full md:w-64 bg-slate-900 text-slate-300 border-r border-slate-800 shrink-0 flex flex-col">
                 <div className="p-6 border-b border-slate-800 flex flex-col gap-2">
@@ -159,7 +192,17 @@ export default function AdminDashboard() {
                                         className="w-20 px-3 py-1.5 border border-slate-300 rounded text-center focus:ring-2 focus:ring-emerald-500 outline-none"
                                     />
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 items-center">
+                                    <div className="relative">
+                                        <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search products..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none w-48"
+                                        />
+                                    </div>
                                     <button
                                         onClick={handleSaveAllProducts}
                                         disabled={loading}
@@ -175,17 +218,49 @@ export default function AdminDashboard() {
                                     <table className="w-full text-left text-sm whitespace-nowrap">
                                         <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
                                             <tr>
+                                                <th className="px-4 py-3">Image</th>
                                                 <th className="px-4 py-3">ID</th>
                                                 <th className="px-4 py-3">Item</th>
                                                 <th className="px-4 py-3 text-center">Active</th>
-                                                <th className="px-4 py-3">Override ₹</th>
+                                                <th className="px-4 py-3">Override &#8377;</th>
                                                 <th className="px-4 py-3 text-center">MOQ</th>
                                                 <th className="px-4 py-3">Badging</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {editingProducts.map(p => (
+                                            {filteredProducts.map(p => (
                                                 <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${p.isHidden ? 'opacity-50 bg-slate-100' : ''}`}>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-10 h-10 rounded-lg border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center flex-shrink-0">
+                                                                {p.image ? (
+                                                                    <Image
+                                                                        src={p.image}
+                                                                        alt={p.name}
+                                                                        width={40}
+                                                                        height={40}
+                                                                        className="object-cover w-full h-full"
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-slate-400 text-xs font-bold">
+                                                                        {p.name?.[0] || "?"}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleImageUpload(p.id)}
+                                                                disabled={uploadingId === p.id}
+                                                                className="p-1 hover:bg-slate-100 rounded transition-colors disabled:opacity-50"
+                                                                title="Upload image"
+                                                            >
+                                                                {uploadingId === p.id ? (
+                                                                    <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
+                                                                ) : (
+                                                                    <Upload className="w-4 h-4 text-slate-400" />
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    </td>
                                                     <td className="px-4 py-3 font-mono text-xs text-slate-500">{p.id}</td>
                                                     <td className="px-4 py-3">
                                                         <div className="font-bold text-slate-800">{p.name}</div>
@@ -245,61 +320,12 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
-                    {activeTab === "orders" && (
-                        <div className="space-y-4">
-                            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 mb-6">
-                                <LayoutDashboard className="w-6 h-6 text-slate-400" /> Order Management
-                            </h2>
-                            {orders.map(o => (
-                                <div key={o.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-slate-100 pb-4 mb-4">
-                                        <div>
-                                            <div className="flex items-center gap-3 mb-1">
-                                                <span className="font-bold text-slate-800 text-lg">{o.shopName || o.customerName}</span>
-                                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${o.status === 'Fulfilled' ? 'bg-emerald-100 text-emerald-800' :
-                                                    o.status === 'Rejected' ? 'bg-red-100 text-red-800' :
-                                                        o.status === 'Accepted' ? 'bg-blue-100 text-blue-800' :
-                                                            'bg-amber-100 text-amber-800'
-                                                    }`}>
-                                                    {o.status || 'Pending'}
-                                                </span>
-                                            </div>
-                                            <div className="text-sm text-slate-500">{o.customerPhone} • {o.deliveryAddress}</div>
-                                        </div>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <select
-                                                value={o.status || 'Pending'}
-                                                onChange={(e) => updateOrderStatus(o.id, e.target.value)}
-                                                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 p-2 outline-none font-semibold cursor-pointer"
-                                            >
-                                                <option value="Pending">Pending</option>
-                                                <option value="Accepted">Accepted</option>
-                                                <option value="Fulfilled">Fulfilled</option>
-                                                <option value="Rejected">Rejected</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-col md:flex-row justify-between gap-4">
-                                        <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100 flex-1">
-                                            <div className="font-semibold text-slate-700 mb-1">Order Items:</div>
-                                            {o.orderSummary}
-                                        </div>
-                                        <div className="shrink-0 text-right flex flex-col justify-end">
-                                            <div className="text-xs text-slate-400 mb-1">{o.timestamp}</div>
-                                            <div className="text-2xl font-bold text-slate-800">{o.totalValue}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    {activeTab === "orders" && <OrdersTab />}
 
                     {activeTab === "stats" && (
                         <div className="text-center py-20 bg-white rounded-2xl border border-slate-100">
-                            <span className="text-6xl block mb-4">📈</span>
-                            <h3 className="text-xl font-bold text-slate-800">Advanced Analytics Available</h3>
-                            <p className="text-slate-500">Analytics migrated to dedicated server-side components in future phase.</p>
+                            <h3 className="text-xl font-bold text-slate-800">Advanced Analytics</h3>
+                            <p className="text-slate-500 mt-2">Analytics will be available in a future phase.</p>
                         </div>
                     )}
                 </div>
