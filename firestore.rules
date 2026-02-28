@@ -112,6 +112,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
+    // Notifications collection
+    match /notifications/{notifId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Admin can create notifications for any user
+      allow create: if isAdmin();
+      // Users can update their own notifications (mark as read)
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Admin can delete notifications
+      allow delete: if isAdmin();
+    }
+
     // Audit logs (admin only)
     match /auditLogs/{logId} {
       allow read: if isAdmin();

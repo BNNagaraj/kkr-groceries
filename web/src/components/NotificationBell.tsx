@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, updateDoc, doc, orderBy, limit } from "firebase/firestore";
+import { collection, query, where, onSnapshot, updateDoc, doc, orderBy, limit, Timestamp } from "firebase/firestore";
 import { Bell } from "lucide-react";
 import Link from "next/link";
 
@@ -14,7 +14,16 @@ interface Notification {
   title: string;
   message: string;
   read: boolean;
-  createdAt: string;
+  createdAt: string | Timestamp;
+}
+
+/** Convert createdAt (string | Timestamp | undefined) to epoch ms for sorting */
+function toEpoch(v: unknown): number {
+  if (!v) return 0;
+  if (typeof v === "string") return new Date(v).getTime() || 0;
+  if (v instanceof Timestamp) return v.toMillis();
+  if (typeof v === "object" && v !== null && "toMillis" in v) return (v as Timestamp).toMillis();
+  return 0;
 }
 
 export function NotificationBell() {
@@ -22,6 +31,7 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const fallbackUnsub = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -42,21 +52,31 @@ export function NotificationBell() {
       },
       (err) => {
         // Fallback: query without orderBy if index is missing
-        console.warn("Notification query failed, trying fallback:", err);
+        console.warn("[Notifications] Primary query failed, trying fallback:", err.message);
         const fallbackQ = query(
           collection(db, "notifications"),
           where("userId", "==", currentUser.uid),
           limit(20)
         );
-        onSnapshot(fallbackQ, (snap) => {
-          const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Notification);
-          data.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-          setNotifications(data);
-        });
+        fallbackUnsub.current = onSnapshot(
+          fallbackQ,
+          (snap) => {
+            const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Notification);
+            data.sort((a, b) => toEpoch(b.createdAt) - toEpoch(a.createdAt));
+            setNotifications(data);
+          },
+          (fallbackErr) => {
+            console.warn("[Notifications] Fallback query also failed:", fallbackErr.message);
+          }
+        );
       }
     );
 
-    return () => unsub();
+    return () => {
+      unsub();
+      fallbackUnsub.current?.();
+      fallbackUnsub.current = null;
+    };
   }, [currentUser]);
 
   // Close dropdown when clicking outside
@@ -142,7 +162,7 @@ export function NotificationBell() {
                         {notif.message}
                       </div>
                       <div className="text-[11px] text-slate-400 mt-1">
-                        {new Date(notif.createdAt).toLocaleDateString("en-IN", {
+                        {new Date(toEpoch(notif.createdAt)).toLocaleDateString("en-IN", {
                           day: "numeric",
                           month: "short",
                           hour: "2-digit",
