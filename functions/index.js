@@ -7,6 +7,77 @@ const { getAuth } = require("firebase-admin/auth");
 initializeApp();
 const db = getFirestore();
 
+// ─── Admin emails: Firestore-backed with in-memory cache ───
+const FALLBACK_ADMINS = ["raju2uraju@gmail.com", "kanthati.chakri@gmail.com"];
+let _adminCache = { emails: null, notificationEmails: null, ts: 0 };
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function getAdminEmails() {
+  if (_adminCache.emails && Date.now() - _adminCache.ts < CACHE_TTL) {
+    return _adminCache.emails;
+  }
+  try {
+    const snap = await db.collection("settings").doc("admins").get();
+    if (snap.exists && Array.isArray(snap.data().emails) && snap.data().emails.length > 0) {
+      _adminCache.emails = snap.data().emails.map((e) => e.toLowerCase());
+      _adminCache.notificationEmails = snap.data().notificationEmails || _adminCache.emails;
+      _adminCache.ts = Date.now();
+      return _adminCache.emails;
+    }
+  } catch (err) {
+    console.warn("Failed to read settings/admins, using fallback:", err.message);
+  }
+  return FALLBACK_ADMINS;
+}
+
+async function getNotificationEmails() {
+  if (_adminCache.notificationEmails && Date.now() - _adminCache.ts < CACHE_TTL) {
+    return _adminCache.notificationEmails;
+  }
+  await getAdminEmails(); // populates cache
+  return _adminCache.notificationEmails || FALLBACK_ADMINS;
+}
+
+// ─── Rate limiter (Firestore-based) ───
+async function isRateLimited(userId, action, maxCalls, windowMs) {
+  const docRef = db.collection("_rateLimits").doc(`${userId}_${action}`);
+  try {
+    const snap = await docRef.get();
+    const now = Date.now();
+    if (snap.exists) {
+      const data = snap.data();
+      if (now - data.windowStart < windowMs) {
+        if (data.count >= maxCalls) return true;
+        await docRef.update({ count: FieldValue.increment(1) });
+        return false;
+      }
+    }
+    // New window
+    await docRef.set({ windowStart: now, count: 1 });
+    return false;
+  } catch (err) {
+    console.warn("Rate limit check failed, allowing:", err.message);
+    return false; // fail open
+  }
+}
+
+// ─── Auth helpers ───
+function requireAuth(request) {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+  return request.auth;
+}
+
+async function requireAdmin(request) {
+  const caller = requireAuth(request);
+  const email = caller.token?.email?.toLowerCase();
+  if (caller.token?.admin === true) return caller;
+  const admins = await getAdminEmails();
+  if (email && admins.includes(email)) return caller;
+  throw new HttpsError("permission-denied", "Admin access required.");
+}
+
 // Try to get storage, but don't fail if it's not configured
 let storage;
 try {
@@ -21,6 +92,11 @@ try {
  */
 exports.uploadProductImage = onCall(async (request) => {
   try {
+    const caller = await requireAdmin(request);
+    if (await isRateLimited(caller.uid, "uploadImage", 30, 10 * 60 * 1000)) {
+      throw new HttpsError("resource-exhausted", "Too many uploads. Try again later.");
+    }
+
     const data = request.data;
     if (!data || !data.productId || !data.base64Image) {
       throw new HttpsError("invalid-argument", "Missing productId or base64Image.");
@@ -108,6 +184,11 @@ exports.uploadProductImage = onCall(async (request) => {
  */
 exports.submitOrder = onCall(async (request) => {
   try {
+    const userId = request.auth?.uid || "anon_" + (request.rawRequest?.ip || "unknown");
+    if (await isRateLimited(userId, "submitOrder", 5, 15 * 60 * 1000)) {
+      throw new HttpsError("resource-exhausted", "Too many orders. Please wait before placing another.");
+    }
+
     const data = request.data;
     if (!data || !data.cart || data.cart.length === 0) {
       throw new HttpsError("invalid-argument", "Order must contain items.");
@@ -172,8 +253,9 @@ exports.submitOrder = onCall(async (request) => {
 
     // Queue Email Notification
     try {
+      const notifyEmails = await getNotificationEmails();
       await db.collection("mail").add({
-        to: ["raju2uraju@gmail.com", "kanthati.chakri@gmail.com"],
+        to: notifyEmails,
         message: {
           subject: `New Order: ${orderId} - ₹${data.totalValue}`,
           html: emailHtml,
@@ -202,12 +284,9 @@ exports.submitOrder = onCall(async (request) => {
  */
 exports.setAdminClaim = onCall(async (request) => {
   try {
-    // Verify the caller is an authorized admin
-    const callerEmail = request.auth?.token?.email;
-    const authorizedAdmins = ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com'];
-    
-    if (!callerEmail || !authorizedAdmins.includes(callerEmail.toLowerCase())) {
-      throw new HttpsError('permission-denied', 'Only authorized admins can set admin claims.');
+    const caller = await requireAdmin(request);
+    if (await isRateLimited(caller.uid, "setAdminClaim", 10, 10 * 60 * 1000)) {
+      throw new HttpsError("resource-exhausted", "Too many requests. Try again later.");
     }
 
     const { email, admin = true } = request.data;
@@ -249,8 +328,13 @@ exports.setAdminClaim = onCall(async (request) => {
  */
 exports.getUserClaims = onCall(async (request) => {
   try {
+    const caller = await requireAdmin(request);
+    if (await isRateLimited(caller.uid, "getUserClaims", 20, 5 * 60 * 1000)) {
+      throw new HttpsError("resource-exhausted", "Too many requests. Try again later.");
+    }
+
     const { email } = request.data;
-    
+
     if (!email) {
       throw new HttpsError('invalid-argument', 'Email is required.');
     }

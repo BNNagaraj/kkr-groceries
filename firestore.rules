@@ -118,6 +118,11 @@ service cloud.firestore {
       allow create: if isAuthenticated();
     }
     
+    // Rate limiting collection (internal use by Cloud Functions only)
+    match /_rateLimits/{docId} {
+      allow read, write: if false;
+    }
+
     // Presence/Online status
     match /presence/{userId} {
       allow read: if isAdmin();

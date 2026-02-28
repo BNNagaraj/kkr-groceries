@@ -28,8 +28,7 @@ async function checkAdminToken() {
     
     const adminEmails = [
         'raju2uraju@gmail.com',
-        'kanthati.chakri@gmail.com',
-        'nagaraj.b@swastikinfralogics.com'
+        'kanthati.chakri@gmail.com'
     ];
     
     // Check if user is admin by email but missing claim

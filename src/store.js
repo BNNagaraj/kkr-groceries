@@ -224,7 +224,7 @@ export default store;
 // ============================================
 
 // Constant data
-export const ADMIN_EMAILS = ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com', 'nagaraj.b@swastikinfralogics.com'];
+export const ADMIN_EMAILS = ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com'];
 export const GOOGLE_SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
 
 /** @type {Array<Object>} Products array */

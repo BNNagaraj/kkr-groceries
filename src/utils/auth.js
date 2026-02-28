@@ -71,8 +71,7 @@ export async function getAdminStatus() {
             // Check if email is in admin list
             const adminEmails = [
                 'raju2uraju@gmail.com',
-                'kanthati.chakri@gmail.com',
-                'nagaraj.b@swastikinfralogics.com'
+                'kanthati.chakri@gmail.com'
             ];
             
             if (adminEmails.includes(user.email?.toLowerCase())) {
