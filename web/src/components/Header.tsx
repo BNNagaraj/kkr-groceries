@@ -8,12 +8,14 @@ import { ShoppingCart, User, LogOut, Settings } from "lucide-react";
 
 import { EnquiryModal } from "./EnquiryModal";
 import { NotificationBell } from "./NotificationBell";
+import { AuthModal } from "./AuthModal";
 
 export function Header({ onOpenCart }: { onOpenCart: () => void }) {
     const { cart } = useAppStore();
     const { currentUser, isAdmin } = useAuth();
     const [menuOpen, setMenuOpen] = useState(false);
     const [enquiryOpen, setEnquiryOpen] = useState(false);
+    const [authOpen, setAuthOpen] = useState(false);
 
     // Calculate total items in cart
     const cartItemCount = Object.keys(cart).length;
@@ -91,12 +93,8 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                             <p className="text-xs text-slate-500 mb-2">Sign in to save addresses and view past orders.</p>
                                             <button
                                                 onClick={() => {
-                                                    import("@/lib/firebase").then(({ auth }) => {
-                                                        import("firebase/auth").then(({ GoogleAuthProvider, signInWithPopup }) => {
-                                                            signInWithPopup(auth, new GoogleAuthProvider()).catch(() => {});
-                                                        });
-                                                    });
                                                     setMenuOpen(false);
+                                                    setAuthOpen(true);
                                                 }}
                                                 className="w-full bg-[#064e3b] text-white rounded-lg py-2 text-sm font-semibold hover:bg-[#065f46]"
                                             >
@@ -124,6 +122,7 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                 </div>
             </header>
             <EnquiryModal isOpen={enquiryOpen} onClose={() => setEnquiryOpen(false)} />
+            <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
         </>
     );
 }
