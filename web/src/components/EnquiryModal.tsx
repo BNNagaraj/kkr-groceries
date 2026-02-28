@@ -2,11 +2,13 @@
 
 import React, { useState } from "react";
 import { X, Send, Store } from "lucide-react";
+import { validateName, validatePhone, validatePincode } from "@/lib/validation";
 
 export function EnquiryModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState("");
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
     const [formData, setFormData] = useState({
         customerName: "",
@@ -21,6 +23,22 @@ export function EnquiryModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Validate
+        const errors: Record<string, string> = {};
+        const nameResult = validateName(formData.customerName);
+        if (!nameResult.valid) errors.customerName = nameResult.error!;
+        const phoneResult = validatePhone(formData.phone);
+        if (!phoneResult.valid) errors.phone = phoneResult.error!;
+        const pincodeResult = validatePincode(formData.pincode);
+        if (!pincodeResult.valid) errors.pincode = pincodeResult.error!;
+
+        if (Object.keys(errors).length > 0) {
+            setFormErrors(errors);
+            return;
+        }
+        setFormErrors({});
+
         setLoading(true);
         setSuccess(false);
         setError("");
@@ -39,7 +57,7 @@ export function EnquiryModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 setSuccess(false);
                 onClose();
             }, 3000);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
             setError("Failed to send enquiry. Please try again or contact us directly.");
         } finally {
@@ -86,11 +104,13 @@ export function EnquiryModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Your Name *</label>
-                                        <input required value={formData.customerName} onChange={e => setFormData({ ...formData, customerName: e.target.value })} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-shadow" placeholder="John Doe" />
+                                        <input required value={formData.customerName} onChange={e => { setFormData({ ...formData, customerName: e.target.value }); setFormErrors(p => { const n = { ...p }; delete n.customerName; return n; }); }} className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-shadow ${formErrors.customerName ? "border-red-400" : "border-slate-200"}`} placeholder="John Doe" />
+                                        {formErrors.customerName && <p className="text-red-500 text-xs mt-1">{formErrors.customerName}</p>}
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Phone *</label>
-                                        <input required type="tel" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-shadow" placeholder="+91" />
+                                        <input required type="tel" value={formData.phone} onChange={e => { setFormData({ ...formData, phone: e.target.value }); setFormErrors(p => { const n = { ...p }; delete n.phone; return n; }); }} className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-shadow ${formErrors.phone ? "border-red-400" : "border-slate-200"}`} placeholder="+91" />
+                                        {formErrors.phone && <p className="text-red-500 text-xs mt-1">{formErrors.phone}</p>}
                                     </div>
                                 </div>
 
@@ -102,7 +122,8 @@ export function EnquiryModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Pincode *</label>
-                                        <input required type="text" value={formData.pincode} onChange={e => setFormData({ ...formData, pincode: e.target.value })} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-shadow" placeholder="500001" />
+                                        <input required type="text" value={formData.pincode} onChange={e => { setFormData({ ...formData, pincode: e.target.value }); setFormErrors(p => { const n = { ...p }; delete n.pincode; return n; }); }} className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-shadow ${formErrors.pincode ? "border-red-400" : "border-slate-200"}`} placeholder="500001" />
+                                        {formErrors.pincode && <p className="text-red-500 text-xs mt-1">{formErrors.pincode}</p>}
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Business Type</label>

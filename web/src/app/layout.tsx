@@ -32,6 +32,7 @@ export const metadata: Metadata = {
 
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppProvider } from "@/contexts/AppContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function RootLayout({
   children,
@@ -45,7 +46,9 @@ export default function RootLayout({
       >
         <AuthProvider>
           <AppProvider>
-            {children}
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
           </AppProvider>
         </AuthProvider>
       </body>

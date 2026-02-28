@@ -55,7 +55,7 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
                             src={product.image}
                             alt={product.name}
                             fill
-                            unoptimized // Allow external URLs like unsplash without strict next.config
+                            sizes="70px"
                             className="object-cover"
                             onError={() => setImgError(true)}
                         />

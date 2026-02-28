@@ -8,6 +8,13 @@ import { X, MapPin, Truck, ChevronRight, User } from "lucide-react";
 import { functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { MapPicker, LocationDetails } from "./MapPicker";
+import { validateName, validatePhone, validateAddress, sanitizeInput } from "@/lib/validation";
+
+interface SubmitOrderResponse {
+    success: boolean;
+    orderId: string;
+    message: string;
+}
 
 export function CartDrawer({
     isOpen,
@@ -31,15 +38,31 @@ export function CartDrawer({
     const [phone, setPhone] = useState(currentUser?.phoneNumber || "");
     const [address, setAddress] = useState("");
     const [locationDetails, setLocationDetails] = useState<LocationDetails | null>(null);
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
     const handleCheckoutSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!currentUser) return alert("Please sign in to place an order.");
         if (cartItems.length === 0) return alert("Cart is empty.");
 
+        // Validate fields
+        const errors: Record<string, string> = {};
+        const nameResult = validateName(customerName);
+        if (!nameResult.valid) errors.customerName = nameResult.error!;
+        const phoneResult = validatePhone(phone);
+        if (!phoneResult.valid) errors.phone = phoneResult.error!;
+        const addressResult = validateAddress(address);
+        if (!addressResult.valid) errors.address = addressResult.error!;
+
+        if (Object.keys(errors).length > 0) {
+            setFormErrors(errors);
+            return;
+        }
+        setFormErrors({});
+
         setLoading(true);
         try {
-            const submitOrderApi = httpsCallable(functions, "submitOrder");
+            const submitOrderApi = httpsCallable<unknown, SubmitOrderResponse>(functions, "submitOrder");
 
             const orderSummary = cartItems
                 .map((i) => `${i.name} (${i.qty} ${i.unit})`)
@@ -47,11 +70,11 @@ export function CartDrawer({
 
             const payload = {
                 cart: cartItems,
-                customerName,
-                customerPhone: phone,
-                shopName,
-                deliveryAddress: address,
-                locationDetails, // Structured street, city, state, pin
+                customerName: sanitizeInput(customerName),
+                customerPhone: sanitizeInput(phone),
+                shopName: sanitizeInput(shopName),
+                deliveryAddress: sanitizeInput(address),
+                locationDetails,
                 orderSummary,
                 productCount: cartItems.length,
                 totalValue: `₹${total.toLocaleString("en-IN")}`,
@@ -59,15 +82,16 @@ export function CartDrawer({
 
             const result = await submitOrderApi(payload);
 
-            if ((result.data as any).success) {
-                alert("Order placed successfully! Order ID: " + (result.data as any).orderId);
+            if (result.data.success) {
+                alert("Order placed successfully! Order ID: " + result.data.orderId);
                 clearCart();
                 setIsCheckingOut(false);
                 onClose();
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            alert("Failed to submit order: " + err.message);
+            const message = err instanceof Error ? err.message : "Unknown error occurred";
+            alert("Failed to submit order: " + message);
         } finally {
             setLoading(false);
         }
@@ -134,7 +158,7 @@ export function CartDrawer({
                                                     src={item.image}
                                                     alt={item.name}
                                                     fill
-                                                    unoptimized
+                                                    sizes="64px"
                                                     className="object-cover"
                                                 />
                                             ) : (
@@ -224,10 +248,14 @@ export function CartDrawer({
                                     <input
                                         required
                                         value={customerName}
-                                        onChange={(e) => setCustomerName(e.target.value)}
-                                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                                        onChange={(e) => {
+                                            setCustomerName(e.target.value);
+                                            setFormErrors((prev) => { const n = { ...prev }; delete n.customerName; return n; });
+                                        }}
+                                        className={`w-full p-2.5 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${formErrors.customerName ? "border-red-400" : "border-slate-200"}`}
                                         placeholder="John Doe"
                                     />
+                                    {formErrors.customerName && <p className="text-red-500 text-xs mt-1">{formErrors.customerName}</p>}
                                 </div>
 
                                 <div>
@@ -238,10 +266,14 @@ export function CartDrawer({
                                         required
                                         type="tel"
                                         value={phone}
-                                        onChange={(e) => setPhone(e.target.value)}
-                                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                                        onChange={(e) => {
+                                            setPhone(e.target.value);
+                                            setFormErrors((prev) => { const n = { ...prev }; delete n.phone; return n; });
+                                        }}
+                                        className={`w-full p-2.5 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-all ${formErrors.phone ? "border-red-400" : "border-slate-200"}`}
                                         placeholder="+91"
                                     />
+                                    {formErrors.phone && <p className="text-red-500 text-xs mt-1">{formErrors.phone}</p>}
                                 </div>
 
                                 <div>
@@ -265,10 +297,14 @@ export function CartDrawer({
                                 <textarea
                                     required
                                     value={address}
-                                    onChange={(e) => setAddress(e.target.value)}
-                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[100px] resize-none"
+                                    onChange={(e) => {
+                                        setAddress(e.target.value);
+                                        setFormErrors((prev) => { const n = { ...prev }; delete n.address; return n; });
+                                    }}
+                                    className={`w-full p-2.5 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[100px] resize-none ${formErrors.address ? "border-red-400" : "border-slate-200"}`}
                                     placeholder="Enter full delivery address..."
                                 />
+                                {formErrors.address && <p className="text-red-500 text-xs mt-1">{formErrors.address}</p>}
                                 <button
                                     type="button"
                                     onClick={() => setMapOpen(true)}

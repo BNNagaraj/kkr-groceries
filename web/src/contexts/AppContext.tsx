@@ -43,10 +43,29 @@ const AppContext = createContext<AppContextType>({
 
 export const useAppStore = () => useContext(AppContext);
 
+const CART_STORAGE_KEY = "kkr-cart";
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
     const [products, setProducts] = useState<Product[]>([]);
     const [loadingProducts, setLoadingProducts] = useState(true);
-    const [cart, setCart] = useState<Record<number, CartItem>>({});
+    const [cart, setCart] = useState<Record<number, CartItem>>(() => {
+        if (typeof window === "undefined") return {};
+        try {
+            const stored = localStorage.getItem(CART_STORAGE_KEY);
+            return stored ? JSON.parse(stored) : {};
+        } catch {
+            return {};
+        }
+    });
+
+    // Persist cart to localStorage
+    useEffect(() => {
+        try {
+            localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+        } catch {
+            // localStorage full or unavailable
+        }
+    }, [cart]);
 
     useEffect(() => {
         // Listen to Firebase Products
@@ -88,7 +107,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
     };
 
-    const clearCart = () => setCart({});
+    const clearCart = () => {
+        setCart({});
+        try { localStorage.removeItem(CART_STORAGE_KEY); } catch { /* ignore */ }
+    };
 
     const getCartTotal = () => {
         let total = 0;
