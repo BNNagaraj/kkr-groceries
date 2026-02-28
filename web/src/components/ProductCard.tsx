@@ -63,6 +63,7 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
                             fill
                             sizes="70px"
                             className="object-cover"
+                            unoptimized={product.image.includes("unsplash.com")}
                             onError={() => setImgError(true)}
                         />
                     ) : (

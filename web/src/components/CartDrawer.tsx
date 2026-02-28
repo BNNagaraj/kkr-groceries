@@ -175,6 +175,7 @@ export function CartDrawer({
                                                             fill
                                                             sizes="64px"
                                                             className="object-cover"
+                                                            unoptimized={item.image.includes("unsplash.com")}
                                                         />
                                                     ) : (
                                                         <span className="w-full h-full flex items-center justify-center font-bold text-slate-300 text-xl">

@@ -273,6 +273,7 @@ export default function AdminDashboard() {
                                                                         width={40}
                                                                         height={40}
                                                                         className="object-cover w-full h-full"
+                                                                        unoptimized={p.image.includes("unsplash.com")}
                                                                     />
                                                                 ) : (
                                                                     <span className="text-slate-400 text-xs font-bold">
