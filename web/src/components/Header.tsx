@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ShoppingCart, User, LogOut, Settings } from "lucide-react";
 
 import { EnquiryModal } from "./EnquiryModal";
+import { NotificationBell } from "./NotificationBell";
 
 export function Header({ onOpenCart }: { onOpenCart: () => void }) {
     const { cart } = useAppStore();
@@ -46,6 +47,8 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                 <Settings className="w-5 h-5" />
                             </Link>
                         )}
+
+                        {currentUser && <NotificationBell />}
 
                         <div className="relative">
                             <button

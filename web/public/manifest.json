@@ -1,0 +1,18 @@
+{
+  "name": "KKR Groceries - B2B Wholesale",
+  "short_name": "KKR Groceries",
+  "description": "Fresh vegetables at APMC wholesale prices for hotels, restaurants & retailers in Hyderabad.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#064e3b",
+  "background_color": "#f8fafc",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥬</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["food", "shopping", "business"]
+}
