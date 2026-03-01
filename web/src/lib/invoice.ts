@@ -2,360 +2,603 @@ import { Order } from "@/types/order";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-/* ─── colour palette (matches email template) ─── */
-const GREEN_DARK = "#064e3b";
-const GREEN_MID = "#047857";
-const GREEN_LIGHT = "#059669";
-const GREEN_BG = "#f0fdf4";
-const GREEN_BORDER = "#dcfce7";
-const SLATE_900 = "#1e293b";
-const SLATE_500 = "#64748b";
-const SLATE_300 = "#94a3b8";
-const WHITE = "#ffffff";
+/* ══════════════════════════════════════════════════════════════════
+   KKR GROCERIES — PROFESSIONAL INVOICE / BILL GENERATOR
+   Indian Standard compliant (GST Act Sec 31, Rules 46/49)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── Colour palette (matches email template) ─── */
+const C = {
+  greenDark: "#064e3b",
+  greenMid: "#047857",
+  greenLight: "#059669",
+  greenBg: "#f0fdf4",
+  greenBorder: "#dcfce7",
+  greenMint: "#a7f3d0",
+  slate900: "#1e293b",
+  slate700: "#334155",
+  slate500: "#64748b",
+  slate400: "#94a3b8",
+  slate300: "#cbd5e1",
+  slate100: "#f1f5f9",
+  slate50: "#f8fafc",
+  white: "#ffffff",
+  blue: "#2563eb",
+  blueBg: "#dbeafe",
+  red: "#dc2626",
+  redBg: "#fee2e2",
+  amber: "#92400e",
+  amberBg: "#fef3c7",
+} as const;
+
+/* ─── Seller / Company info ─── */
+const SELLER = {
+  name: "KKR Groceries",
+  tagline: "B2B Vegetable Wholesale",
+  address: "Hyderabad, Telangana, India",
+  phone: "+91 93472 13498",
+  gstin: "Not Registered",          // update when GST-registered
+  placeOfSupply: "Telangana (36)",
+  stateCode: "36",
+};
+
+const IS_GST_REGISTERED = false;    // flip to true when GST applies
 
 /* ─── helpers ─── */
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace("#", "");
-  return [
-    parseInt(h.substring(0, 2), 16),
-    parseInt(h.substring(2, 4), 16),
-    parseInt(h.substring(4, 6), 16),
-  ];
+function hex(h: string): [number, number, number] {
+  const s = h.replace("#", "");
+  return [parseInt(s.substring(0, 2), 16), parseInt(s.substring(2, 4), 16), parseInt(s.substring(4, 6), 16)];
 }
 
-function formatCurrency(n: number): string {
-  return "₹" + n.toLocaleString("en-IN");
+function cur(n: number): string {
+  return "\u20B9" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function curWhole(n: number): string {
+  return "\u20B9" + n.toLocaleString("en-IN");
+}
+
+/** Convert number to Indian-English words — "Rupees Twelve Thousand Five Hundred Only" */
+function amountInWords(num: number): string {
+  if (num === 0) return "Rupees Zero Only";
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+  const toWords = (n: number): string => {
+    if (n === 0) return "";
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "");
+    if (n < 1000) return ones[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " and " + toWords(n % 100) : "");
+    if (n < 100000) return toWords(Math.floor(n / 1000)) + " Thousand" + (n % 1000 ? " " + toWords(n % 1000) : "");
+    if (n < 10000000) return toWords(Math.floor(n / 100000)) + " Lakh" + (n % 100000 ? " " + toWords(n % 100000) : "");
+    return toWords(Math.floor(n / 10000000)) + " Crore" + (n % 10000000 ? " " + toWords(n % 10000000) : "");
+  };
+
+  const whole = Math.floor(Math.abs(num));
+  const paise = Math.round((Math.abs(num) - whole) * 100);
+  let result = "Rupees " + toWords(whole);
+  if (paise > 0) result += " and " + toWords(paise) + " Paise";
+  return result + " Only";
 }
 
 function formatDate(order: Order): string {
-  if (order.timestamp) return order.timestamp;
-  if (order.createdAt?.toDate) {
-    return order.createdAt.toDate().toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-  return new Date().toLocaleString("en-IN");
+  const d = getOrderDate(order);
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatDateTime(order: Order): string {
+  const d = getOrderDate(order);
+  return d.toLocaleString("en-IN", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: true,
+  });
+}
+
+function getOrderDate(order: Order): Date {
+  if (order.createdAt?.toDate) return order.createdAt.toDate();
+  if (order.timestamp) return new Date(order.timestamp);
+  return new Date();
 }
 
 function getDateForFilename(order: Order): string {
-  let d: Date;
-  if (order.createdAt?.toDate) {
-    d = order.createdAt.toDate();
-  } else if (order.timestamp) {
-    d = new Date(order.timestamp);
-  } else {
-    d = new Date();
-  }
+  const d = getOrderDate(order);
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 }
 
-/* ─── status badge colours ─── */
-function getStatusStyle(status: string): {
-  bg: [number, number, number];
-  fg: [number, number, number];
-  label: string;
-} {
+/* ─── Document type logic (Indian norms) ─── */
+interface DocType {
+  title: string;
+  subtitle: string;
+  disclaimer: string;
+  showWatermark: boolean;
+}
+
+function getDocumentType(status: string): DocType {
+  const isFulfilled = status === "Fulfilled" || status === "Delivered";
+
+  if (isFulfilled) {
+    if (IS_GST_REGISTERED) {
+      return {
+        title: "TAX INVOICE",
+        subtitle: "Original for Recipient",
+        disclaimer: "",
+        showWatermark: false,
+      };
+    }
+    return {
+      title: "BILL OF SUPPLY",
+      subtitle: "Original for Recipient",
+      disclaimer: "Supply by dealer not liable to be registered under GST",
+      showWatermark: false,
+    };
+  }
+
+  // Pending, Accepted, Rejected — always proforma
+  return {
+    title: "PROFORMA INVOICE",
+    subtitle: "Order Estimate — Not a Final Bill",
+    disclaimer: "This is not a Tax Invoice / Bill of Supply. For reference only.",
+    showWatermark: true,
+  };
+}
+
+/* ─── Status badge styling ─── */
+function getStatusBadge(status: string) {
   switch (status) {
     case "Accepted":
-      return { bg: [219, 234, 254], fg: [37, 99, 235], label: "ACCEPTED" };
+      return { bg: hex(C.blueBg), fg: hex(C.blue), label: "ACCEPTED" };
     case "Fulfilled":
-      return { bg: [220, 252, 231], fg: [5, 150, 105], label: "FULFILLED" };
+    case "Delivered":
+      return { bg: [220, 252, 231] as [number, number, number], fg: hex(C.greenLight), label: "FULFILLED" };
     case "Rejected":
-      return { bg: [254, 226, 226], fg: [220, 38, 38], label: "REJECTED" };
+      return { bg: hex(C.redBg), fg: hex(C.red), label: "CANCELLED" };
     default:
-      return { bg: [254, 243, 199], fg: [146, 64, 14], label: "PENDING" };
+      return { bg: hex(C.amberBg), fg: hex(C.amber), label: "PENDING" };
   }
 }
 
-/* ══════════════════════════════════════════════
-   PDF INVOICE GENERATOR
-   ══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════
+   MAIN GENERATOR
+   ══════════════════════════════════════════════════════════════════ */
 export function downloadInvoice(order: Order): void {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const pageW = doc.internal.pageSize.getWidth();
-  const margin = 16;
-  const contentW = pageW - margin * 2;
+  const W = doc.internal.pageSize.getWidth();   // 210
+  const H = doc.internal.pageSize.getHeight();  // 297
+  const M = 14;                                 // margin
+  const CW = W - M * 2;                        // content width
+  const midX = W / 2;
   let y = 0;
 
-  // ─── HEADER (green gradient bar) ───
-  doc.setFillColor(...hexToRgb(GREEN_DARK));
-  doc.rect(0, 0, pageW, 38, "F");
-  // lighter stripe
-  doc.setFillColor(...hexToRgb(GREEN_MID));
-  doc.rect(0, 32, pageW, 6, "F");
+  const cart = order.revisedFulfilledCart || order.revisedAcceptedCart || order.cart || [];
+  const status = order.status || "Pending";
+  const docType = getDocumentType(status);
+  const badge = getStatusBadge(status);
+  const orderId = order.orderId || order.id;
 
-  // Brand name
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(...hexToRgb(WHITE));
-  doc.text("KKR Groceries", pageW / 2, 16, { align: "center" });
-
-  // Subtitle
-  doc.setFontSize(8);
-  doc.setTextColor(167, 243, 208); // #a7f3d0
-  doc.text("HYDERABAD B2B WHOLESALE", pageW / 2, 22, { align: "center" });
-
-  // INVOICE label
-  doc.setFontSize(11);
-  doc.setTextColor(...hexToRgb(WHITE));
-  doc.text("TAX INVOICE", pageW / 2, 30, { align: "center" });
-
-  y = 46;
-
-  // ─── ORDER ID BAR ───
-  doc.setFillColor(...hexToRgb(GREEN_BG));
-  doc.roundedRect(margin, y, contentW, 20, 3, 3, "F");
-  doc.setDrawColor(...hexToRgb(GREEN_BORDER));
-  doc.roundedRect(margin, y, contentW, 20, 3, 3, "S");
-
-  // Order ID (left)
-  doc.setFontSize(8);
-  doc.setTextColor(...hexToRgb(GREEN_MID));
-  doc.setFont("helvetica", "bold");
-  doc.text("ORDER ID", margin + 6, y + 7);
-  doc.setFontSize(12);
-  doc.setTextColor(...hexToRgb(GREEN_DARK));
-  doc.text(order.orderId || order.id, margin + 6, y + 15);
-
-  // Status badge (centre-right)
-  const statusStyle = getStatusStyle(order.status || "Pending");
-  const badgeX = pageW / 2 + 10;
-  doc.setFillColor(...statusStyle.bg);
-  doc.roundedRect(badgeX, y + 5, 30, 10, 3, 3, "F");
-  doc.setFontSize(8);
-  doc.setTextColor(...statusStyle.fg);
-  doc.setFont("helvetica", "bold");
-  doc.text(statusStyle.label, badgeX + 15, y + 12, { align: "center" });
-
-  // Date + item count (right)
-  const cart =
-    order.revisedFulfilledCart ||
-    order.revisedAcceptedCart ||
-    order.cart ||
-    [];
-  const itemCount = cart.length;
-  doc.setFontSize(8);
-  doc.setTextColor(...hexToRgb(GREEN_MID));
-  doc.text("DATE", pageW - margin - 6, y + 7, { align: "right" });
-  doc.setFontSize(10);
-  doc.setTextColor(...hexToRgb(SLATE_900));
-  doc.text(formatDate(order), pageW - margin - 6, y + 15, { align: "right" });
-
-  y += 28;
-
-  // ─── CUSTOMER DETAILS SECTION ───
-  doc.setFontSize(9);
-  doc.setTextColor(...hexToRgb(GREEN_MID));
-  doc.setFont("helvetica", "bold");
-  doc.text("DELIVERY DETAILS", margin, y);
-  y += 3;
-
-  doc.setFillColor(248, 250, 252); // #f8fafc
-  doc.roundedRect(margin, y, contentW, 36, 3, 3, "F");
-
-  const detailsCol1 = margin + 6;
-  const detailsCol2 = pageW / 2 + 4;
-
-  // Row 1: Customer name + Phone
-  y += 8;
-  doc.setFontSize(7);
-  doc.setTextColor(...hexToRgb(SLATE_300));
-  doc.setFont("helvetica", "bold");
-  doc.text("CUSTOMER", detailsCol1, y);
-  doc.text("PHONE", detailsCol2, y);
-
-  y += 5;
-  doc.setFontSize(10);
-  doc.setTextColor(...hexToRgb(SLATE_900));
-  doc.setFont("helvetica", "bold");
-  doc.text(order.customerName || "N/A", detailsCol1, y);
-  doc.text(order.phone || "N/A", detailsCol2, y);
-
-  // Row 2: Shop + Address
-  y += 8;
-  doc.setFontSize(7);
-  doc.setTextColor(...hexToRgb(SLATE_300));
-  doc.setFont("helvetica", "bold");
-  if (order.shopName && order.shopName !== "Not specified") {
-    doc.text("SHOP / BUSINESS", detailsCol1, y);
-  }
-  doc.text("DELIVERY ADDRESS", detailsCol2, y);
-
-  y += 5;
-  doc.setFontSize(10);
-  doc.setTextColor(...hexToRgb(SLATE_900));
-  doc.setFont("helvetica", "bold");
-  if (order.shopName && order.shopName !== "Not specified") {
-    doc.text(order.shopName, detailsCol1, y);
-  }
-
-  // Wrap address text
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  const addressLines = doc.splitTextToSize(
-    order.location || "N/A",
-    contentW / 2 - 10
-  );
-  doc.text(addressLines, detailsCol2, y);
-
-  // Calculate where the details box ends
-  const detailsBoxEndY = y + Math.max(addressLines.length * 4, 4) + 4;
-
-  y = detailsBoxEndY + 6;
-
-  // ─── ORDER ITEMS TABLE ───
-  doc.setFontSize(9);
-  doc.setTextColor(...hexToRgb(GREEN_MID));
-  doc.setFont("helvetica", "bold");
-  doc.text("ORDER ITEMS", margin, y);
-  y += 3;
-
+  // Compute total
   let calculatedTotal = 0;
+  cart.forEach((item) => { calculatedTotal += item.qty * item.price; });
+
+  // Parse total value (from string like "₹12,500")
+  const totalNum = (() => {
+    if (typeof order.totalValue === "string") {
+      const n = parseFloat(order.totalValue.replace(/[^\d.]/g, ""));
+      if (!isNaN(n)) return n;
+    }
+    return calculatedTotal;
+  })();
+
+  /* ═══════════════════ PROFORMA WATERMARK ═══════════════════ */
+  if (docType.showWatermark) {
+    doc.saveGraphicsState();
+    // @ts-expect-error - jsPDF GState
+    doc.setGState(new doc.GState({ opacity: 0.06 }));
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(72);
+    doc.setTextColor(...hex(C.slate900));
+    doc.text("PROFORMA", midX, H / 2, {
+      align: "center",
+      angle: 45,
+    });
+    doc.restoreGraphicsState();
+  }
+
+  /* ═══════════════════ HEADER ═══════════════════ */
+  // Dark green header bar
+  doc.setFillColor(...hex(C.greenDark));
+  doc.rect(0, 0, W, 36, "F");
+  // Lighter accent stripe
+  doc.setFillColor(...hex(C.greenMid));
+  doc.rect(0, 30, W, 6, "F");
+
+  // Company name
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(...hex(C.white));
+  doc.text(SELLER.name, M + 2, 14);
+
+  // Tagline
+  doc.setFontSize(8);
+  doc.setTextColor(167, 243, 208);
+  doc.text(SELLER.tagline.toUpperCase(), M + 2, 20);
+
+  // Seller contact — right side
+  doc.setFontSize(7.5);
+  doc.setTextColor(...hex(C.white));
+  doc.setFont("helvetica", "normal");
+  doc.text(SELLER.address, W - M - 2, 10, { align: "right" });
+  doc.text("Phone: " + SELLER.phone, W - M - 2, 15, { align: "right" });
+  if (IS_GST_REGISTERED) {
+    doc.setFont("helvetica", "bold");
+    doc.text("GSTIN: " + SELLER.gstin, W - M - 2, 20, { align: "right" });
+  }
+
+  // Document title in accent stripe
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...hex(C.white));
+  doc.text(docType.title, midX, 34.5, { align: "center" });
+
+  y = 42;
+
+  /* ═══════════════════ DOCUMENT INFO BAR ═══════════════════ */
+  doc.setFillColor(...hex(C.greenBg));
+  doc.roundedRect(M, y, CW, 18, 2, 2, "F");
+  doc.setDrawColor(...hex(C.greenBorder));
+  doc.setLineWidth(0.3);
+  doc.roundedRect(M, y, CW, 18, 2, 2, "S");
+
+  const col1 = M + 5;
+  const col2 = M + CW * 0.28;
+  const col3 = M + CW * 0.56;
+  const col4 = M + CW * 0.78;
+
+  // Invoice No
+  doc.setFontSize(6.5);
+  doc.setTextColor(...hex(C.greenMid));
+  doc.setFont("helvetica", "bold");
+  doc.text("INVOICE NO.", col1, y + 6);
+  doc.setFontSize(9);
+  doc.setTextColor(...hex(C.greenDark));
+  doc.text(orderId, col1, y + 12);
+
+  // Date
+  doc.setFontSize(6.5);
+  doc.setTextColor(...hex(C.greenMid));
+  doc.text("DATE", col2, y + 6);
+  doc.setFontSize(9);
+  doc.setTextColor(...hex(C.slate900));
+  doc.text(formatDate(order), col2, y + 12);
+
+  // Place of Supply
+  doc.setFontSize(6.5);
+  doc.setTextColor(...hex(C.greenMid));
+  doc.text("PLACE OF SUPPLY", col3, y + 6);
+  doc.setFontSize(9);
+  doc.setTextColor(...hex(C.slate900));
+  doc.text(SELLER.placeOfSupply, col3, y + 12);
+
+  // Status badge
+  doc.setFillColor(...badge.bg);
+  doc.roundedRect(col4, y + 4, 32, 10, 3, 3, "F");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...badge.fg);
+  doc.setFont("helvetica", "bold");
+  doc.text(badge.label, col4 + 16, y + 10.5, { align: "center" });
+
+  y += 24;
+
+  /* ═══════════════════ SELLER ↔ BUYER (two columns) ═══════════════════ */
+  const halfW = (CW - 4) / 2;
+  const boxH = 34;
+
+  // ── FROM (Seller) ──
+  doc.setFillColor(...hex(C.slate50));
+  doc.roundedRect(M, y, halfW, boxH, 2, 2, "F");
+
+  doc.setFontSize(7);
+  doc.setTextColor(...hex(C.greenMid));
+  doc.setFont("helvetica", "bold");
+  doc.text("FROM", M + 5, y + 6);
+
+  doc.setFontSize(10);
+  doc.setTextColor(...hex(C.slate900));
+  doc.text(SELLER.name, M + 5, y + 13);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...hex(C.slate500));
+  doc.text(SELLER.address, M + 5, y + 19);
+  doc.text("Ph: " + SELLER.phone, M + 5, y + 24);
+  if (IS_GST_REGISTERED) {
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...hex(C.slate700));
+    doc.text("GSTIN: " + SELLER.gstin, M + 5, y + 29);
+  }
+
+  // ── TO (Buyer) ──
+  const buyerX = M + halfW + 4;
+  doc.setFillColor(...hex(C.slate50));
+  doc.roundedRect(buyerX, y, halfW, boxH, 2, 2, "F");
+
+  doc.setFontSize(7);
+  doc.setTextColor(...hex(C.greenMid));
+  doc.setFont("helvetica", "bold");
+  doc.text("TO", buyerX + 5, y + 6);
+
+  doc.setFontSize(10);
+  doc.setTextColor(...hex(C.slate900));
+  doc.text(order.customerName || "N/A", buyerX + 5, y + 13);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...hex(C.slate500));
+
+  let buyerY = y + 19;
+  if (order.shopName && order.shopName !== "Not specified") {
+    doc.text(order.shopName, buyerX + 5, buyerY);
+    buyerY += 5;
+  }
+  doc.text("Ph: " + (order.phone || "N/A"), buyerX + 5, buyerY);
+  buyerY += 5;
+
+  // Address — wrap inside the box
+  const addrLines = doc.splitTextToSize(order.location || "N/A", halfW - 10);
+  doc.text(addrLines.slice(0, 2), buyerX + 5, buyerY);
+
+  y += boxH + 6;
+
+  /* ═══════════════════ ITEMS TABLE ═══════════════════ */
+  doc.setFontSize(8);
+  doc.setTextColor(...hex(C.greenMid));
+  doc.setFont("helvetica", "bold");
+  doc.text("ORDER ITEMS", M, y);
+  y += 2;
+
   const tableRows = cart.map((item, i) => {
     const amount = item.qty * item.price;
-    calculatedTotal += amount;
-    const nameStr = [item.name, item.telugu, item.hindi]
-      .filter(Boolean)
-      .join(" / ");
+    const nameStr = [item.name, item.telugu, item.hindi].filter(Boolean).join(" / ");
     return [
-      (i + 1).toString(),
+      String(i + 1),
       nameStr,
-      item.qty.toString(),
+      "0713",              // HSN code for dried vegetables (placeholder)
+      String(item.qty),
       item.unit,
-      formatCurrency(item.price),
-      formatCurrency(amount),
+      cur(item.price),
+      cur(amount),
     ];
   });
 
   autoTable(doc, {
     startY: y,
-    margin: { left: margin, right: margin },
-    head: [["#", "Item", "Qty", "Unit", "Price", "Amount"]],
+    margin: { left: M, right: M },
+    head: [["#", "Description of Goods", "HSN", "Qty", "Unit", "Rate (\u20B9)", "Amount (\u20B9)"]],
     body: tableRows,
     theme: "plain",
     headStyles: {
-      fillColor: hexToRgb(GREEN_DARK),
-      textColor: hexToRgb(WHITE),
+      fillColor: hex(C.greenDark),
+      textColor: hex(C.white),
       fontStyle: "bold",
-      fontSize: 8,
-      cellPadding: 3,
+      fontSize: 7.5,
+      cellPadding: { top: 3, bottom: 3, left: 2, right: 2 },
       halign: "left",
     },
     columnStyles: {
-      0: { halign: "center", cellWidth: 10, fontStyle: "bold" },
+      0: { halign: "center", cellWidth: 9 },
       1: { cellWidth: "auto" },
-      2: { halign: "center", cellWidth: 16, fontStyle: "bold" },
-      3: { halign: "center", cellWidth: 18 },
-      4: { halign: "right", cellWidth: 24 },
-      5: {
-        halign: "right",
-        cellWidth: 28,
-        fontStyle: "bold",
-        textColor: hexToRgb(GREEN_MID),
-      },
+      2: { halign: "center", cellWidth: 14 },
+      3: { halign: "center", cellWidth: 13, fontStyle: "bold" },
+      4: { halign: "center", cellWidth: 14 },
+      5: { halign: "right", cellWidth: 22 },
+      6: { halign: "right", cellWidth: 26, fontStyle: "bold", textColor: hex(C.greenMid) },
     },
     bodyStyles: {
-      fontSize: 9,
-      textColor: hexToRgb(SLATE_900),
-      cellPadding: 3,
+      fontSize: 8,
+      textColor: hex(C.slate900),
+      cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
     },
-    alternateRowStyles: {
-      fillColor: [248, 250, 252],
-    },
-    styles: {
-      lineColor: [241, 245, 249],
-      lineWidth: 0.3,
-    },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    styles: { lineColor: [241, 245, 249], lineWidth: 0.2 },
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  y = (doc as any).lastAutoTable.finalY + 6;
+  y = (doc as any).lastAutoTable.finalY + 2;
 
-  // ─── TOTAL AMOUNT BAR ───
-  doc.setFillColor(...hexToRgb(GREEN_DARK));
-  doc.roundedRect(margin, y, contentW, 16, 3, 3, "F");
-  // lighter gradient overlay on right side
-  doc.setFillColor(...hexToRgb(GREEN_MID));
-  doc.roundedRect(pageW / 2, y, contentW / 2 + margin - pageW / 2, 16, 0, 0, "F");
-  // re-draw rounded right corners
-  doc.setFillColor(...hexToRgb(GREEN_MID));
-  doc.roundedRect(pageW - margin - 30, y, 30, 16, 3, 3, "F");
+  /* ═══════════════════ TAX SUMMARY TABLE ═══════════════════ */
+  const summaryX = M + CW * 0.52;
+  const summaryW = CW * 0.48;
+  const labelX = summaryX + 4;
+  const valX = summaryX + summaryW - 4;
+  const rowH = 6.5;
 
-  doc.setFontSize(10);
+  // Subtotal
+  doc.setFillColor(...hex(C.slate50));
+  doc.rect(summaryX, y, summaryW, rowH, "F");
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...hex(C.slate500));
+  doc.text("Subtotal", labelX, y + 4.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...hex(C.slate900));
+  doc.text(cur(calculatedTotal), valX, y + 4.5, { align: "right" });
+  y += rowH;
+
+  if (IS_GST_REGISTERED) {
+    // CGST row
+    doc.setFillColor(...hex(C.white));
+    doc.rect(summaryX, y, summaryW, rowH, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...hex(C.slate500));
+    doc.setFontSize(8);
+    doc.text("CGST (0%)", labelX, y + 4.5);
+    doc.text(cur(0), valX, y + 4.5, { align: "right" });
+    y += rowH;
+
+    // SGST row
+    doc.setFillColor(...hex(C.slate50));
+    doc.rect(summaryX, y, summaryW, rowH, "F");
+    doc.text("SGST (0%)", labelX, y + 4.5);
+    doc.text(cur(0), valX, y + 4.5, { align: "right" });
+    y += rowH;
+  } else {
+    // Tax exempt note
+    doc.setFillColor(...hex(C.white));
+    doc.rect(summaryX, y, summaryW, rowH, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...hex(C.slate400));
+    doc.setFontSize(7);
+    doc.text("Tax: Not Applicable (Unregistered)", labelX, y + 4.5);
+    doc.setTextColor(...hex(C.slate500));
+    doc.setFontSize(8);
+    doc.text(cur(0), valX, y + 4.5, { align: "right" });
+    y += rowH;
+  }
+
+  // ── Total bar ──
+  const totalBarH = 10;
+  doc.setFillColor(...hex(C.greenDark));
+  doc.roundedRect(summaryX, y + 1, summaryW, totalBarH, 2, 2, "F");
+  doc.setFontSize(9);
   doc.setTextColor(167, 243, 208);
   doc.setFont("helvetica", "bold");
-  doc.text("Total Amount", margin + 8, y + 10);
+  doc.text("TOTAL", labelX, y + 7.5);
+  doc.setFontSize(13);
+  doc.setTextColor(...hex(C.white));
+  doc.text(curWhole(totalNum), valX, y + 8, { align: "right" });
 
-  doc.setFontSize(16);
-  doc.setTextColor(...hexToRgb(WHITE));
-  doc.text(
-    order.totalValue || formatCurrency(calculatedTotal),
-    pageW - margin - 8,
-    y + 11,
-    { align: "right" }
-  );
+  y += totalBarH + 6;
 
-  y += 24;
+  /* ═══════════════════ AMOUNT IN WORDS ═══════════════════ */
+  doc.setFillColor(...hex(C.greenBg));
+  doc.roundedRect(M, y, CW, 10, 2, 2, "F");
+  doc.setFontSize(7);
+  doc.setTextColor(...hex(C.greenMid));
+  doc.setFont("helvetica", "bold");
+  doc.text("AMOUNT IN WORDS", M + 5, y + 4);
+  doc.setFontSize(8.5);
+  doc.setTextColor(...hex(C.greenDark));
+  doc.setFont("helvetica", "bold");
+  const wordsText = amountInWords(totalNum);
+  const wrappedWords = doc.splitTextToSize(wordsText, CW - 10);
+  doc.text(wrappedWords[0] || wordsText, M + 5, y + 8.5);
 
-  // ─── ITEMS SUMMARY ───
-  doc.setFontSize(9);
-  doc.setTextColor(...hexToRgb(SLATE_500));
-  doc.setFont("helvetica", "normal");
-  doc.text(
-    `${itemCount} item${itemCount !== 1 ? "s" : ""} | ${order.orderSummary || ""}`,
-    pageW / 2,
-    y,
-    { align: "center" }
-  );
+  y += 14;
 
-  y += 10;
+  /* ═══════════════════ DISCLAIMER (for proforma) ═══════════════════ */
+  if (docType.disclaimer) {
+    doc.setFillColor(254, 243, 199);  // amber-100
+    doc.roundedRect(M, y, CW, 8, 2, 2, "F");
+    doc.setFontSize(7);
+    doc.setTextColor(...hex(C.amber));
+    doc.setFont("helvetica", "bold");
+    doc.text("NOTE: " + docType.disclaimer, midX, y + 5.5, { align: "center" });
+    y += 12;
+  }
 
-  // ─── FOOTER ───
-  // Check if we need more space for footer — add page if needed
-  const pageH = doc.internal.pageSize.getHeight();
-  if (y > pageH - 30) {
+  /* ═══════════════════ TERMS & CONDITIONS + SIGNATURE ═══════════════════ */
+  // Check if we need a new page
+  if (y > H - 65) {
     doc.addPage();
     y = 20;
   }
 
-  // Footer separator
-  doc.setDrawColor(...hexToRgb(GREEN_BORDER));
-  doc.setLineWidth(0.3);
-  doc.line(margin, y, pageW - margin, y);
-  y += 8;
+  // Divider line
+  doc.setDrawColor(...hex(C.slate300));
+  doc.setLineWidth(0.2);
+  doc.line(M, y, W - M, y);
+  y += 5;
 
-  // Footer text
-  doc.setFontSize(8);
-  doc.setTextColor(...hexToRgb(GREEN_MID));
+  // Two-column bottom section
+  const termsW = CW * 0.58;
+  const sigW = CW * 0.38;
+  const sigX = M + CW - sigW;
+
+  // ── Terms & Conditions (left) ──
+  doc.setFontSize(7.5);
+  doc.setTextColor(...hex(C.greenMid));
   doc.setFont("helvetica", "bold");
-  doc.text("KKR Groceries", pageW / 2, y, { align: "center" });
+  doc.text("TERMS & CONDITIONS", M, y);
   y += 4;
-  doc.setTextColor(...hexToRgb(SLATE_500));
+
+  const terms = [
+    "1. Goods once sold will not be taken back or exchanged.",
+    "2. All disputes are subject to Hyderabad jurisdiction.",
+    "3. Prices are subject to change without prior notice.",
+    "4. Payment to be made as per agreed terms.",
+    "5. Please verify goods at the time of delivery.",
+  ];
+
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.text(
-    "Hyderabad B2B Vegetable Wholesale",
-    pageW / 2,
-    y,
-    { align: "center" }
-  );
-  y += 4;
-  doc.setTextColor(...hexToRgb(SLATE_300));
-  doc.text("Thank you for choosing KKR Groceries!", pageW / 2, y, {
-    align: "center",
+  doc.setFontSize(6.5);
+  doc.setTextColor(...hex(C.slate500));
+  terms.forEach((t) => {
+    doc.text(t, M, y);
+    y += 3.8;
   });
 
-  // ─── DOWNLOAD ───
-  const orderId = order.orderId || order.id;
+  // ── Authorised Signatory (right) ──
+  const sigTopY = y - (terms.length * 3.8) - 4;    // align with terms top
+  doc.setFillColor(...hex(C.slate50));
+  doc.roundedRect(sigX, sigTopY, sigW, 32, 2, 2, "F");
+
+  doc.setFontSize(7.5);
+  doc.setTextColor(...hex(C.greenMid));
+  doc.setFont("helvetica", "bold");
+  doc.text("For " + SELLER.name, sigX + sigW / 2, sigTopY + 6, { align: "center" });
+
+  // Signature line
+  doc.setDrawColor(...hex(C.slate300));
+  doc.setLineWidth(0.2);
+  doc.line(sigX + 10, sigTopY + 22, sigX + sigW - 10, sigTopY + 22);
+
+  doc.setFontSize(7);
+  doc.setTextColor(...hex(C.slate500));
+  doc.setFont("helvetica", "normal");
+  doc.text("Authorised Signatory", sigX + sigW / 2, sigTopY + 27, { align: "center" });
+
+  y = Math.max(y, sigTopY + 36) + 4;
+
+  /* ═══════════════════ FOOTER ═══════════════════ */
+  // Check page space
+  if (y > H - 22) {
+    doc.addPage();
+    y = H - 22;
+  }
+
+  // Footer divider
+  doc.setDrawColor(...hex(C.greenBorder));
+  doc.setLineWidth(0.3);
+  doc.line(M, y, W - M, y);
+  y += 5;
+
+  // Computer generated note
+  doc.setFontSize(6.5);
+  doc.setTextColor(...hex(C.slate400));
+  doc.setFont("helvetica", "italic");
+  doc.text("This is a computer-generated document and does not require a physical signature.", midX, y, { align: "center" });
+  y += 4;
+
+  // Brand footer
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...hex(C.greenMid));
+  doc.text(SELLER.name, midX, y, { align: "center" });
+  y += 3.5;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  doc.setTextColor(...hex(C.slate500));
+  doc.text(SELLER.tagline + " | " + SELLER.address + " | " + SELLER.phone, midX, y, { align: "center" });
+  y += 3.5;
+  doc.setTextColor(...hex(C.slate400));
+  doc.setFontSize(6);
+  doc.text("Thank you for your business!", midX, y, { align: "center" });
+
+  /* ═══════════════════ SAVE / DOWNLOAD ═══════════════════ */
   const dateStr = getDateForFilename(order);
   const filename = `${orderId}_${dateStr}.pdf`;
-
   doc.save(filename);
 }
