@@ -198,7 +198,7 @@ export default function BuyerDashboard() {
                         return (
                             <Link
                                 key={o.id}
-                                href={`/dashboard/buyer/orders/${o.id}`}
+                                href={`/dashboard/buyer/orders/detail?id=${o.id}`}
                                 className="block bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 transition-all group"
                             >
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">

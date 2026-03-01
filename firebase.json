@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "dist",
+    "public": "web/out",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -9,6 +9,12 @@
       "*.py",
       "firebase-debug.log",
       "README.md"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
     ],
     "headers": [
       {

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc, deleteField, addDoc, collection } from "firebase/firestore";
-import { useParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -46,9 +46,9 @@ function statusBadgeVariant(status: string): "default" | "secondary" | "destruct
 export default function OrderDetailPage() {
   const { currentUser } = useAuth();
   const { col } = useMode();
-  const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const orderId = params.orderId as string;
+  const orderId = searchParams.get("id") as string;
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
