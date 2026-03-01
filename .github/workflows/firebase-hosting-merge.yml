@@ -14,16 +14,19 @@ jobs:
       checks: write
     steps:
       - uses: actions/checkout@v4
-      
+
       # Setup Node.js
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      
-      # Install dependencies and build
-      - run: npm ci && npm run build
-      
+          cache-dependency-path: web/package-lock.json
+
+      # Install dependencies and build Next.js app
+      - name: Install and build
+        working-directory: web
+        run: npm ci && npx next build
+
       # Deploy to Firebase Hosting
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
@@ -31,7 +34,7 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KKR_GROCERIES_02 }}
           channelId: live
           projectId: kkr-groceries-02
-      
+
       # Deploy Firestore Rules and Indexes using Firebase CLI
       - name: Deploy Firestore configuration
         uses: w9jds/firebase-action@master
