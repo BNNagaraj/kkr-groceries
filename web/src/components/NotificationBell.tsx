@@ -146,7 +146,7 @@ export function NotificationBell() {
               notifications.map((notif) => (
                 <Link
                   key={notif.id}
-                  href={`/dashboard/buyer/orders/${notif.orderId}`}
+                  href={`/dashboard/buyer/orders/detail?id=${notif.orderId}`}
                   onClick={() => handleNotificationClick(notif)}
                   className={`block px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition-colors ${
                     !notif.read ? "bg-primary/5" : ""

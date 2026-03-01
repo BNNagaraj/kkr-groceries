@@ -6,6 +6,8 @@ export interface OrderCartItem {
   price: number;
   unit: string;
   image?: string;
+  telugu?: string;
+  hindi?: string;
 }
 
 export interface PendingModification {
