@@ -388,53 +388,73 @@ export default function OrderDetailPage() {
 
         {/* Order Items */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-4">
-          <h2 className="font-bold text-slate-800 mb-3">Order Items</h2>
-          <div className="space-y-3">
-            {cart.map((item: OrderCartItem, idx: number) => {
-              const amount = item.qty * item.price;
-              const origItem = order.originalCart
-                ? order.originalCart.find((oi) => oi.name === item.name)
-                : undefined;
-              const qtyChanged = origItem && origItem.qty !== item.qty;
-              const priceChanged = origItem && origItem.price !== item.price;
+          <h2 className="font-bold text-slate-800 mb-3 uppercase tracking-wide text-xs text-emerald-700">Order Items</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-emerald-600">
+                  <th className="py-2 px-2 text-left text-xs font-bold text-emerald-700 uppercase tracking-wider w-8">#</th>
+                  <th className="py-2 px-2 text-left text-xs font-bold text-emerald-700 uppercase tracking-wider">Item</th>
+                  <th className="py-2 px-2 text-center text-xs font-bold text-emerald-700 uppercase tracking-wider w-14">Qty</th>
+                  <th className="py-2 px-2 text-center text-xs font-bold text-emerald-700 uppercase tracking-wider w-16">Unit</th>
+                  <th className="py-2 px-2 text-right text-xs font-bold text-emerald-700 uppercase tracking-wider w-16">Price</th>
+                  <th className="py-2 px-2 text-right text-xs font-bold text-emerald-700 uppercase tracking-wider w-20">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cart.map((item: OrderCartItem, idx: number) => {
+                  const amount = item.qty * item.price;
+                  const origItem = order.originalCart
+                    ? order.originalCart.find((oi) => oi.name === item.name)
+                    : undefined;
+                  const qtyChanged = origItem && origItem.qty !== item.qty;
+                  const priceChanged = origItem && origItem.price !== item.price;
 
-              return (
-                <div key={idx} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
-                  <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden relative shrink-0 flex items-center justify-center">
-                    {item.image ? (
-                      <Image src={item.image} alt={item.name} fill sizes="40px" className="object-cover" unoptimized={!item.image.includes("googleapis.com")} />
-                    ) : (
-                      <span className="text-sm font-bold text-slate-300">{item.name[0]}</span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-800 text-sm">{item.name}</div>
-                    <div className="text-xs text-slate-500">
-                      {qtyChanged && (
-                        <span className="line-through text-slate-400 mr-1">{origItem.qty}</span>
-                      )}
-                      <span className={qtyChanged ? "bg-yellow-100 rounded px-0.5" : ""}>
-                        {item.qty} {item.unit}
-                      </span>
-                      {" × "}
-                      {priceChanged && (
-                        <span className="line-through text-slate-400 mr-1">₹{origItem.price}</span>
-                      )}
-                      <span className={priceChanged ? "bg-yellow-100 rounded px-0.5" : ""}>
-                        ₹{item.price}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="font-bold text-slate-800 text-sm">
-                    ₹{amount.toLocaleString("en-IN")}
-                  </div>
-                </div>
-              );
-            })}
+                  return (
+                    <tr key={idx} className="border-b border-slate-100 last:border-0">
+                      <td className="py-3 px-2 text-slate-400 text-xs">{idx + 1}</td>
+                      <td className="py-3 px-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden relative shrink-0 flex items-center justify-center">
+                            {item.image ? (
+                              <Image src={item.image} alt={item.name} fill sizes="36px" className="object-cover" unoptimized={!item.image.includes("googleapis.com")} />
+                            ) : (
+                              <span className="text-xs font-bold text-slate-300">{item.name[0]}</span>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-semibold text-slate-800">{item.name}</span>
+                            {(item.telugu || item.hindi) && (
+                              <div className="text-xs text-slate-400">
+                                {[item.telugu, item.hindi].filter(Boolean).join(" · ")}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        {qtyChanged && (
+                          <span className="line-through text-slate-400 mr-1 text-xs">{origItem.qty}</span>
+                        )}
+                        <span className={qtyChanged ? "bg-yellow-100 rounded px-1" : "text-slate-700"}>{item.qty}</span>
+                      </td>
+                      <td className="py-3 px-2 text-center text-slate-500">{item.unit}</td>
+                      <td className="py-3 px-2 text-right">
+                        {priceChanged && (
+                          <span className="line-through text-slate-400 mr-1 text-xs">₹{origItem.price}</span>
+                        )}
+                        <span className={priceChanged ? "bg-yellow-100 rounded px-1" : "text-slate-700"}>₹{item.price}</span>
+                      </td>
+                      <td className="py-3 px-2 text-right font-bold text-emerald-700">₹{amount.toLocaleString("en-IN")}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
           {/* Total */}
-          <div className="border-t border-slate-200 mt-3 pt-3 flex justify-between items-center">
+          <div className="border-t-2 border-emerald-600 mt-1 pt-3 flex justify-between items-center">
             <div className="text-sm text-slate-500 flex items-center gap-1">
               <Truck className="w-4 h-4" /> Free Delivery
             </div>
