@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAppStore } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShoppingCart, User, LogOut, Settings, TrendingUp } from "lucide-react";
+import { markOffline } from "@/hooks/usePresence";
 
 import { EnquiryModal } from "./EnquiryModal";
 import { NotificationBell } from "./NotificationBell";
@@ -109,8 +110,10 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                             </Link>
                                             <button
                                                 className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
-                                                onClick={() => {
-                                                    import("@/lib/firebase").then(({ auth }) => auth.signOut());
+                                                onClick={async () => {
+                                                    if (currentUser) await markOffline(currentUser.uid);
+                                                    const { auth } = await import("@/lib/firebase");
+                                                    await auth.signOut();
                                                     setMenuOpen(false);
                                                 }}
                                             >
