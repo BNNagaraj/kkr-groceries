@@ -4,9 +4,10 @@ node_modules/
 # Build output
 dist/
 
-# Environment variables
-.env
+# Environment variables (local secrets only)
+/.env
 .env.local
+.env*.local
 
 # Firebase
 firebase-debug.log
