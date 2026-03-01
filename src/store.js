@@ -224,7 +224,7 @@ export default store;
 // ============================================
 
 // Constant data
-export const ADMIN_EMAILS = ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com', 'nagaraj.b@swastikinfralogics.com'];
+export const ADMIN_EMAILS = ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com'];
 export const GOOGLE_SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
 
 /** @type {Array<Object>} Products array */
@@ -245,8 +245,8 @@ const defaultProducts = [
     { id: 8, name: 'Cabbage', telugu: 'క్యాబేజీ', hindi: 'Patta Gobi', price: 22, unit: 'piece', moq: 20, category: 'rotate', image: 'https://images.unsplash.com/photo-1597362925123-77861d3bfac1?w=800&q=80' },
     { id: 9, name: 'Carrot', telugu: 'క్యారెట్', hindi: 'Gajar', price: 42, unit: 'kg', moq: 25, category: 'rotate', image: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=800&q=80' },
     { id: 10, name: 'Spinach', telugu: 'పాలకూర', hindi: 'Palak', price: 18, unit: 'bunch', moq: 50, category: 'regional', image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=800&q=80', fresh: true },
-    { id: 11, name: 'Bottle Gourd', telugu: 'సొరకాయ', hindi: 'Lauki', price: 35, unit: 'piece', moq: 15, category: 'regional', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Bottle_gourd_-_%E0%B4%9A%E0%B5%81%E0%B4%B0%E0%B4%95%E0%B5%8D%E0%B4%95_03.JPG/1200px-Bottle_gourd_-_%E0%B4%9A%E0%B5%81%E0%B4%B0%E0%B4%95%E0%B5%8D%E0%B4%95_03.JPG' },
-    { id: 12, name: 'Ridge Gourd', telugu: 'బీరకాయ', hindi: 'Turiya', price: 40, unit: 'kg', moq: 25, category: 'regional', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Ridge_Gourd_Southern_India.jpg/1200px-Ridge_Gourd_Southern_India.jpg' }
+    { id: 11, name: 'Bottle Gourd', telugu: 'సొరకాయ', hindi: 'Lauki', price: 35, unit: 'piece', moq: 15, category: 'regional', image: null },
+    { id: 12, name: 'Ridge Gourd', telugu: 'బీరకాయ', hindi: 'Turiya', price: 40, unit: 'kg', moq: 25, category: 'regional', image: null }
 ];
 
 /**

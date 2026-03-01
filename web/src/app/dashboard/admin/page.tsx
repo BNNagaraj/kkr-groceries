@@ -1,27 +1,56 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppStore, Product } from "@/contexts/AppContext";
-import { db } from "@/lib/firebase";
-import { collection, query, getDocs, orderBy, updateDoc, doc, setDoc } from "firebase/firestore";
+import { db, functions } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import Link from "next/link";
-import { Settings, PackageSearch, Activity, LayoutDashboard, ArrowLeft, LogOut, Save, Download } from "lucide-react";
+import Image from "next/image";
+import { Settings, PackageSearch, Activity, ArrowLeft, LogOut, Save, Upload, Loader2, Search, Cog, Users, ShoppingBasket, BookOpen, FlaskConical, Plus } from "lucide-react";
+import { PRODUCT_CATEGORIES } from "@/lib/constants";
+import { useMode } from "@/contexts/ModeContext";
+import { ModeToggle } from "@/components/admin/ModeToggle";
 import { useRouter } from "next/navigation";
+import OrdersTab from "@/components/admin/OrdersTab";
+import AdminAnalytics from "@/components/admin/AdminAnalytics";
+import SettingsTab from "@/components/admin/SettingsTab";
+import UsersTab from "@/components/admin/UsersTab";
+import BuyingStockTab from "@/components/admin/BuyingStockTab";
+import AccountsTab from "@/components/admin/AccountsTab";
+import AddProductModal from "@/components/admin/AddProductModal";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function AdminDashboard() {
     const { currentUser, isAdmin, loading: authLoading } = useAuth();
     const { products } = useAppStore();
+    const { mode } = useMode();
     const router = useRouter();
 
-    const [activeTab, setActiveTab] = useState<"prices" | "orders" | "stats">("prices");
-
-    // Local state for editing products before saving
+    const [activeTab, setActiveTab] = useState<"prices" | "orders" | "stats" | "users" | "stock" | "accounts" | "settings">("prices");
     const [editingProducts, setEditingProducts] = useState<Product[]>([]);
     const [globalCommission, setGlobalCommission] = useState(15);
-
-    const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [uploadingId, setUploadingId] = useState<number | null>(null);
+    const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
+    const [addProductOpen, setAddProductOpen] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const uploadTargetId = useRef<number | null>(null);
 
     useEffect(() => {
         if (!authLoading && (!currentUser || !isAdmin)) {
@@ -30,40 +59,17 @@ export default function AdminDashboard() {
     }, [currentUser, isAdmin, authLoading, router]);
 
     useEffect(() => {
-        // Clone products for local admin editing
         if (products.length > 0) {
             setEditingProducts(JSON.parse(JSON.stringify(products)));
         }
     }, [products]);
 
-    const loadOrders = async () => {
-        setLoading(true);
-        try {
-            const snap = await getDocs(query(collection(db, "orders"), orderBy("createdAt", "desc")));
-            setOrders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        } catch (e) {
-            // Fallback
-            const snap = await getDocs(collection(db, "orders"));
-            const data = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
-            data.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-            setOrders(data);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (isAdmin && activeTab === "orders") {
-            loadOrders();
-        }
-    }, [isAdmin, activeTab]);
-
-    const handleProductChange = (id: number, field: keyof Product, value: any) => {
+    const handleProductChange = (id: number, field: keyof Product, value: string | number | boolean) => {
         setEditingProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
     };
 
     const handleSaveAllProducts = async () => {
-        if (!confirm("Save all product changes to live database?")) return;
+        setConfirmSaveOpen(false);
         setLoading(true);
         try {
             const batch = [];
@@ -71,24 +77,69 @@ export default function AdminDashboard() {
                 batch.push(setDoc(doc(db, "products", p.id.toString()), p, { merge: true }));
             }
             await Promise.all(batch);
-            alert("All products have been updated successfully!");
+            toast.success("All products have been updated successfully!");
         } catch (e) {
-            console.error(e);
-            alert("Error saving products.");
+            console.error("[Admin] Failed to save products:", e);
+            toast.error("Error saving products. Please try again.");
         } finally {
             setLoading(false);
         }
     };
 
-    const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    const handleImageUpload = (productId: number) => {
+        uploadTargetId.current = productId;
+        fileInputRef.current?.click();
+    };
+
+    const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        const productId = uploadTargetId.current;
+        if (!file || productId === null) return;
+
+        if (!file.type.startsWith("image/")) {
+            toast.error("Please select an image file.");
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error("Image must be under 10MB.");
+            return;
+        }
+
+        setUploadingId(productId);
         try {
-            await updateDoc(doc(db, "orders", orderId), { status: newStatus });
-            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-        } catch (e) {
-            console.error(e);
-            alert("Failed to update status");
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+
+            const uploadFn = httpsCallable<
+                { productId: string; base64Image: string },
+                { success: boolean; url: string }
+            >(functions, "uploadProductImage");
+            const result = await uploadFn({ productId: productId.toString(), base64Image: base64 });
+
+            if (result.data.success && result.data.url) {
+                setEditingProducts(prev =>
+                    prev.map(p => p.id === productId ? { ...p, image: result.data.url } : p)
+                );
+                toast.success("Image uploaded successfully!");
+            }
+        } catch (err) {
+            console.error("Image upload failed:", err);
+            toast.error("Image upload failed. Please try again.");
+        } finally {
+            setUploadingId(null);
+            if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
+
+    const filteredProducts = editingProducts.filter(p => {
+        if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
+        return p.name.toLowerCase().includes(q) || p.telugu?.toLowerCase().includes(q) || p.id.toString().includes(q);
+    });
 
     if (authLoading || (!currentUser || !isAdmin)) {
         return <div className="min-h-screen flex items-center justify-center p-8">Loading Admin Area...</div>;
@@ -96,6 +147,33 @@ export default function AdminDashboard() {
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+            {/* Hidden file input for image upload */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onFileSelected}
+            />
+
+            {/* Save Confirmation Dialog */}
+            <AlertDialog open={confirmSaveOpen} onOpenChange={setConfirmSaveOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Save all product changes?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will update {editingProducts.length} products in the live database. Customers will see these changes immediately.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleSaveAllProducts}>
+                            Save to Live Catalog
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
             {/* Sidebar */}
             <div className="w-full md:w-64 bg-slate-900 text-slate-300 border-r border-slate-800 shrink-0 flex flex-col">
                 <div className="p-6 border-b border-slate-800 flex flex-col gap-2">
@@ -132,9 +210,34 @@ export default function AdminDashboard() {
                     >
                         <Activity className="w-5 h-5" /> Analytics
                     </button>
+                    <button
+                        onClick={() => setActiveTab("users")}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'users' ? 'bg-slate-800 text-white shadow-inner' : 'hover:bg-slate-800/50 hover:text-white'}`}
+                    >
+                        <Users className="w-5 h-5" /> User Management
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("stock")}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'stock' ? 'bg-slate-800 text-white shadow-inner' : 'hover:bg-slate-800/50 hover:text-white'}`}
+                    >
+                        <ShoppingBasket className="w-5 h-5" /> Buying Stock
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("accounts")}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'accounts' ? 'bg-slate-800 text-white shadow-inner' : 'hover:bg-slate-800/50 hover:text-white'}`}
+                    >
+                        <BookOpen className="w-5 h-5" /> Accounts
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("settings")}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'settings' ? 'bg-slate-800 text-white shadow-inner' : 'hover:bg-slate-800/50 hover:text-white'}`}
+                    >
+                        <Cog className="w-5 h-5" /> Settings
+                    </button>
                 </nav>
 
-                <div className="p-4 border-t border-slate-800 hidden md:block">
+                <div className="p-4 border-t border-slate-800 hidden md:block space-y-2">
+                    <ModeToggle />
                     <button
                         onClick={() => { import("@/lib/firebase").then(({ auth }) => auth.signOut()) }}
                         className="flex items-center gap-2 text-red-400 font-medium px-4 py-2 hover:bg-red-500/10 rounded-lg w-full transition-colors"
@@ -147,26 +250,47 @@ export default function AdminDashboard() {
             {/* Main Content */}
             <div className="flex-1 p-4 md:p-8 max-h-screen overflow-y-auto">
                 <div className="max-w-6xl mx-auto">
+                    {mode === "test" && (
+                        <div className="bg-amber-50 border border-amber-300 text-amber-800 px-4 py-2.5 rounded-xl mb-4 text-sm font-semibold flex items-center justify-center gap-2">
+                            <FlaskConical className="w-4 h-4" />
+                            TEST MODE — Data shown is for testing purposes only
+                        </div>
+                    )}
                     {activeTab === "prices" && (
                         <div className="space-y-6">
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                                 <div className="flex items-center gap-4">
                                     <label className="font-bold text-slate-700">Global Margin %:</label>
-                                    <input
+                                    <Input
                                         type="number"
                                         value={globalCommission}
                                         onChange={(e) => setGlobalCommission(Number(e.target.value))}
-                                        className="w-20 px-3 py-1.5 border border-slate-300 rounded text-center focus:ring-2 focus:ring-emerald-500 outline-none"
+                                        className="w-20 text-center"
                                     />
                                 </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={handleSaveAllProducts}
+                                <div className="flex gap-2 items-center">
+                                    <div className="relative">
+                                        <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <Input
+                                            type="text"
+                                            placeholder="Search products..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="pl-8 w-48"
+                                        />
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setAddProductOpen(true)}
+                                    >
+                                        <Plus className="w-4 h-4" /> Add Product
+                                    </Button>
+                                    <Button
+                                        onClick={() => setConfirmSaveOpen(true)}
                                         disabled={loading}
-                                        className="flex items-center gap-2 bg-[#064e3b] hover:bg-[#065f46] text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors disabled:opacity-50"
                                     >
                                         <Save className="w-4 h-4" /> Save Live Catalog
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
 
@@ -175,21 +299,84 @@ export default function AdminDashboard() {
                                     <table className="w-full text-left text-sm whitespace-nowrap">
                                         <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
                                             <tr>
+                                                <th className="px-4 py-3">Image</th>
                                                 <th className="px-4 py-3">ID</th>
                                                 <th className="px-4 py-3">Item</th>
+                                                <th className="px-4 py-3">Category</th>
                                                 <th className="px-4 py-3 text-center">Active</th>
-                                                <th className="px-4 py-3">Override ₹</th>
+                                                <th className="px-4 py-3">Override &#8377;</th>
                                                 <th className="px-4 py-3 text-center">MOQ</th>
+                                                <th className="px-4 py-3 text-center">
+                                                    <label className="flex items-center gap-1 justify-center cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={editingProducts.length > 0 && editingProducts.every(p => p.moqRequired !== false)}
+                                                            onChange={(e) => {
+                                                                const val = e.target.checked;
+                                                                setEditingProducts(prev => prev.map(p => ({ ...p, moqRequired: val })));
+                                                            }}
+                                                            className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                                                        />
+                                                        <span>MOQ Req.</span>
+                                                    </label>
+                                                </th>
                                                 <th className="px-4 py-3">Badging</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {editingProducts.map(p => (
+                                            {filteredProducts.map(p => (
                                                 <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${p.isHidden ? 'opacity-50 bg-slate-100' : ''}`}>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-10 h-10 rounded-lg border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center flex-shrink-0">
+                                                                {p.image ? (
+                                                                    <Image
+                                                                        src={p.image}
+                                                                        alt={p.name}
+                                                                        width={40}
+                                                                        height={40}
+                                                                        className="object-cover w-full h-full"
+                                                                        unoptimized={!p.image.includes("googleapis.com")}
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-slate-400 text-xs font-bold">
+                                                                        {p.name?.[0] || "?"}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleImageUpload(p.id)}
+                                                                disabled={uploadingId === p.id}
+                                                                className="p-1 hover:bg-slate-100 rounded transition-colors disabled:opacity-50"
+                                                                title="Upload image"
+                                                            >
+                                                                {uploadingId === p.id ? (
+                                                                    <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
+                                                                ) : (
+                                                                    <Upload className="w-4 h-4 text-slate-400" />
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    </td>
                                                     <td className="px-4 py-3 font-mono text-xs text-slate-500">{p.id}</td>
                                                     <td className="px-4 py-3">
                                                         <div className="font-bold text-slate-800">{p.name}</div>
-                                                        <div className="text-xs text-slate-500">{p.telugu}</div>
+                                                        <div className="text-xs text-slate-500">
+                                                            <span className="font-telugu">{p.telugu}</span>
+                                                            {p.hindi && <><span className="text-slate-300 mx-1">|</span>{p.hindi}</>}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <select
+                                                            value={p.category || ""}
+                                                            onChange={(e) => handleProductChange(p.id, "category", e.target.value)}
+                                                            className="px-2 py-1 border border-slate-200 rounded text-xs bg-white focus:ring-1 focus:ring-emerald-500 w-full max-w-[140px]"
+                                                        >
+                                                            <option value="">—</option>
+                                                            {PRODUCT_CATEGORIES.map((c) => (
+                                                                <option key={c.id} value={c.id}>{c.label}</option>
+                                                            ))}
+                                                        </select>
                                                     </td>
                                                     <td className="px-4 py-3 text-center">
                                                         <input
@@ -214,6 +401,14 @@ export default function AdminDashboard() {
                                                             value={p.moq || 1}
                                                             onChange={(e) => handleProductChange(p.id, 'moq', Number(e.target.value))}
                                                             className="w-16 px-2 py-1 border border-slate-200 rounded text-center focus:ring-1 focus:ring-emerald-500"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={p.moqRequired !== false}
+                                                            onChange={(e) => handleProductChange(p.id, 'moqRequired', e.target.checked)}
+                                                            className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
                                                         />
                                                     </td>
                                                     <td className="px-4 py-3">
@@ -245,63 +440,25 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
-                    {activeTab === "orders" && (
-                        <div className="space-y-4">
-                            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 mb-6">
-                                <LayoutDashboard className="w-6 h-6 text-slate-400" /> Order Management
-                            </h2>
-                            {orders.map(o => (
-                                <div key={o.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-slate-100 pb-4 mb-4">
-                                        <div>
-                                            <div className="flex items-center gap-3 mb-1">
-                                                <span className="font-bold text-slate-800 text-lg">{o.shopName || o.customerName}</span>
-                                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${o.status === 'Fulfilled' ? 'bg-emerald-100 text-emerald-800' :
-                                                    o.status === 'Rejected' ? 'bg-red-100 text-red-800' :
-                                                        o.status === 'Accepted' ? 'bg-blue-100 text-blue-800' :
-                                                            'bg-amber-100 text-amber-800'
-                                                    }`}>
-                                                    {o.status || 'Pending'}
-                                                </span>
-                                            </div>
-                                            <div className="text-sm text-slate-500">{o.customerPhone} • {o.deliveryAddress}</div>
-                                        </div>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <select
-                                                value={o.status || 'Pending'}
-                                                onChange={(e) => updateOrderStatus(o.id, e.target.value)}
-                                                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 p-2 outline-none font-semibold cursor-pointer"
-                                            >
-                                                <option value="Pending">Pending</option>
-                                                <option value="Accepted">Accepted</option>
-                                                <option value="Fulfilled">Fulfilled</option>
-                                                <option value="Rejected">Rejected</option>
-                                            </select>
-                                        </div>
-                                    </div>
+                    {activeTab === "orders" && <OrdersTab products={products} />}
 
-                                    <div className="flex flex-col md:flex-row justify-between gap-4">
-                                        <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100 flex-1">
-                                            <div className="font-semibold text-slate-700 mb-1">Order Items:</div>
-                                            {o.orderSummary}
-                                        </div>
-                                        <div className="shrink-0 text-right flex flex-col justify-end">
-                                            <div className="text-xs text-slate-400 mb-1">{o.timestamp}</div>
-                                            <div className="text-2xl font-bold text-slate-800">{o.totalValue}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    {activeTab === "stats" && <AdminAnalytics />}
 
-                    {activeTab === "stats" && (
-                        <div className="text-center py-20 bg-white rounded-2xl border border-slate-100">
-                            <span className="text-6xl block mb-4">📈</span>
-                            <h3 className="text-xl font-bold text-slate-800">Advanced Analytics Available</h3>
-                            <p className="text-slate-500">Analytics migrated to dedicated server-side components in future phase.</p>
-                        </div>
-                    )}
+                    {activeTab === "users" && <UsersTab />}
+
+                    {activeTab === "stock" && <BuyingStockTab />}
+
+                    {activeTab === "accounts" && <AccountsTab />}
+
+                    {activeTab === "settings" && <SettingsTab />}
+
+                    {/* Add Product Modal */}
+                    <AddProductModal
+                        open={addProductOpen}
+                        onClose={() => setAddProductOpen(false)}
+                        existingIds={editingProducts.map(p => p.id)}
+                        onProductAdded={(p) => setEditingProducts(prev => [...prev, p])}
+                    />
                 </div>
             </div>
         </div>

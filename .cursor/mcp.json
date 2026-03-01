@@ -7,7 +7,7 @@
         "@gannonh/firebase-mcp"
       ],
       "env": {
-        "SERVICE_ACCOUNT_KEY_PATH": "${workspaceFolder}/.firebase/serviceAccountKey.json",
+        "SERVICE_ACCOUNT_KEY_PATH": "D:/AI/kkr-groceries-02/.firebase/serviceAccountKey.json",
         "FIREBASE_STORAGE_BUCKET": "kkr-groceries-02.firebasestorage.app",
         "DEBUG_LOG_FILE": "true"
       }

@@ -11,7 +11,7 @@ service cloud.firestore {
       // Check custom claim OR admin email list (fallback)
       return isAuthenticated() && (
         request.auth.token.admin == true ||
-        request.auth.token.email.lower() in ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com', 'nagaraj.b@swastikinfralogics.com']
+        request.auth.token.email.lower() in ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com']
       );
     }
     
@@ -72,9 +72,7 @@ service cloud.firestore {
         request.resource.data.total > 0;
       
       // Update: Admin can update status and timestamps
-      allow update: if isAdmin() && 
-        request.resource.data.keys().hasOnly(['status', 'updatedAt', 'placedAt', 'acceptedAt', 'shippedAt', 'deliveredAt', 'fulfilledAt', 'rejectedAt', 'revisedAcceptedCart', 'revisedFulfilledCart', 'orderSummary', 'totalValue', 'productCount', 'customerName', 'phone', 'userPhone', 'location', 'pincode', 'userEmail']) &&
-        request.resource.data.status in ['Pending', 'Accepted', 'Fulfilled', 'Rejected'];
+      allow update: if isAdmin();
       
       // Delete: Only admin
       allow delete: if isAdmin();
@@ -86,7 +84,8 @@ service cloud.firestore {
       
       // Addresses subcollection
       match /addresses/{addressId} {
-        allow read, write: if isOwner(userId) &&
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) &&
           validString(request.resource.data.name, 2, 50) &&
           validString(request.resource.data.phone, 10, 10) &&
           validString(request.resource.data.loc, 10, 200) &&
@@ -114,17 +113,81 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
+    // Notifications collection
+    match /notifications/{notifId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Admin can create notifications for any user
+      allow create: if isAdmin();
+      // Users can update their own notifications (mark as read)
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Admin can delete notifications
+      allow delete: if isAdmin();
+    }
+
     // Audit logs (admin only)
     match /auditLogs/{logId} {
       allow read: if isAdmin();
       allow create: if isAuthenticated();
     }
     
+    // Rate limiting collection (internal use by Cloud Functions only)
+    match /_rateLimits/{docId} {
+      allow read, write: if false;
+    }
+
     // Presence/Online status
     match /presence/{userId} {
       allow read: if isAdmin();
       allow create, update: if isAuthenticated() && request.auth.uid == userId;
       allow delete: if false;
+    }
+
+    // Stock purchases (admin only)
+    match /stockPurchases/{purchaseId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Account entries — manual ledger entries (admin only)
+    match /accountEntries/{entryId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Test Mode collections (prefixed duplicates) ───
+
+    match /test_orders/{orderId} {
+      allow read: if isAdmin() ||
+        (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /test_stockPurchases/{purchaseId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /test_accountEntries/{entryId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /test_notifications/{notifId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAdmin();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
     }
   }
 }
