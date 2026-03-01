@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAppStore } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { ShoppingCart, User, LogOut, Settings } from "lucide-react";
+import { ShoppingCart, User, LogOut, Settings, TrendingUp } from "lucide-react";
 
 import { EnquiryModal } from "./EnquiryModal";
 import { NotificationBell } from "./NotificationBell";
@@ -16,9 +16,12 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [enquiryOpen, setEnquiryOpen] = useState(false);
     const [authOpen, setAuthOpen] = useState(false);
+    const [mounted, setMounted] = useState(false);
 
-    // Calculate total items in cart
-    const cartItemCount = Object.keys(cart).length;
+    useEffect(() => { setMounted(true); }, []);
+
+    // Cart count only available after hydration (cart comes from localStorage)
+    const cartItemCount = mounted ? Object.keys(cart).length : 0;
 
     return (
         <>
@@ -35,6 +38,14 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 sm:gap-3">
+                        {isAdmin && (
+                            <Link
+                                href="/market-rates"
+                                className="hidden sm:flex text-sm font-bold bg-white/10 hover:bg-white/20 transition-colors px-3 py-1.5 rounded-full items-center gap-1.5"
+                            >
+                                <TrendingUp className="w-4 h-4" /> Market Rates
+                            </Link>
+                        )}
                         <button
                             onClick={() => setEnquiryOpen(true)}
                             className="hidden sm:flex text-sm font-bold bg-white/10 hover:bg-white/20 transition-colors px-3 py-1.5 rounded-full items-center"
@@ -57,9 +68,18 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                 onClick={() => setMenuOpen(!menuOpen)}
                                 aria-label="User menu"
                                 aria-expanded={menuOpen}
-                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors overflow-hidden"
                             >
-                                <User className="w-5 h-5" />
+                                {currentUser?.photoURL ? (
+                                    <img
+                                        src={currentUser.photoURL}
+                                        alt=""
+                                        className="w-full h-full object-cover rounded-full"
+                                        referrerPolicy="no-referrer"
+                                    />
+                                ) : (
+                                    <User className="w-5 h-5" />
+                                )}
                             </button>
 
                             {menuOpen && (
@@ -67,8 +87,17 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                     {currentUser ? (
                                         <>
                                             <div className="px-4 py-2 border-b border-slate-100 flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 font-bold flex flex-col items-center justify-center shrink-0">
-                                                    {currentUser.displayName ? currentUser.displayName[0].toUpperCase() : "U"}
+                                                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center shrink-0 overflow-hidden">
+                                                    {currentUser.photoURL ? (
+                                                        <img
+                                                            src={currentUser.photoURL}
+                                                            alt=""
+                                                            className="w-full h-full object-cover"
+                                                            referrerPolicy="no-referrer"
+                                                        />
+                                                    ) : (
+                                                        currentUser.displayName ? currentUser.displayName[0].toUpperCase() : "U"
+                                                    )}
                                                 </div>
                                                 <div className="min-w-0">
                                                     <div className="text-sm font-semibold truncate">{currentUser.displayName || "User"}</div>

@@ -84,7 +84,8 @@ service cloud.firestore {
       
       // Addresses subcollection
       match /addresses/{addressId} {
-        allow read, write: if isOwner(userId) &&
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) &&
           validString(request.resource.data.name, 2, 50) &&
           validString(request.resource.data.phone, 10, 10) &&
           validString(request.resource.data.loc, 10, 200) &&
@@ -140,6 +141,53 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create, update: if isAuthenticated() && request.auth.uid == userId;
       allow delete: if false;
+    }
+
+    // Stock purchases (admin only)
+    match /stockPurchases/{purchaseId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Account entries — manual ledger entries (admin only)
+    match /accountEntries/{entryId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Test Mode collections (prefixed duplicates) ───
+
+    match /test_orders/{orderId} {
+      allow read: if isAdmin() ||
+        (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /test_stockPurchases/{purchaseId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /test_accountEntries/{entryId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /test_notifications/{notifId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAdmin();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
     }
   }
 }

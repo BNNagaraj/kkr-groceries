@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, updateDoc, doc, orderBy, limit, Timestamp } from "firebase/firestore";
+import { useMode } from "@/contexts/ModeContext";
 import { Bell } from "lucide-react";
 import Link from "next/link";
 
@@ -28,6 +29,7 @@ function toEpoch(v: unknown): number {
 
 export function NotificationBell() {
   const { currentUser } = useAuth();
+  const { col } = useMode();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -37,7 +39,7 @@ export function NotificationBell() {
     if (!currentUser) return;
 
     const q = query(
-      collection(db, "notifications"),
+      collection(db, col("notifications")),
       where("userId", "==", currentUser.uid),
       orderBy("createdAt", "desc"),
       limit(20)
@@ -54,7 +56,7 @@ export function NotificationBell() {
         // Fallback: query without orderBy if index is missing
         console.warn("[Notifications] Primary query failed, trying fallback:", err.message);
         const fallbackQ = query(
-          collection(db, "notifications"),
+          collection(db, col("notifications")),
           where("userId", "==", currentUser.uid),
           limit(20)
         );
@@ -77,7 +79,7 @@ export function NotificationBell() {
       fallbackUnsub.current?.();
       fallbackUnsub.current = null;
     };
-  }, [currentUser]);
+  }, [currentUser, col]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -94,7 +96,7 @@ export function NotificationBell() {
 
   const markAsRead = async (notifId: string) => {
     try {
-      await updateDoc(doc(db, "notifications", notifId), { read: true });
+      await updateDoc(doc(db, col("notifications"), notifId), { read: true });
     } catch (e) {
       console.error("Failed to mark notification as read:", e);
     }

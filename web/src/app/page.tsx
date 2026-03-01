@@ -4,14 +4,18 @@ import React, { useState } from "react";
 import { Header } from "@/components/Header";
 import { ProductCard } from "@/components/ProductCard";
 import { CartDrawer } from "@/components/CartDrawer";
+import { Footer } from "@/components/Footer";
 import { useAppStore } from "@/contexts/AppContext";
 import { Search } from "lucide-react";
 
 const CATEGORIES = [
   { id: "all", label: "All Items" },
-  { id: "daily", label: "Daily Needs" },
-  { id: "rotate", label: "Rotational" },
-  { id: "regional", label: "Regional" },
+  { id: "leafy", label: "Leafy & Herbs" },
+  { id: "roots", label: "Roots, Tubers & Bulbs" },
+  { id: "fruit_veg", label: "Fruit Vegetables" },
+  { id: "gourds", label: "Gourds & Beans" },
+  { id: "cruciferous", label: "Cruciferous & Others" },
+  { id: "sweet", label: "Sweet Fruits" },
 ];
 
 export default function Home() {
@@ -46,24 +50,6 @@ export default function Home() {
       <Header onOpenCart={() => setCartOpen(true)} />
 
       <main id="main-content" className="max-w-[1400px] mx-auto px-4 mt-[90px]">
-        {/* Market Status Banner */}
-        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-6 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
-          <div>
-            <div className="text-emerald-800 font-bold mb-1 flex items-center gap-2">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-              </span>
-              Live APMC Prices Active
-            </div>
-            <div className="text-emerald-700/80 text-sm font-medium">Bowenpally Market Yard rates synced today at 06:00 AM</div>
-          </div>
-          <p className="text-xs bg-white text-emerald-800 px-3 py-1.5 rounded-lg border border-emerald-100 font-bold shadow-sm whitespace-nowrap">
-            Minimum Order Value: ₹500
-          </p>
-        </div>
-
         {/* Controls: Search and Filters */}
         <div className="mb-6 flex flex-col md:flex-row gap-4 items-center">
           <div className="relative w-full md:w-96 shrink-0">
@@ -117,6 +103,7 @@ export default function Home() {
         )}
       </main>
 
+      <Footer />
       <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
     </div>
   );

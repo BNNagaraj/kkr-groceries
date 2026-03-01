@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { usePresence } from "@/hooks/usePresence";
 
 interface AuthContextType {
     currentUser: User | null;
@@ -67,6 +68,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         return unsubscribe;
     }, []);
+
+    // Presence tracking — writes heartbeat to Firestore presence collection
+    usePresence(currentUser);
 
     const isAdmin = hasClaim || (
         currentUser?.email

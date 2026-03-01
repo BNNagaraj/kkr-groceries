@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { db } from "@/lib/firebase";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { db, functions } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
 import {
   collection,
   query,
@@ -15,6 +16,9 @@ import {
   DocumentSnapshot,
   deleteField,
   addDoc,
+  where,
+  Timestamp,
+  QueryConstraint,
 } from "firebase/firestore";
 import Image from "next/image";
 import {
@@ -27,9 +31,12 @@ import {
   FileText,
   MapPin,
   Clock,
+  Calendar,
 } from "lucide-react";
 import { Order, OrderStatus, STATUS_TIMESTAMP_FIELDS, OrderCartItem } from "@/types/order";
 import { downloadInvoice } from "@/lib/invoice";
+import { useMode } from "@/contexts/ModeContext";
+import { Product } from "@/contexts/AppContext";
 import OrderEditModal from "./OrderEditModal";
 import { StatusTimeline, formatStatusTime } from "@/components/OrderTimeline";
 import { toast } from "sonner";
@@ -49,9 +56,22 @@ const DATE_FILTERS = [
   { key: "quarter", label: "Quarter" },
   { key: "half", label: "6 Months" },
   { key: "year", label: "Year" },
+  { key: "custom", label: "Custom Range" },
 ] as const;
 
 type DateFilterKey = (typeof DATE_FILTERS)[number]["key"];
+
+const STATUS_FILTERS: Array<OrderStatus | "all"> = ["all", "Pending", "Accepted", "Fulfilled", "Rejected"];
+
+const DATE_MS_MAP: Record<string, number> = {
+  today: DAY,
+  week: 7 * DAY,
+  fortnight: 14 * DAY,
+  month: 30 * DAY,
+  quarter: 90 * DAY,
+  half: 180 * DAY,
+  year: 365 * DAY,
+};
 
 function statusBadgeVariant(status: OrderStatus, hasPendingMod: boolean): "default" | "secondary" | "destructive" | "outline" {
   if (status === "Fulfilled") return "default";
@@ -61,12 +81,25 @@ function statusBadgeVariant(status: OrderStatus, hasPendingMod: boolean): "defau
   return "outline";
 }
 
-export default function OrdersTab() {
+export default function OrdersTab({ products = [] }: { products?: Product[] }) {
+  const { col } = useMode();
+
+  // Lookup map: product name → image URL (for backfilling orders missing images)
+  const productImageMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    products.forEach((p) => {
+      if (p.image) map[p.name.toLowerCase()] = p.image;
+    });
+    return map;
+  }, [products]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [dateFilter, setDateFilter] = useState<DateFilterKey>("all");
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
+  const [customFrom, setCustomFrom] = useState<string>("");
+  const [customTo, setCustomTo] = useState<string>("");
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const lastDocRef = useRef<DocumentSnapshot | null>(null);
 
@@ -79,17 +112,34 @@ export default function OrdersTab() {
     }
 
     try {
-      let q = query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(ORDERS_PER_PAGE));
+      // Build query constraints for server-side filtering
+      const constraints: QueryConstraint[] = [];
 
-      if (!reset && lastDocRef.current) {
-        q = query(
-          collection(db, "orders"),
-          orderBy("createdAt", "desc"),
-          startAfter(lastDocRef.current),
-          limit(ORDERS_PER_PAGE)
-        );
+      // Status filter (must come before orderBy if using composite index)
+      if (statusFilter !== "all") {
+        constraints.push(where("status", "==", statusFilter));
       }
 
+      // Date range filter
+      if (dateFilter === "custom" && customFrom) {
+        constraints.push(where("createdAt", ">=", Timestamp.fromDate(new Date(customFrom + "T00:00:00"))));
+        if (customTo) {
+          const toDate = new Date(customTo + "T23:59:59.999");
+          constraints.push(where("createdAt", "<=", Timestamp.fromDate(toDate)));
+        }
+      } else if (dateFilter !== "all" && DATE_MS_MAP[dateFilter]) {
+        const startMs = Date.now() - DATE_MS_MAP[dateFilter];
+        constraints.push(where("createdAt", ">=", Timestamp.fromDate(new Date(startMs))));
+      }
+
+      constraints.push(orderBy("createdAt", "desc"));
+      constraints.push(limit(ORDERS_PER_PAGE));
+
+      if (!reset && lastDocRef.current) {
+        constraints.push(startAfter(lastDocRef.current));
+      }
+
+      const q = query(collection(db, col("orders")), ...constraints);
       const snap = await getDocs(q);
       const newOrders = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order);
 
@@ -104,13 +154,8 @@ export default function OrdersTab() {
     } catch (e) {
       console.warn("[Orders] Query failed, trying fallback:", e);
       try {
-        const snap = await getDocs(query(collection(db, "orders"), limit(ORDERS_PER_PAGE)));
+        const snap = await getDocs(query(collection(db, col("orders")), orderBy("createdAt", "desc"), limit(ORDERS_PER_PAGE)));
         const data = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order);
-        data.sort((a, b) => {
-          const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
-          const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
-          return tB - tA;
-        });
         setOrders(data);
         setHasMore(false);
       } catch (e2) {
@@ -121,7 +166,7 @@ export default function OrdersTab() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, []);
+  }, [dateFilter, statusFilter, customFrom, customTo, col]);
 
   useEffect(() => {
     loadOrders(true);
@@ -142,11 +187,19 @@ export default function OrdersTab() {
         updates.shippedAt = serverTimestamp();
       }
 
-      await updateDoc(doc(db, "orders", orderId), updates);
+      await updateDoc(doc(db, col("orders"), orderId), updates);
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
       );
       toast.success(`Order ${newStatus.toLowerCase()} successfully.`);
+
+      // Send notification to buyer (fire-and-forget)
+      try {
+        const notifyFn = httpsCallable(functions, "notifyOrderStatusChange");
+        notifyFn({ orderId, newStatus, orderCollection: col("orders") });
+      } catch (notifyErr) {
+        console.warn("Failed to trigger status notification:", notifyErr);
+      }
     } catch (e) {
       console.error("Failed to update status:", e);
       toast.error("Failed to update order status.", {
@@ -157,7 +210,7 @@ export default function OrdersTab() {
 
   const handleCancelModification = async (orderId: string) => {
     try {
-      await updateDoc(doc(db, "orders", orderId), {
+      await updateDoc(doc(db, col("orders"), orderId), {
         pendingModification: deleteField(),
         modificationStatus: deleteField(),
         buyerNotified: false,
@@ -203,7 +256,7 @@ export default function OrdersTab() {
       status: "PendingBuyerApproval" as const,
     };
 
-    await updateDoc(doc(db, "orders", orderId), {
+    await updateDoc(doc(db, col("orders"), orderId), {
       pendingModification,
       modificationStatus: "PendingBuyerApproval",
     });
@@ -211,7 +264,7 @@ export default function OrdersTab() {
     // Send notification to buyer
     if (userId) {
       try {
-        await addDoc(collection(db, "notifications"), {
+        await addDoc(collection(db, col("notifications")), {
           userId,
           orderId,
           type: "orderModification",
@@ -221,7 +274,7 @@ export default function OrdersTab() {
           read: false,
           createdAt: new Date().toISOString(),
         });
-        await updateDoc(doc(db, "orders", orderId), {
+        await updateDoc(doc(db, col("orders"), orderId), {
           buyerNotified: true,
           notificationSentAt: new Date().toISOString(),
         });
@@ -241,30 +294,13 @@ export default function OrdersTab() {
     toast.success("Changes sent to buyer for approval.");
   };
 
-  // Date filtering
-  const now = Date.now();
-  const filteredOrders = orders.filter((o) => {
-    if (dateFilter === "all") return true;
-    const ts = o.createdAt?.toMillis ? o.createdAt.toMillis() : null;
-    if (!ts) return true;
-    const diff = now - ts;
-    if (dateFilter === "today") return diff <= DAY;
-    if (dateFilter === "week") return diff <= 7 * DAY;
-    if (dateFilter === "fortnight") return diff <= 14 * DAY;
-    if (dateFilter === "month") return diff <= 30 * DAY;
-    if (dateFilter === "quarter") return diff <= 90 * DAY;
-    if (dateFilter === "half") return diff <= 180 * DAY;
-    if (dateFilter === "year") return diff <= 365 * DAY;
-    return true;
-  });
-
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
           <LayoutDashboard className="w-6 h-6 text-slate-400" /> Order Management
-          <span className="text-sm font-normal text-slate-400">({filteredOrders.length})</span>
+          <span className="text-sm font-normal text-slate-400">({orders.length})</span>
         </h2>
         <Button
           variant="secondary"
@@ -293,19 +329,58 @@ export default function OrdersTab() {
         ))}
       </div>
 
+      {/* Custom Date Range */}
+      {dateFilter === "custom" && (
+        <div className="flex flex-wrap gap-2 items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+          <Calendar className="w-4 h-4 text-slate-400" />
+          <label className="text-xs font-semibold text-slate-500">From:</label>
+          <input
+            type="date"
+            value={customFrom}
+            onChange={(e) => setCustomFrom(e.target.value)}
+            className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:ring-1 focus:ring-emerald-500 outline-none"
+          />
+          <label className="text-xs font-semibold text-slate-500">To:</label>
+          <input
+            type="date"
+            value={customTo}
+            onChange={(e) => setCustomTo(e.target.value)}
+            className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm focus:ring-1 focus:ring-emerald-500 outline-none"
+          />
+        </div>
+      )}
+
+      {/* Status Filter */}
+      <div className="flex flex-wrap gap-1.5">
+        <span className="text-xs font-semibold text-slate-400 self-center mr-1">Status:</span>
+        {STATUS_FILTERS.map((s) => (
+          <button
+            key={s}
+            onClick={() => setStatusFilter(s)}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+              statusFilter === s
+                ? "bg-slate-800 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            {s === "all" ? "All Statuses" : s}
+          </button>
+        ))}
+      </div>
+
       {/* Loading state */}
       {loading && (
         <div className="text-center py-12 text-slate-400">Loading orders...</div>
       )}
 
       {/* Empty state */}
-      {!loading && filteredOrders.length === 0 && (
+      {!loading && orders.length === 0 && (
         <div className="text-center py-12 text-slate-400">No orders found for this timeframe.</div>
       )}
 
       {/* Order cards */}
       {!loading &&
-        filteredOrders.map((o) => {
+        orders.map((o) => {
           const hasPendingMod = o.modificationStatus === "PendingBuyerApproval";
           const statusText = hasPendingMod ? "Pending Approval" : o.status || "Pending";
           const cart = o.cart || [];
@@ -363,7 +438,7 @@ export default function OrdersTab() {
               {/* Cart items */}
               <div className="px-4 py-3">
                 {cart.length > 0 ? (
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {cart.map((item, idx) => {
                       const amount = (item.qty || 0) * (item.price || 0);
                       const origItem = o.originalCart
@@ -375,40 +450,52 @@ export default function OrdersTab() {
                       return (
                         <div
                           key={idx}
-                          className="flex items-center justify-between text-sm py-1 border-b border-slate-50 last:border-0"
+                          className="flex items-center gap-3 text-sm py-2 border-b border-slate-50 last:border-0"
                         >
-                          <div className="w-8 h-8 rounded bg-slate-50 border border-slate-100 overflow-hidden relative shrink-0 flex items-center justify-center mr-2">
-                            {item.image ? (
-                              <Image
-                                src={item.image}
-                                alt={item.name}
-                                fill
-                                sizes="32px"
-                                className="object-cover"
-                                unoptimized={item.image.includes("unsplash.com")}
-                              />
-                            ) : (
-                              <span className="text-xs font-bold text-slate-300">
-                                {item.name?.[0] || "?"}
-                              </span>
-                            )}
+                          {/* Product Image - with backfill from current products */}
+                          {(() => {
+                            const resolvedImg = item.image || productImageMap[(item.name || "").toLowerCase()] || "";
+                            return (
+                              <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-100 overflow-hidden relative shrink-0 flex items-center justify-center">
+                                {resolvedImg ? (
+                                  <Image
+                                    src={resolvedImg}
+                                    alt={item.name}
+                                    fill
+                                    sizes="56px"
+                                    className="object-cover"
+                                    unoptimized={!resolvedImg.includes("googleapis.com")}
+                                  />
+                                ) : (
+                                  <span className="text-sm font-bold text-slate-300">
+                                    {item.name?.[0] || "?"}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
+
+                          {/* Product Name */}
+                          <span className="text-slate-700 font-medium flex-1 min-w-0 truncate">{item.name}</span>
+
+                          {/* Qty + Price + Total grouped on the right */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`text-right ${qtyChanged ? "bg-yellow-100 rounded px-1" : "text-slate-500"}`}>
+                              {qtyChanged && (
+                                <span className="line-through text-slate-400 mr-1 text-xs">{origItem.qty}</span>
+                              )}
+                              {item.qty} {item.unit}
+                            </span>
+                            <span className={`text-right ${priceChanged ? "bg-yellow-100 rounded px-1" : "text-slate-500"}`}>
+                              {priceChanged && (
+                                <span className="line-through text-slate-400 mr-1 text-xs">&#8377;{origItem.price}</span>
+                              )}
+                              &#8377;{item.price}
+                            </span>
+                            <span className="text-slate-800 font-semibold w-20 text-right">
+                              &#8377;{amount.toLocaleString("en-IN")}
+                            </span>
                           </div>
-                          <span className="text-slate-700 font-medium flex-1">{item.name}</span>
-                          <span className={`w-24 text-right ${qtyChanged ? "bg-yellow-100 rounded px-1" : "text-slate-500"}`}>
-                            {qtyChanged && (
-                              <span className="line-through text-slate-400 mr-1 text-xs">{origItem.qty}</span>
-                            )}
-                            {item.qty} {item.unit}
-                          </span>
-                          <span className={`w-20 text-right ${priceChanged ? "bg-yellow-100 rounded px-1" : "text-slate-500"}`}>
-                            {priceChanged && (
-                              <span className="line-through text-slate-400 mr-1 text-xs">&#8377;{origItem.price}</span>
-                            )}
-                            &#8377;{item.price}
-                          </span>
-                          <span className="text-slate-800 font-semibold w-20 text-right">
-                            &#8377;{amount.toLocaleString("en-IN")}
-                          </span>
                         </div>
                       );
                     })}
@@ -418,14 +505,9 @@ export default function OrdersTab() {
                 )}
               </div>
 
-              {/* Footer: total + actions */}
+              {/* Footer: actions left + total right */}
               <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                <div className="flex items-center gap-4">
-                  <span className="text-xs text-slate-400">{o.productCount || cart.length} items</span>
-                  <span className="text-lg font-extrabold text-slate-800">{o.totalValue}</span>
-                </div>
-
-                {/* Action buttons */}
+                {/* Action buttons — LEFT side */}
                 <div className="flex flex-wrap gap-2">
                   {hasPendingMod ? (
                     <>
@@ -474,13 +556,19 @@ export default function OrdersTab() {
                     </>
                   ) : null}
                 </div>
+
+                {/* Item count + total — RIGHT side */}
+                <div className="flex items-center gap-4">
+                  <span className="text-xs text-slate-400">{o.productCount || cart.length} items</span>
+                  <span className="text-lg font-extrabold text-slate-800">{o.totalValue}</span>
+                </div>
               </div>
             </div>
           );
         })}
 
       {/* Load More */}
-      {!loading && hasMore && dateFilter === "all" && (
+      {!loading && hasMore && (
         <div className="text-center pt-4">
           <Button
             variant="secondary"

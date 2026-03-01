@@ -14,6 +14,8 @@ export interface LocationDetails {
     city: string;
     state: string;
     pincode: string;
+    lat?: number;
+    lng?: number;
 }
 
 const HYDERABAD_CENTER = { lat: 17.3850, lng: 78.4867 };
@@ -117,7 +119,9 @@ export function MapPicker({
                 if (searchInputRef.current) searchInputRef.current.value = results[0].formatted_address;
 
                 const details = parseAddressComponents(results[0].address_components);
-                setStructuredDetails(details);
+                const lat = typeof pos.lat === 'function' ? pos.lat() : pos.lat;
+                const lng = typeof pos.lng === 'function' ? pos.lng() : pos.lng;
+                setStructuredDetails({ ...details, lat, lng });
             } else {
                 setAddress("Location not found");
             }
@@ -177,7 +181,12 @@ export function MapPicker({
 
                     checkGeofence(place.geometry.location);
                     setAddress(place.formatted_address || "");
-                    setStructuredDetails(parseAddressComponents(place.address_components || []));
+                    const placeDetails = parseAddressComponents(place.address_components || []);
+                    setStructuredDetails({
+                        ...placeDetails,
+                        lat: place.geometry.location.lat(),
+                        lng: place.geometry.location.lng(),
+                    });
                 });
 
                 setAutocomplete(gAutocomplete);
@@ -210,7 +219,7 @@ export function MapPicker({
         if (!window.google) {
             const script = document.createElement("script");
             // Appended Geometry library for spherical math
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&libraries=places,geometry`;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&libraries=places,geometry,visualization`;
             script.async = true;
             script.defer = true;
             script.onload = initMap;

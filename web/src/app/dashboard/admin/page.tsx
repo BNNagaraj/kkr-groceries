@@ -8,10 +8,18 @@ import { doc, setDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import Link from "next/link";
 import Image from "next/image";
-import { Settings, PackageSearch, Activity, ArrowLeft, LogOut, Save, Upload, Loader2, Search } from "lucide-react";
+import { Settings, PackageSearch, Activity, ArrowLeft, LogOut, Save, Upload, Loader2, Search, Cog, Users, ShoppingBasket, BookOpen, FlaskConical, Plus } from "lucide-react";
+import { PRODUCT_CATEGORIES } from "@/lib/constants";
+import { useMode } from "@/contexts/ModeContext";
+import { ModeToggle } from "@/components/admin/ModeToggle";
 import { useRouter } from "next/navigation";
 import OrdersTab from "@/components/admin/OrdersTab";
 import AdminAnalytics from "@/components/admin/AdminAnalytics";
+import SettingsTab from "@/components/admin/SettingsTab";
+import UsersTab from "@/components/admin/UsersTab";
+import BuyingStockTab from "@/components/admin/BuyingStockTab";
+import AccountsTab from "@/components/admin/AccountsTab";
+import AddProductModal from "@/components/admin/AddProductModal";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -30,15 +38,17 @@ import {
 export default function AdminDashboard() {
     const { currentUser, isAdmin, loading: authLoading } = useAuth();
     const { products } = useAppStore();
+    const { mode } = useMode();
     const router = useRouter();
 
-    const [activeTab, setActiveTab] = useState<"prices" | "orders" | "stats">("prices");
+    const [activeTab, setActiveTab] = useState<"prices" | "orders" | "stats" | "users" | "stock" | "accounts" | "settings">("prices");
     const [editingProducts, setEditingProducts] = useState<Product[]>([]);
     const [globalCommission, setGlobalCommission] = useState(15);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [uploadingId, setUploadingId] = useState<number | null>(null);
     const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
+    const [addProductOpen, setAddProductOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploadTargetId = useRef<number | null>(null);
 
@@ -200,9 +210,34 @@ export default function AdminDashboard() {
                     >
                         <Activity className="w-5 h-5" /> Analytics
                     </button>
+                    <button
+                        onClick={() => setActiveTab("users")}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'users' ? 'bg-slate-800 text-white shadow-inner' : 'hover:bg-slate-800/50 hover:text-white'}`}
+                    >
+                        <Users className="w-5 h-5" /> User Management
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("stock")}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'stock' ? 'bg-slate-800 text-white shadow-inner' : 'hover:bg-slate-800/50 hover:text-white'}`}
+                    >
+                        <ShoppingBasket className="w-5 h-5" /> Buying Stock
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("accounts")}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'accounts' ? 'bg-slate-800 text-white shadow-inner' : 'hover:bg-slate-800/50 hover:text-white'}`}
+                    >
+                        <BookOpen className="w-5 h-5" /> Accounts
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("settings")}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'settings' ? 'bg-slate-800 text-white shadow-inner' : 'hover:bg-slate-800/50 hover:text-white'}`}
+                    >
+                        <Cog className="w-5 h-5" /> Settings
+                    </button>
                 </nav>
 
-                <div className="p-4 border-t border-slate-800 hidden md:block">
+                <div className="p-4 border-t border-slate-800 hidden md:block space-y-2">
+                    <ModeToggle />
                     <button
                         onClick={() => { import("@/lib/firebase").then(({ auth }) => auth.signOut()) }}
                         className="flex items-center gap-2 text-red-400 font-medium px-4 py-2 hover:bg-red-500/10 rounded-lg w-full transition-colors"
@@ -215,6 +250,12 @@ export default function AdminDashboard() {
             {/* Main Content */}
             <div className="flex-1 p-4 md:p-8 max-h-screen overflow-y-auto">
                 <div className="max-w-6xl mx-auto">
+                    {mode === "test" && (
+                        <div className="bg-amber-50 border border-amber-300 text-amber-800 px-4 py-2.5 rounded-xl mb-4 text-sm font-semibold flex items-center justify-center gap-2">
+                            <FlaskConical className="w-4 h-4" />
+                            TEST MODE — Data shown is for testing purposes only
+                        </div>
+                    )}
                     {activeTab === "prices" && (
                         <div className="space-y-6">
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
@@ -239,6 +280,12 @@ export default function AdminDashboard() {
                                         />
                                     </div>
                                     <Button
+                                        variant="outline"
+                                        onClick={() => setAddProductOpen(true)}
+                                    >
+                                        <Plus className="w-4 h-4" /> Add Product
+                                    </Button>
+                                    <Button
                                         onClick={() => setConfirmSaveOpen(true)}
                                         disabled={loading}
                                     >
@@ -255,9 +302,24 @@ export default function AdminDashboard() {
                                                 <th className="px-4 py-3">Image</th>
                                                 <th className="px-4 py-3">ID</th>
                                                 <th className="px-4 py-3">Item</th>
+                                                <th className="px-4 py-3">Category</th>
                                                 <th className="px-4 py-3 text-center">Active</th>
                                                 <th className="px-4 py-3">Override &#8377;</th>
                                                 <th className="px-4 py-3 text-center">MOQ</th>
+                                                <th className="px-4 py-3 text-center">
+                                                    <label className="flex items-center gap-1 justify-center cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={editingProducts.length > 0 && editingProducts.every(p => p.moqRequired !== false)}
+                                                            onChange={(e) => {
+                                                                const val = e.target.checked;
+                                                                setEditingProducts(prev => prev.map(p => ({ ...p, moqRequired: val })));
+                                                            }}
+                                                            className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                                                        />
+                                                        <span>MOQ Req.</span>
+                                                    </label>
+                                                </th>
                                                 <th className="px-4 py-3">Badging</th>
                                             </tr>
                                         </thead>
@@ -274,7 +336,7 @@ export default function AdminDashboard() {
                                                                         width={40}
                                                                         height={40}
                                                                         className="object-cover w-full h-full"
-                                                                        unoptimized={p.image.includes("unsplash.com")}
+                                                                        unoptimized={!p.image.includes("googleapis.com")}
                                                                     />
                                                                 ) : (
                                                                     <span className="text-slate-400 text-xs font-bold">
@@ -299,7 +361,22 @@ export default function AdminDashboard() {
                                                     <td className="px-4 py-3 font-mono text-xs text-slate-500">{p.id}</td>
                                                     <td className="px-4 py-3">
                                                         <div className="font-bold text-slate-800">{p.name}</div>
-                                                        <div className="text-xs text-slate-500">{p.telugu}</div>
+                                                        <div className="text-xs text-slate-500">
+                                                            <span className="font-telugu">{p.telugu}</span>
+                                                            {p.hindi && <><span className="text-slate-300 mx-1">|</span>{p.hindi}</>}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <select
+                                                            value={p.category || ""}
+                                                            onChange={(e) => handleProductChange(p.id, "category", e.target.value)}
+                                                            className="px-2 py-1 border border-slate-200 rounded text-xs bg-white focus:ring-1 focus:ring-emerald-500 w-full max-w-[140px]"
+                                                        >
+                                                            <option value="">—</option>
+                                                            {PRODUCT_CATEGORIES.map((c) => (
+                                                                <option key={c.id} value={c.id}>{c.label}</option>
+                                                            ))}
+                                                        </select>
                                                     </td>
                                                     <td className="px-4 py-3 text-center">
                                                         <input
@@ -324,6 +401,14 @@ export default function AdminDashboard() {
                                                             value={p.moq || 1}
                                                             onChange={(e) => handleProductChange(p.id, 'moq', Number(e.target.value))}
                                                             className="w-16 px-2 py-1 border border-slate-200 rounded text-center focus:ring-1 focus:ring-emerald-500"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={p.moqRequired !== false}
+                                                            onChange={(e) => handleProductChange(p.id, 'moqRequired', e.target.checked)}
+                                                            className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
                                                         />
                                                     </td>
                                                     <td className="px-4 py-3">
@@ -355,9 +440,25 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
-                    {activeTab === "orders" && <OrdersTab />}
+                    {activeTab === "orders" && <OrdersTab products={products} />}
 
                     {activeTab === "stats" && <AdminAnalytics />}
+
+                    {activeTab === "users" && <UsersTab />}
+
+                    {activeTab === "stock" && <BuyingStockTab />}
+
+                    {activeTab === "accounts" && <AccountsTab />}
+
+                    {activeTab === "settings" && <SettingsTab />}
+
+                    {/* Add Product Modal */}
+                    <AddProductModal
+                        open={addProductOpen}
+                        onClose={() => setAddProductOpen(false)}
+                        existingIds={editingProducts.map(p => p.id)}
+                        onProductAdded={(p) => setEditingProducts(prev => [...prev, p])}
+                    />
                 </div>
             </div>
         </div>

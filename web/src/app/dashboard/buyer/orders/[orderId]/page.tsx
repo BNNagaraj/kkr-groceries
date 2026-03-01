@@ -17,6 +17,7 @@ import {
   Truck,
   AlertTriangle,
 } from "lucide-react";
+import { useMode } from "@/contexts/ModeContext";
 import { Order, OrderCartItem } from "@/types/order";
 import { downloadInvoice } from "@/lib/invoice";
 import { StatusTimeline, formatStatusTime } from "@/components/OrderTimeline";
@@ -44,6 +45,7 @@ function statusBadgeVariant(status: string): "default" | "secondary" | "destruct
 
 export default function OrderDetailPage() {
   const { currentUser } = useAuth();
+  const { col } = useMode();
   const params = useParams();
   const router = useRouter();
   const orderId = params.orderId as string;
@@ -61,7 +63,7 @@ export default function OrderDetailPage() {
     const fetchOrder = async () => {
       setLoading(true);
       try {
-        const snap = await getDoc(doc(db, "orders", orderId));
+        const snap = await getDoc(doc(db, col("orders"), orderId));
         if (!snap.exists()) {
           setError("Order not found.");
           return;
@@ -81,7 +83,7 @@ export default function OrderDetailPage() {
     };
 
     fetchOrder();
-  }, [currentUser, orderId]);
+  }, [currentUser, orderId, col]);
 
   const handleApproveModification = async () => {
     if (!order?.pendingModification) return;
@@ -89,7 +91,7 @@ export default function OrderDetailPage() {
     setActionLoading(true);
     try {
       const mod = order.pendingModification;
-      await updateDoc(doc(db, "orders", order.id), {
+      await updateDoc(doc(db, col("orders"), order.id), {
         cart: mod.proposedCart,
         orderSummary: mod.proposedSummary,
         totalValue: mod.proposedTotalValue,
@@ -100,7 +102,7 @@ export default function OrderDetailPage() {
       });
 
       // Notify admin
-      await addDoc(collection(db, "notifications"), {
+      await addDoc(collection(db, col("notifications")), {
         userId: "admin",
         orderId: order.id,
         type: "modificationApproved",
@@ -137,12 +139,12 @@ export default function OrderDetailPage() {
     setRejectDialogOpen(false);
     setActionLoading(true);
     try {
-      await updateDoc(doc(db, "orders", order.id), {
+      await updateDoc(doc(db, col("orders"), order.id), {
         pendingModification: deleteField(),
         modificationStatus: "RejectedByBuyer",
       });
 
-      await addDoc(collection(db, "notifications"), {
+      await addDoc(collection(db, col("notifications")), {
         userId: "admin",
         orderId: order.id,
         type: "modificationRejected",
@@ -371,7 +373,14 @@ export default function OrderDetailPage() {
             {order.location && (
               <div className="flex items-start gap-2 text-slate-600 sm:col-span-2">
                 <MapPin className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                <span>{order.location}{order.pincode ? ` - ${order.pincode}` : ""}</span>
+                <a
+                  href={`https://maps.google.com/?q=${encodeURIComponent(order.location)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sky-600 hover:underline"
+                >
+                  {order.location}{order.pincode ? ` - ${order.pincode}` : ""}
+                </a>
               </div>
             )}
           </div>
@@ -393,7 +402,7 @@ export default function OrderDetailPage() {
                 <div key={idx} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
                   <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden relative shrink-0 flex items-center justify-center">
                     {item.image ? (
-                      <Image src={item.image} alt={item.name} fill sizes="40px" className="object-cover" unoptimized={item.image.includes("unsplash.com")} />
+                      <Image src={item.image} alt={item.name} fill sizes="40px" className="object-cover" unoptimized={!item.image.includes("googleapis.com")} />
                     ) : (
                       <span className="text-sm font-bold text-slate-300">{item.name[0]}</span>
                     )}

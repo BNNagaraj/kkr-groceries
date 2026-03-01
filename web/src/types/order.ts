@@ -30,6 +30,8 @@ export interface Order {
   shopName: string;
   location: string;
   pincode?: string;
+  lat?: number;
+  lng?: number;
   userEmail?: string;
   cart: OrderCartItem[];
   orderSummary: string;

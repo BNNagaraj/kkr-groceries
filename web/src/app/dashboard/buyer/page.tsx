@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc } from "firebase/firestore";
 import Link from "next/link";
 import { Package, MapPin, Trash2, LogOut, ArrowLeft, BarChart2, ChevronRight } from "lucide-react";
+import { useMode } from "@/contexts/ModeContext";
 import { Order } from "@/types/order";
 import { toast } from "sonner";
 
@@ -55,6 +56,7 @@ function statusBadgeVariant(status: string): "default" | "secondary" | "destruct
 
 export default function BuyerDashboard() {
     const { currentUser } = useAuth();
+    const { col } = useMode();
     const [activeTab, setActiveTab] = useState<"overview" | "orders" | "addresses">("overview");
 
     const [orders, setOrders] = useState<Order[]>([]);
@@ -69,13 +71,13 @@ export default function BuyerDashboard() {
             setLoading(true);
             try {
                 // Fetch Orders
-                const qOrders = query(collection(db, "orders"), where("userId", "==", currentUser.uid), orderBy("createdAt", "desc"));
+                const qOrders = query(collection(db, col("orders")), where("userId", "==", currentUser.uid), orderBy("createdAt", "desc"));
                 try {
                     const snap = await getDocs(qOrders);
                     setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as Order)));
                 } catch {
                     // Fallback if index missing
-                    const fallbackQ = query(collection(db, "orders"), where("userId", "==", currentUser.uid));
+                    const fallbackQ = query(collection(db, col("orders")), where("userId", "==", currentUser.uid));
                     const snap = await getDocs(fallbackQ);
                     const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Order));
                     data.sort((a, b) => {
@@ -97,7 +99,7 @@ export default function BuyerDashboard() {
         };
 
         fetchData();
-    }, [currentUser]);
+    }, [currentUser, col]);
 
     const handleDeleteAddress = async () => {
         if (!deleteTarget || !currentUser) return;
@@ -244,7 +246,14 @@ export default function BuyerDashboard() {
                                 <div className="font-bold text-slate-800 mb-1">
                                     {a.name || 'Contact'} <span className="font-normal text-slate-500 ml-1">- {a.phone}</span>
                                 </div>
-                                <div className="text-sm text-slate-600 mb-1 leading-relaxed max-w-xl">{a.loc}</div>
+                                <a
+                                    href={`https://maps.google.com/?q=${encodeURIComponent(a.loc)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-sky-600 hover:underline mb-1 leading-relaxed max-w-xl block"
+                                >
+                                    {a.loc}
+                                </a>
                                 <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pincode: {a.pin}</div>
                             </div>
                             <Button

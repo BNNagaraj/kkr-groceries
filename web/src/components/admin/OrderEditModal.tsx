@@ -6,6 +6,7 @@ import { Send } from "lucide-react";
 import { Order, OrderCartItem } from "@/types/order";
 import { updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useMode } from "@/contexts/ModeContext";
 import { toast } from "sonner";
 
 import {
@@ -42,6 +43,7 @@ interface Props {
 }
 
 export default function OrderEditModal({ order, onClose, onSave }: Props) {
+  const { col } = useMode();
   const showFulfilled = order.status === "Fulfilled";
   const originalCart = order.originalCart || order.cart || [];
   const acCart = order.revisedAcceptedCart || order.cart || [];
@@ -89,7 +91,7 @@ export default function OrderEditModal({ order, onClose, onSave }: Props) {
     try {
       // Store originalCart if not already stored
       if (!order.originalCart) {
-        await updateDoc(doc(db, "orders", order.id), { originalCart: order.cart });
+        await updateDoc(doc(db, col("orders"), order.id), { originalCart: order.cart });
       }
 
       // Build proposed cart from accepted values (items with qty > 0)
@@ -181,7 +183,7 @@ export default function OrderEditModal({ order, onClose, onSave }: Props) {
                               fill
                               sizes="32px"
                               className="object-cover"
-                              unoptimized={item.image.includes("unsplash.com")}
+                              unoptimized={!item.image.includes("googleapis.com")}
                             />
                           ) : (
                             <span className="text-xs font-bold text-slate-300">
