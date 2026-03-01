@@ -7,6 +7,7 @@ import { collection, query, where, getDocs, orderBy, deleteDoc, doc } from "fire
 import Link from "next/link";
 import { Package, MapPin, Trash2, LogOut, ArrowLeft, BarChart2, ChevronRight } from "lucide-react";
 import { useMode } from "@/contexts/ModeContext";
+import { markOffline } from "@/hooks/usePresence";
 import { Order } from "@/types/order";
 import { toast } from "sonner";
 
@@ -329,7 +330,11 @@ export default function BuyerDashboard() {
 
                 <div className="p-4 border-t border-slate-100 hidden md:block">
                     <button
-                        onClick={() => { import("@/lib/firebase").then(({ auth }) => auth.signOut()) }}
+                        onClick={async () => {
+                            if (currentUser) await markOffline(currentUser.uid);
+                            const { auth } = await import("@/lib/firebase");
+                            await auth.signOut();
+                        }}
                         className="flex items-center gap-2 text-red-600 font-medium px-4 py-2 hover:bg-red-50 rounded-lg w-full transition-colors"
                     >
                         <LogOut className="w-4 h-4" /> Sign Out

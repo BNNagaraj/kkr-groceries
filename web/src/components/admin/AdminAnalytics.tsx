@@ -165,9 +165,9 @@ export default function AdminAnalytics() {
           if (lastSeen && typeof lastSeen.toMillis === "function") {
             lastSeenMs = lastSeen.toMillis();
           }
-          // Support both new schema (online: boolean) and old schema (status: string)
-          const isOnline = data.online === true || data.status === "online";
-          if (lastSeenMs > twoMinutesAgo || isOnline) {
+          // User is online only if marked online AND heartbeat is recent (within 2 min)
+          const isMarkedOnline = data.online === true || data.status === "online";
+          if (isMarkedOnline && lastSeenMs > twoMinutesAgo) {
             users.push({ ...data, uid: data.uid || data.userId || d.id, lastSeen });
           }
         });

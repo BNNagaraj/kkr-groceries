@@ -20,6 +20,7 @@ import UsersTab from "@/components/admin/UsersTab";
 import BuyingStockTab from "@/components/admin/BuyingStockTab";
 import AccountsTab from "@/components/admin/AccountsTab";
 import AddProductModal from "@/components/admin/AddProductModal";
+import { markOffline } from "@/hooks/usePresence";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -239,7 +240,11 @@ export default function AdminDashboard() {
                 <div className="p-4 border-t border-slate-800 hidden md:block space-y-2">
                     <ModeToggle />
                     <button
-                        onClick={() => { import("@/lib/firebase").then(({ auth }) => auth.signOut()) }}
+                        onClick={async () => {
+                            if (currentUser) await markOffline(currentUser.uid);
+                            const { auth } = await import("@/lib/firebase");
+                            await auth.signOut();
+                        }}
                         className="flex items-center gap-2 text-red-400 font-medium px-4 py-2 hover:bg-red-500/10 rounded-lg w-full transition-colors"
                     >
                         <LogOut className="w-4 h-4" /> Sign Out
