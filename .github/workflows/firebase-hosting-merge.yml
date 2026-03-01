@@ -34,12 +34,3 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KKR_GROCERIES_02 }}
           channelId: live
           projectId: kkr-groceries-02
-
-      # Deploy Firestore Rules and Indexes using Firebase CLI
-      - name: Deploy Firestore configuration
-        uses: w9jds/firebase-action@master
-        with:
-          args: deploy --only firestore:rules,firestore:indexes
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KKR_GROCERIES_02 }}
-          PROJECT_ID: kkr-groceries-02
