@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { MapPin, X, Navigation, Search, AlertCircle } from "lucide-react";
 
 declare global {
@@ -282,6 +283,10 @@ export function MapPicker({
         }
     }, [geocodePosition]);
 
+    // Track if component is mounted (needed for createPortal with SSR/Next.js)
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
+
     const handleConfirm = () => {
         if (address && !isOutOfZone) {
             onLocationSelect(address, structuredDetails);
@@ -289,10 +294,13 @@ export function MapPicker({
         }
     };
 
-    if (!isOpen) return null;
+    if (!isOpen || !mounted) return null;
 
-    return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col md:p-8 justify-end md:justify-center items-center">
+    // Render via portal directly into document.body to escape Radix Dialog's
+    // pointer-events: none on <body>. Without this, the Sheet (Radix Dialog)
+    // blocks ALL touch/click events on MapPicker because it's outside the dialog portal.
+    return createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col md:p-8 justify-end md:justify-center items-center" style={{ pointerEvents: "auto" }}>
             <div className="bg-white w-full max-w-2xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[100dvh] md:max-h-[90vh] animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-200">
 
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white shadow-sm z-10">
@@ -365,6 +373,7 @@ export function MapPicker({
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
