@@ -233,13 +233,19 @@ export function MapPicker({
         };
 
         if (!window.google) {
-            const script = document.createElement("script");
-            // Appended Geometry library for spherical math
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&libraries=places,geometry,visualization`;
-            script.async = true;
-            script.defer = true;
-            script.onload = initMap;
-            document.head.appendChild(script);
+            // Prevent duplicate script injection (race condition on re-open)
+            const existing = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+            if (existing) {
+                // Script tag exists but hasn't loaded yet — wait for it
+                existing.addEventListener("load", initMap);
+            } else {
+                const script = document.createElement("script");
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&libraries=places,geometry,visualization`;
+                script.async = true;
+                script.defer = true;
+                script.onload = initMap;
+                document.head.appendChild(script);
+            }
         } else {
             initMap();
         }
