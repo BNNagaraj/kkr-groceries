@@ -139,6 +139,7 @@ export function MapPicker({
                 zoom: 12,
                 mapTypeControl: false,
                 streetViewControl: false,
+                gestureHandling: "greedy",       // single-finger pan on mobile (no two-finger requirement)
                 styles: customMapStyles
             });
 
@@ -160,6 +161,16 @@ export function MapPicker({
                 map: gMap,
                 draggable: true,
                 animation: window.google.maps.Animation.DROP,
+                icon: {
+                    url: "data:image/svg+xml," + encodeURIComponent(
+                        `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52">
+                            <path d="M20 0C8.95 0 0 8.95 0 20c0 14 20 32 20 32s20-18 20-32C40 8.95 31.05 0 20 0z" fill="#059669"/>
+                            <circle cx="20" cy="18" r="8" fill="white"/>
+                        </svg>`
+                    ),
+                    scaledSize: new window.google.maps.Size(40, 52),   // large touch target
+                    anchor: new window.google.maps.Point(20, 52),
+                },
             });
 
             // Initialize Search Autocomplete with Session Tokens handled automatically by the Widget
@@ -204,6 +215,11 @@ export function MapPicker({
                 geocodePosition(gMarker.getPosition());
             });
 
+            // Trigger resize after modal slide-in animation (200ms) so map registers touch events correctly
+            setTimeout(() => {
+                window.google.maps.event.trigger(gMap, "resize");
+            }, 300);
+
             // High Accuracy Locate Me on start
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((pos) => {
@@ -240,7 +256,7 @@ export function MapPicker({
 
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col md:p-8 justify-end md:justify-center items-center">
-            <div className="bg-white w-full max-w-2xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-200">
+            <div className="bg-white w-full max-w-2xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[100dvh] md:max-h-[90vh] animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-200">
 
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white shadow-sm z-10">
                     <div>
@@ -266,7 +282,7 @@ export function MapPicker({
                     />
                 </div>
 
-                <div className="relative h-[300px] md:h-[400px] w-full bg-slate-100">
+                <div className="relative flex-1 min-h-[250px] w-full bg-slate-100" style={{ touchAction: "none" }}>
                     <div ref={mapRef} className="absolute inset-0 w-full h-full" />
                     <button
                         onClick={() => {
