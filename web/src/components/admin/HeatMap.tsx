@@ -29,28 +29,6 @@ function saveGeocodeCache(cache: Record<string, GeoCoord>) {
   try { localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache)); } catch {}
 }
 
-// ─── Premium Dark Emerald Map Style ─────────────────────────────────────────
-const darkEmeraldStyle = [
-  { elementType: "geometry", stylers: [{ color: "#0f1b15" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#6ee7b7" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#0a1610" }] },
-  { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#162b1f" }] },
-  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#1f3d2c" }] },
-  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#1a3526" }] },
-  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#264f38" }] },
-  { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#4ade80" }] },
-  { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#34d399" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#082f1e" }] },
-  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#34d399" }] },
-  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#11231a" }] },
-  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#4ade80" }] },
-  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#0d2e1c" }] },
-  { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#0f2318" }] },
-  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#0f1b15" }] },
-  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#162b1f" }] },
-  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#1f3d2c" }] },
-];
 
 // ─── Gradient Presets ───────────────────────────────────────────────────────
 type GradientKey = "emerald" | "fire" | "revenue";
@@ -207,8 +185,6 @@ export default function HeatMap({ orders }: Props) {
         fullscreenControlOptions: { position: window.google.maps.ControlPosition.TOP_RIGHT },
         zoomControl: true,
         zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_CENTER },
-        styles: darkEmeraldStyle,
-        backgroundColor: "#0f1b15",
       });
     }
 
@@ -345,7 +321,7 @@ export default function HeatMap({ orders }: Props) {
       </div>
 
       {/* ── Map ────────────────────────────────────────────── */}
-      <div ref={mapRef} className="h-[480px] w-full bg-slate-900" />
+      <div ref={mapRef} className="h-[480px] w-full bg-gray-100" />
 
       {/* ── Legend Footer ──────────────────────────────────── */}
       <div className="px-4 py-3 border-t border-emerald-900/20 bg-slate-900/80">

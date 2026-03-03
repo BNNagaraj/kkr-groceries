@@ -31,28 +31,6 @@ const STATUS_CONFIG: Record<string, { color: string; dark: string; label: string
 const ALL_STATUSES = Object.keys(STATUS_CONFIG);
 type DateRange = "7d" | "30d" | "all";
 
-// ─── Premium Dark Emerald Map Style ─────────────────────────────────────────
-const darkEmeraldStyle = [
-  { elementType: "geometry", stylers: [{ color: "#0f1b15" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#6ee7b7" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#0a1610" }] },
-  { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#162b1f" }] },
-  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#1f3d2c" }] },
-  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#1a3526" }] },
-  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#264f38" }] },
-  { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#4ade80" }] },
-  { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#34d399" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#082f1e" }] },
-  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#34d399" }] },
-  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#11231a" }] },
-  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#4ade80" }] },
-  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#0d2e1c" }] },
-  { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#0f2318" }] },
-  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#0f1b15" }] },
-  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#162b1f" }] },
-  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#1f3d2c" }] },
-];
 
 interface GeoCoord { lat: number; lng: number; }
 
@@ -172,8 +150,6 @@ export default function OrderLocationMap({ orders }: Props) {
         fullscreenControlOptions: { position: window.google.maps.ControlPosition.TOP_RIGHT },
         zoomControl: true,
         zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_CENTER },
-        styles: darkEmeraldStyle,
-        backgroundColor: "#0f1b15",
       });
       infoWindowRef.current = new window.google.maps.InfoWindow();
     }
@@ -349,7 +325,7 @@ export default function OrderLocationMap({ orders }: Props) {
       </div>
 
       {/* ── Map ────────────────────────────────────────────── */}
-      <div ref={mapRef} className="h-[480px] w-full bg-slate-900" />
+      <div ref={mapRef} className="h-[480px] w-full bg-gray-100" />
 
       {/* ── Legend & Stats Footer ────────────────────────────── */}
       <div className="px-4 py-3 border-t border-emerald-900/20 bg-slate-900/80 flex flex-wrap items-center justify-between gap-3">

@@ -28,31 +28,6 @@ function createBrandedPin(color = "#059669", darkColor = "#064e3b") {
     return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 
-// ─── Premium Emerald Light Map Style ────────────────────────────────────────
-const premiumLightStyle = [
-    { elementType: "geometry", stylers: [{ color: "#f0fdf4" }] },
-    { elementType: "labels.text.fill", stylers: [{ color: "#064e3b" }] },
-    { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }] },
-    { elementType: "labels.icon", stylers: [{ visibility: "simplified" }] },
-    { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
-    { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#d1fae5" }] },
-    { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#d1fae5" }] },
-    { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#a7f3d0" }] },
-    { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#047857" }] },
-    { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#6b7280" }] },
-    { featureType: "water", elementType: "geometry", stylers: [{ color: "#a7f3d0" }] },
-    { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#047857" }] },
-    { featureType: "poi", elementType: "geometry", stylers: [{ color: "#ecfdf5" }] },
-    { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#065f46" }] },
-    { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#bbf7d0" }] },
-    { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#047857" }] },
-    { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#ecfdf5" }] },
-    { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#f0fdf4" }] },
-    { featureType: "transit", elementType: "geometry", stylers: [{ color: "#d1fae5" }] },
-    { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#065f46" }] },
-    { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#a7f3d0" }] },
-    { featureType: "administrative.land_parcel", elementType: "labels.text.fill", stylers: [{ color: "#6b7280" }] },
-];
 
 export function MapPicker({
     isOpen,
@@ -141,33 +116,18 @@ export function MapPicker({
                 zoomControl: true,
                 zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_CENTER },
                 gestureHandling: "greedy",
-                styles: premiumLightStyle,
-                backgroundColor: "#f0fdf4",
             });
 
-            // Delivery Radius — outer glow circle
+            // Delivery Radius — subtle boundary ring (no fill to keep map fully visible)
             new window.google.maps.Circle({
                 strokeColor: "#059669",
-                strokeOpacity: 0.3,
-                strokeWeight: 1.5,
+                strokeOpacity: 0.6,
+                strokeWeight: 2,
                 fillColor: "#10b981",
-                fillOpacity: 0.04,
+                fillOpacity: 0.02,
                 map: gMap,
                 center: HYDERABAD_CENTER,
                 radius: MAX_DELIVERY_RADIUS_KM * 1000,
-                clickable: false,
-            });
-
-            // Inner dashed-feel ring at center
-            new window.google.maps.Circle({
-                strokeColor: "#059669",
-                strokeOpacity: 0.15,
-                strokeWeight: 1,
-                fillColor: "transparent",
-                fillOpacity: 0,
-                map: gMap,
-                center: HYDERABAD_CENTER,
-                radius: MAX_DELIVERY_RADIUS_KM * 500,
                 clickable: false,
             });
 
@@ -323,7 +283,7 @@ export function MapPicker({
                 </div>
 
                 {/* ── Map Container ──────────────────────────────────── */}
-                <div className="relative flex-1 min-h-[280px] w-full bg-emerald-50" style={{ touchAction: "none" }}>
+                <div className="relative flex-1 min-h-[280px] w-full bg-gray-100" style={{ touchAction: "none" }}>
                     <div ref={mapRef} className="absolute inset-0 w-full h-full" />
 
                     {/* Floating Distance Badge */}
