@@ -51,15 +51,15 @@ const PRESETS: Record<PresetKey, Preset> = {
       { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#1565C0" }] },
       { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#BBDEFB" }] },
 
-      // Highways — bold red
-      { featureType: "road.highway", elementType: "geometry.fill", stylers: [{ color: "#EF5350" }] },
-      { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#C62828" }] },
-      { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#B71C1C" }] },
+      // Highways — deep purple (avoids metro red/blue conflict)
+      { featureType: "road.highway", elementType: "geometry.fill", stylers: [{ color: "#AB47BC" }] },
+      { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#7B1FA2" }] },
+      { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#4A148C" }] },
 
-      // Arterial roads — orange
-      { featureType: "road.arterial", elementType: "geometry.fill", stylers: [{ color: "#FFA726" }] },
-      { featureType: "road.arterial", elementType: "geometry.stroke", stylers: [{ color: "#E65100" }] },
-      { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#BF360C" }] },
+      // Arterial roads — golden amber (avoids metro red/blue conflict)
+      { featureType: "road.arterial", elementType: "geometry.fill", stylers: [{ color: "#FFB300" }] },
+      { featureType: "road.arterial", elementType: "geometry.stroke", stylers: [{ color: "#FF8F00" }] },
+      { featureType: "road.arterial", elementType: "labels.text.fill", stylers: [{ color: "#E65100" }] },
 
       // Local roads — light cream/yellow
       { featureType: "road.local", elementType: "geometry.fill", stylers: [{ color: "#FFFDE7" }] },
@@ -74,9 +74,13 @@ const PRESETS: Record<PresetKey, Preset> = {
       { featureType: "poi.business", elementType: "geometry.fill", stylers: [{ color: "#F5F5F5" }] },
       { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#546E7A" }] },
 
-      // Transit — muted gray
-      { featureType: "transit", elementType: "geometry", stylers: [{ color: "#E0E0E0" }] },
-      { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#5C6BC0" }] },
+      // Transit — enhanced visibility (keep base subtle so TransitLayer metro lines pop)
+      { featureType: "transit.line", elementType: "geometry.fill", stylers: [{ color: "#B0BEC5" }, { weight: 2.5 }] },
+      { featureType: "transit.line", elementType: "geometry.stroke", stylers: [{ color: "#78909C" }] },
+      { featureType: "transit.station", elementType: "geometry.fill", stylers: [{ color: "#CFD8DC" }] },
+      { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#37474F" }] },
+      { featureType: "transit.station", elementType: "labels.text.stroke", stylers: [{ color: "#FFFFFF" }, { weight: 4 }] },
+      { featureType: "transit.station", elementType: "labels.icon", stylers: [{ saturation: 40 }, { lightness: -10 }] },
 
       // Admin boundaries
       { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#BDBDBD" }] },
