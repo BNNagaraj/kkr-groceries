@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { MapPin, X, Navigation, Search, AlertCircle, Crosshair, Maximize2 } from "lucide-react";
+import MapStyleSettings, { buildMapStyles, loadMapSettings } from "./MapStyleSettings";
 
 declare global {
     interface Window {
@@ -51,6 +52,7 @@ export function MapPicker({
     const [locating, setLocating] = useState(false);
     const [isOutOfZone, setIsOutOfZone] = useState(false);
     const [distanceKm, setDistanceKm] = useState(0);
+    const [mapObj, setMapObj] = useState<any>(null);
 
     const parseAddressComponents = (components: any[]) => {
         let street = "", city = "", state = "", pincode = "";
@@ -116,6 +118,7 @@ export function MapPicker({
                 zoomControl: true,
                 zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_CENTER },
                 gestureHandling: "greedy",
+                styles: buildMapStyles(loadMapSettings()),
             });
 
             // Delivery Radius — subtle boundary ring (no fill to keep map fully visible)
@@ -147,6 +150,7 @@ export function MapPicker({
             gMapRef.current = gMap;
             gMarkerRef.current = gMarker;
             initDoneRef.current = true;
+            setMapObj(gMap);
 
             gMap.addListener("click", (e: any) => {
                 gMarker.setPosition(e.latLng);
@@ -285,6 +289,9 @@ export function MapPicker({
                 {/* ── Map Container ──────────────────────────────────── */}
                 <div className="relative flex-1 min-h-[280px] w-full bg-gray-100" style={{ touchAction: "none" }}>
                     <div ref={mapRef} className="absolute inset-0 w-full h-full" />
+
+                    {/* Map Style Settings */}
+                    {mapObj && <MapStyleSettings mapInstance={mapObj} position="top-left" />}
 
                     {/* Floating Distance Badge */}
                     {address && !isOutOfZone && distanceKm > 0 && (

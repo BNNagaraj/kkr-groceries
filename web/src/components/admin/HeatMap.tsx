@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Order } from "@/types/order";
 import { Flame, Loader2, Layers, Palette } from "lucide-react";
+import MapStyleSettings, { buildMapStyles, loadMapSettings } from "../MapStyleSettings";
 
 declare global {
   interface Window {
@@ -93,6 +94,7 @@ export default function HeatMap({ orders }: Props) {
   const [gradient, setGradient] = useState<GradientKey>("emerald");
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeProgress, setGeocodeProgress] = useState({ done: 0, total: 0 });
+  const [mapObj, setMapObj] = useState<any>(null);
   const resolvedCoords = useRef<Map<string, GeoCoord>>(new Map());
 
   const resolveCoordinates = useCallback(async () => {
@@ -185,7 +187,9 @@ export default function HeatMap({ orders }: Props) {
         fullscreenControlOptions: { position: window.google.maps.ControlPosition.TOP_RIGHT },
         zoomControl: true,
         zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_CENTER },
+        styles: buildMapStyles(loadMapSettings()),
       });
+      setMapObj(mapInstance.current);
     }
 
     await resolveCoordinates();
@@ -321,7 +325,10 @@ export default function HeatMap({ orders }: Props) {
       </div>
 
       {/* ── Map ────────────────────────────────────────────── */}
-      <div ref={mapRef} className="h-[480px] w-full bg-gray-100" />
+      <div className="relative">
+        <div ref={mapRef} className="h-[480px] w-full bg-gray-100" />
+        {mapObj && <MapStyleSettings mapInstance={mapObj} position="top-left" />}
+      </div>
 
       {/* ── Legend Footer ──────────────────────────────────── */}
       <div className="px-4 py-3 border-t border-emerald-900/20 bg-slate-900/80">

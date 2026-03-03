@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Order } from "@/types/order";
 import { MapPin, Loader2, Filter, Calendar, TrendingUp } from "lucide-react";
+import MapStyleSettings, { buildMapStyles, loadMapSettings } from "../MapStyleSettings";
 
 declare global {
   interface Window {
@@ -58,6 +59,7 @@ export default function OrderLocationMap({ orders }: Props) {
   const [geocodeProgress, setGeocodeProgress] = useState({ done: 0, total: 0 });
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(ALL_STATUSES));
   const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [mapObj, setMapObj] = useState<any>(null);
 
   // Filter orders by date range
   const filteredOrders = useMemo(() => {
@@ -150,8 +152,10 @@ export default function OrderLocationMap({ orders }: Props) {
         fullscreenControlOptions: { position: window.google.maps.ControlPosition.TOP_RIGHT },
         zoomControl: true,
         zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_CENTER },
+        styles: buildMapStyles(loadMapSettings()),
       });
       infoWindowRef.current = new window.google.maps.InfoWindow();
+      setMapObj(mapInstance.current);
     }
 
     const map = mapInstance.current;
@@ -325,7 +329,10 @@ export default function OrderLocationMap({ orders }: Props) {
       </div>
 
       {/* ── Map ────────────────────────────────────────────── */}
-      <div ref={mapRef} className="h-[480px] w-full bg-gray-100" />
+      <div className="relative">
+        <div ref={mapRef} className="h-[480px] w-full bg-gray-100" />
+        {mapObj && <MapStyleSettings mapInstance={mapObj} position="top-left" />}
+      </div>
 
       {/* ── Legend & Stats Footer ────────────────────────────── */}
       <div className="px-4 py-3 border-t border-emerald-900/20 bg-slate-900/80 flex flex-wrap items-center justify-between gap-3">
