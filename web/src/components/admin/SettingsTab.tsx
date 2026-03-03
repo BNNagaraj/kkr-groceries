@@ -4,7 +4,9 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
-import { Save, MapPin, Store, FileText, Plus, X, Loader2 } from "lucide-react";
+import { Save, MapPin, Store, FileText, Plus, X, Loader2, Mail, Eye, EyeOff, Send } from "lucide-react";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,6 +18,22 @@ import {
   DEFAULT_BUSINESS,
   DEFAULT_CHECKOUT,
 } from "@/types/settings";
+
+interface SmtpSettings {
+  user: string;
+  password: string;
+  fromName: string;
+  host: string;
+  port: number;
+}
+
+const DEFAULT_SMTP: SmtpSettings = {
+  user: "",
+  password: "",
+  fromName: "KKR Groceries",
+  host: "smtp.gmail.com",
+  port: 587,
+};
 
 declare global {
   interface Window {
@@ -38,10 +56,14 @@ export default function SettingsTab() {
   const [delivery, setDelivery] = useState<DeliverySettings>(DEFAULT_DELIVERY);
   const [business, setBusiness] = useState<BusinessSettings>(DEFAULT_BUSINESS);
   const [checkout, setCheckout] = useState<CheckoutFormSettings>(DEFAULT_CHECKOUT);
+  const [smtp, setSmtp] = useState<SmtpSettings>(DEFAULT_SMTP);
   const [loading, setLoading] = useState(true);
   const [savingDelivery, setSavingDelivery] = useState(false);
   const [savingBusiness, setSavingBusiness] = useState(false);
   const [savingCheckout, setSavingCheckout] = useState(false);
+  const [savingSmtp, setSavingSmtp] = useState(false);
+  const [testingSmtp, setTestingSmtp] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -52,14 +74,16 @@ export default function SettingsTab() {
   useEffect(() => {
     (async () => {
       try {
-        const [dSnap, bSnap, cSnap] = await Promise.all([
+        const [dSnap, bSnap, cSnap, sSnap] = await Promise.all([
           getDoc(doc(db, "settings", "delivery")),
           getDoc(doc(db, "settings", "business")),
           getDoc(doc(db, "settings", "checkout")),
+          getDoc(doc(db, "settings", "smtp")),
         ]);
         if (dSnap.exists()) setDelivery({ ...DEFAULT_DELIVERY, ...dSnap.data() });
         if (bSnap.exists()) setBusiness({ ...DEFAULT_BUSINESS, ...bSnap.data() });
         if (cSnap.exists()) setCheckout({ ...DEFAULT_CHECKOUT, ...cSnap.data() });
+        if (sSnap.exists()) setSmtp({ ...DEFAULT_SMTP, ...sSnap.data() });
       } catch (e) {
         console.error("[Settings] Failed to load:", e);
       } finally {
@@ -178,6 +202,45 @@ export default function SettingsTab() {
       toast.error("Failed to save checkout settings.");
     } finally {
       setSavingCheckout(false);
+    }
+  };
+
+  const saveSmtp_ = async () => {
+    if (!smtp.user || !smtp.password) {
+      toast.error("Gmail address and App Password are required.");
+      return;
+    }
+    setSavingSmtp(true);
+    try {
+      await setDoc(doc(db, "settings", "smtp"), smtp, { merge: true });
+      toast.success("SMTP settings saved!");
+    } catch (e) {
+      console.error("[Settings] Save SMTP error:", e);
+      toast.error("Failed to save SMTP settings.");
+    } finally {
+      setSavingSmtp(false);
+    }
+  };
+
+  const testSmtp_ = async () => {
+    if (!smtp.user || !smtp.password) {
+      toast.error("Save SMTP settings first before testing.");
+      return;
+    }
+    setTestingSmtp(true);
+    try {
+      const testFn = httpsCallable(functions, "testSmtpConfig");
+      const result = await testFn({ testEmail: smtp.user });
+      const data = result.data as { success: boolean; message: string };
+      if (data.success) {
+        toast.success(data.message || "Test email sent successfully!");
+      }
+    } catch (e: any) {
+      const msg = e?.message || "Failed to send test email.";
+      console.error("[Settings] Test SMTP error:", e);
+      toast.error(msg);
+    } finally {
+      setTestingSmtp(false);
     }
   };
 
@@ -577,6 +640,111 @@ export default function SettingsTab() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Email / SMTP Configuration */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
+              <Mail className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800">Email / SMTP Configuration</h3>
+              <p className="text-sm text-slate-500">
+                Gmail credentials for order notification emails
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={testSmtp_}
+              disabled={testingSmtp || !smtp.user || !smtp.password}
+            >
+              {testingSmtp ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+              {testingSmtp ? "Sending..." : "Send Test Email"}
+            </Button>
+            <Button onClick={saveSmtp_} disabled={savingSmtp} size="sm">
+              <Save className="w-4 h-4" />
+              {savingSmtp ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium text-slate-600 mb-1 block">
+              Gmail Address
+            </label>
+            <Input
+              type="email"
+              value={smtp.user}
+              onChange={(e) =>
+                setSmtp((p) => ({ ...p, user: e.target.value }))
+              }
+              placeholder="your-email@gmail.com"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-slate-600 mb-1 block">
+              App Password
+            </label>
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                value={smtp.password}
+                onChange={(e) =>
+                  setSmtp((p) => ({ ...p, password: e.target.value }))
+                }
+                placeholder="16-character app password"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600"
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Generate at{" "}
+              <a
+                href="https://myaccount.google.com/apppasswords"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-500 hover:underline"
+              >
+                myaccount.google.com → Security → App passwords
+              </a>
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-sm font-medium text-slate-600 mb-1 block">
+              Sender Name
+            </label>
+            <Input
+              value={smtp.fromName}
+              onChange={(e) =>
+                setSmtp((p) => ({ ...p, fromName: e.target.value }))
+              }
+              placeholder="KKR Groceries"
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              Emails will be sent as &quot;{smtp.fromName || "KKR Groceries"} &lt;{smtp.user || "email"}&gt;&quot;
+            </p>
           </div>
         </div>
       </div>

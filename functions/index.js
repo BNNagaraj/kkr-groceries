@@ -4,8 +4,14 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getAuth } = require("firebase-admin/auth");
-// ─── Gmail SMTP config ───
-const GMAIL_USER = "raju2uraju@gmail.com";
+// ─── Default SMTP config (fallback if settings/smtp doc doesn't exist) ───
+const DEFAULT_SMTP = {
+  user: "raju2uraju@gmail.com",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  fromName: "KKR Groceries",
+};
 
 initializeApp();
 const db = getFirestore();
@@ -256,6 +262,41 @@ async function getNotificationEmails() {
   }
   await getAdminEmails(); // populates cache
   return _adminCache.notificationEmails || FALLBACK_ADMINS;
+}
+
+// ─── SMTP config: Firestore-backed with in-memory cache ───
+let _smtpCache = { config: null, ts: 0 };
+const SMTP_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function getSmtpConfig() {
+  if (_smtpCache.config && Date.now() - _smtpCache.ts < SMTP_CACHE_TTL) {
+    return _smtpCache.config;
+  }
+  try {
+    const snap = await db.collection("settings").doc("smtp").get();
+    if (snap.exists) {
+      const data = snap.data();
+      if (data.user && data.password) {
+        const config = {
+          user: data.user,
+          password: data.password,
+          host: data.host || DEFAULT_SMTP.host,
+          port: data.port || DEFAULT_SMTP.port,
+          secure: data.secure ?? DEFAULT_SMTP.secure,
+          fromName: data.fromName || DEFAULT_SMTP.fromName,
+        };
+        _smtpCache = { config, ts: Date.now() };
+        return config;
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to read settings/smtp, using fallback:", err.message);
+  }
+  // Fallback: use hardcoded defaults + env secret
+  return {
+    ...DEFAULT_SMTP,
+    password: process.env.GMAIL_APP_PASSWORD || "",
+  };
 }
 
 // ─── App Mode: test/real with cached lookup ───
@@ -829,6 +870,7 @@ exports.updateUserStatus = onCall(async (request) => {
 /**
  * Trigger Email: watches the `mail` collection and sends emails via Gmail SMTP.
  * Documents must have: { to: string[], message: { subject, html } }
+ * SMTP config is read from Firestore settings/smtp (admin-configurable).
  */
 exports.processMailQueue = onDocumentCreated(
   { document: "mail/{mailId}", secrets: ["GMAIL_APP_PASSWORD"] },
@@ -845,20 +887,23 @@ exports.processMailQueue = onDocumentCreated(
       return;
     }
 
+    // Read SMTP config from Firestore (cached, fallback to env/defaults)
+    const smtp = await getSmtpConfig();
+
     const nodemailer = require("nodemailer");
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
       auth: {
-        user: GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
+        user: smtp.user,
+        pass: smtp.password,
       },
     });
 
     try {
       await transporter.sendMail({
-        from: `KKR Groceries <${GMAIL_USER}>`,
+        from: `${smtp.fromName} <${smtp.user}>`,
         to: to.join(", "),
         subject: message.subject,
         html: message.html,
@@ -879,3 +924,61 @@ exports.processMailQueue = onDocumentCreated(
     }
   }
 );
+
+/**
+ * Test SMTP configuration by sending a test email.
+ * Reads settings/smtp from Firestore and verifies credentials work.
+ */
+exports.testSmtpConfig = onCall({ secrets: ["GMAIL_APP_PASSWORD"] }, async (request) => {
+  try {
+    const caller = await requireAdmin(request);
+    if (await isRateLimited(caller.uid, "testSmtp", 5, 10 * 60 * 1000)) {
+      throw new HttpsError("resource-exhausted", "Too many test emails. Please wait.");
+    }
+
+    const { testEmail } = request.data || {};
+
+    // Read SMTP config from Firestore
+    const smtp = await getSmtpConfig();
+
+    if (!smtp.user || !smtp.password) {
+      throw new HttpsError("failed-precondition", "SMTP credentials not configured. Save Gmail address and App Password first.");
+    }
+
+    const recipient = testEmail || smtp.user;
+
+    const nodemailer = require("nodemailer");
+    const transporter = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
+      auth: { user: smtp.user, pass: smtp.password },
+    });
+
+    await transporter.sendMail({
+      from: `${smtp.fromName} <${smtp.user}>`,
+      to: recipient,
+      subject: "✅ KKR Groceries — SMTP Test Successful",
+      html: emailLayout(
+        `<div style="padding:28px 24px;text-align:center;">
+          <div style="width:64px;height:64px;background:#f0fdf4;border-radius:50%;line-height:64px;font-size:28px;margin:0 auto 16px;">✅</div>
+          <h2 style="color:#1e293b;font-size:20px;font-weight:700;margin:0 0 8px;">SMTP Configuration Working!</h2>
+          <p style="color:#64748b;font-size:14px;margin:0;">Email notifications are properly configured and operational.</p>
+          <div style="margin-top:16px;padding:12px 20px;background:#f8fafc;border-radius:10px;display:inline-block;">
+            <span style="color:#94a3b8;font-size:12px;">Sender:</span>
+            <span style="color:#047857;font-size:13px;font-weight:600;margin-left:4px;">${smtp.user}</span>
+          </div>
+        </div>`,
+        "SMTP test successful"
+      ),
+    });
+
+    console.log(`SMTP test email sent to ${recipient} by ${caller.uid}`);
+    return { success: true, message: `Test email sent to ${recipient}` };
+
+  } catch (error) {
+    console.error("SMTP test failed:", error);
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("internal", `SMTP test failed: ${error.message}`);
+  }
+});
