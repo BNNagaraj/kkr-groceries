@@ -1238,51 +1238,82 @@ function buildAddress(pradr) {
 }
 
 /** Query the GST portal with session + captcha flow (single attempt) */
+/** HTTP helper using Node.js built-in https (no external dependency) */
+function httpsRequest(url, options = {}) {
+  const https = require("https");
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(url);
+    const reqOptions = {
+      hostname: parsedUrl.hostname,
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: options.method || "GET",
+      headers: options.headers || {},
+    };
+    const req = https.request(reqOptions, (res) => {
+      const chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => {
+        const body = Buffer.concat(chunks);
+        const cookies = (res.headers["set-cookie"] || [])
+          .map((c) => c.split(";")[0]);
+        resolve({ statusCode: res.statusCode, headers: res.headers, cookies, body });
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(options.timeout || 15000, () => {
+      req.destroy();
+      reject(new Error("Request timeout"));
+    });
+    if (options.body) req.write(options.body);
+    req.end();
+  });
+}
+
 async function queryGSTPortal(gstin) {
   // Step 1: Initialize session — get cookies
-  const sessionRes = await axios.get(GST_PORTAL + "/services/searchtp", {
+  const sessionRes = await httpsRequest(GST_PORTAL + "/services/searchtp", {
     headers: { "User-Agent": UA },
-    timeout: 15000,
   });
-  const sessionCookies = (sessionRes.headers["set-cookie"] || [])
-    .map((c) => c.split(";")[0])
-    .join("; ");
+  const sessionCookies = sessionRes.cookies.join("; ");
 
   // Step 2: Fetch captcha image
-  const captchaRes = await axios.get(GST_PORTAL + "/services/captcha", {
-    responseType: "arraybuffer",
+  const captchaRes = await httpsRequest(GST_PORTAL + "/services/captcha", {
     headers: { Cookie: sessionCookies, "User-Agent": UA },
-    timeout: 15000,
   });
-  const captchaCookies = (captchaRes.headers["set-cookie"] || [])
-    .map((c) => c.split(";")[0]);
-  const allCookies =
-    sessionCookies + (captchaCookies.length ? "; " + captchaCookies.join("; ") : "");
-  const imageBuffer = Buffer.from(captchaRes.data);
+  const allCookies = sessionCookies +
+    (captchaRes.cookies.length ? "; " + captchaRes.cookies.join("; ") : "");
+  const imageBuffer = captchaRes.body;
 
   // Step 3: Solve captcha with Google Cloud Vision
   const captchaText = await solveCaptcha(imageBuffer);
   if (!captchaText) throw new Error("Empty captcha OCR result");
 
   // Step 4: Query taxpayer details
-  const queryRes = await axios.post(
+  const postBody = JSON.stringify({ gstin, captcha: captchaText });
+  const queryRes = await httpsRequest(
     GST_PORTAL + "/services/api/search/taxpayerDetails",
-    { gstin, captcha: captchaText },
     {
+      method: "POST",
       headers: {
         Cookie: allCookies,
         "User-Agent": UA,
         "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(postBody),
         Referer: GST_PORTAL + "/services/searchtp",
       },
-      timeout: 15000,
+      body: postBody,
     }
   );
 
-  const data = queryRes.data;
+  let data;
+  try {
+    data = JSON.parse(queryRes.body.toString("utf8"));
+  } catch {
+    throw new Error("Invalid response from GST portal");
+  }
   // The portal returns taxpayer JSON on success, or an error message string on captcha failure
   if (data && data.gstin) return data;
-  throw new Error(typeof data === "string" ? data : "Captcha verification failed");
+  throw new Error(typeof data === "string" ? data : data?.error || "Captcha verification failed");
 }
 
 exports.verifyGSTIN = onCall({ timeoutSeconds: 60 }, async (request) => {
