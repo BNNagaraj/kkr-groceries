@@ -336,8 +336,15 @@ export function CartDrawer({
 
     return (
         <>
-            <Sheet open={isOpen} onOpenChange={(open) => { if (!open) { setStep(1); onClose(); } }}>
-                <SheetContent side="right" showCloseButton={step === 1} className="flex flex-col p-0 w-full sm:max-w-md">
+            <Sheet open={isOpen} onOpenChange={(open) => { if (!open) { if (mapOpen) return; setStep(1); onClose(); } }}>
+                <SheetContent
+                    side="right"
+                    showCloseButton={step === 1}
+                    className="flex flex-col p-0 w-full sm:max-w-md"
+                    onInteractOutside={(e) => { if (mapOpen) e.preventDefault(); }}
+                    onPointerDownOutside={(e) => { if (mapOpen) e.preventDefault(); }}
+                    onEscapeKeyDown={(e) => { if (mapOpen) e.preventDefault(); }}
+                >
                     <SheetHeader className="p-4 border-b border-slate-100 shrink-0">
                         <SheetTitle className="flex items-center gap-2">
                             {step > 1 ? (
