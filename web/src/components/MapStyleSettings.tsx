@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Settings, RotateCcw, X, ChevronDown, ChevronUp } from "lucide-react";
 
 // ─── Style Presets ──────────────────────────────────────────────────────────
@@ -125,6 +125,8 @@ interface MapSettings {
   mapType: string;
   labels: boolean;
   poi: boolean;
+  transit: boolean;
+  traffic: boolean;
   sliders: Record<string, number>;
 }
 
@@ -134,6 +136,8 @@ function getDefaults(): MapSettings {
     mapType: "roadmap",
     labels: true,
     poi: true,
+    transit: true,
+    traffic: false,
     sliders: Object.fromEntries(SLIDER_CONTROLS.map(c => [c.key, 0])),
   };
 }
@@ -207,6 +211,8 @@ export default function MapStyleSettings({ mapInstance, position = "top-left" }:
   const [isOpen, setIsOpen] = useState(false);
   const [settings, setSettings] = useState<MapSettings>(getDefaults);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const transitLayerRef = useRef<any>(null);
+  const trafficLayerRef = useRef<any>(null);
 
   useEffect(() => {
     setSettings(loadMapSettings());
@@ -214,13 +220,24 @@ export default function MapStyleSettings({ mapInstance, position = "top-left" }:
 
   // Apply styles whenever settings or map instance changes
   useEffect(() => {
-    if (!mapInstance) return;
+    if (!mapInstance || !window.google) return;
     try {
       mapInstance.setOptions({ styles: buildMapStyles(settings) });
-      // Only change map type if it differs from current to avoid reload flicker
       if (mapInstance.getMapTypeId && mapInstance.getMapTypeId() !== settings.mapType) {
         mapInstance.setMapTypeId(settings.mapType);
       }
+
+      // Transit Layer (metro, bus, train routes)
+      if (!transitLayerRef.current) {
+        transitLayerRef.current = new window.google.maps.TransitLayer();
+      }
+      transitLayerRef.current.setMap(settings.transit ? mapInstance : null);
+
+      // Traffic Layer (live traffic)
+      if (!trafficLayerRef.current) {
+        trafficLayerRef.current = new window.google.maps.TrafficLayer();
+      }
+      trafficLayerRef.current.setMap(settings.traffic ? mapInstance : null);
     } catch {
       // Map instance may be stale/destroyed — ignore
     }
@@ -352,26 +369,47 @@ export default function MapStyleSettings({ mapInstance, position = "top-left" }:
               </div>
             </div>
 
-            {/* ── Toggles ──────────────────────────────── */}
-            <div className="px-3.5 py-2.5 border-b border-slate-50 flex items-center gap-5">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={settings.labels}
-                  onChange={e => update({ labels: e.target.checked })}
-                  className="w-3.5 h-3.5 rounded accent-emerald-600"
-                />
-                <span className="text-[11px] font-medium text-slate-600">Labels</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={settings.poi}
-                  onChange={e => update({ poi: e.target.checked })}
-                  className="w-3.5 h-3.5 rounded accent-emerald-600"
-                />
-                <span className="text-[11px] font-medium text-slate-600">POI Icons</span>
-              </label>
+            {/* ── Layers & Toggles ──────────────────────── */}
+            <div className="px-3.5 py-2.5 border-b border-slate-50">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Layers</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={settings.transit}
+                    onChange={e => update({ transit: e.target.checked })}
+                    className="w-3.5 h-3.5 rounded accent-emerald-600"
+                  />
+                  <span className="text-[11px] font-medium text-slate-600">🚇 Transit</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={settings.traffic}
+                    onChange={e => update({ traffic: e.target.checked })}
+                    className="w-3.5 h-3.5 rounded accent-emerald-600"
+                  />
+                  <span className="text-[11px] font-medium text-slate-600">🚗 Traffic</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={settings.labels}
+                    onChange={e => update({ labels: e.target.checked })}
+                    className="w-3.5 h-3.5 rounded accent-emerald-600"
+                  />
+                  <span className="text-[11px] font-medium text-slate-600">🏷️ Labels</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={settings.poi}
+                    onChange={e => update({ poi: e.target.checked })}
+                    className="w-3.5 h-3.5 rounded accent-emerald-600"
+                  />
+                  <span className="text-[11px] font-medium text-slate-600">📍 POI Icons</span>
+                </label>
+              </div>
             </div>
 
             {/* ── Advanced Sliders (collapsible) ────────── */}
