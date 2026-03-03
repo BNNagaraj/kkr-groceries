@@ -4,6 +4,7 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getAuth } = require("firebase-admin/auth");
+const { generateInvoicePdf } = require("./invoice");
 // ─── Default SMTP config (fallback if settings/smtp doc doesn't exist) ───
 const DEFAULT_SMTP = {
   user: "raju2uraju@gmail.com",
@@ -598,6 +599,26 @@ exports.notifyOrderStatusChange = onCall(async (request) => {
     const customerName = order.customerName || "Customer";
     const displayOrderId = order.orderId || orderId;
 
+    // Generate invoice PDF attachment for Fulfilled orders
+    let pdfAttachments = [];
+    if (newStatus === "Fulfilled") {
+      try {
+        const bizSnap = await db.collection("settings").doc("business").get();
+        const bizData = bizSnap.exists ? bizSnap.data() : {};
+        const pdfBuffer = generateInvoicePdf(order, bizData);
+        const pdfBase64 = pdfBuffer.toString("base64");
+        pdfAttachments = [{
+          filename: `Invoice_${displayOrderId}.pdf`,
+          content: pdfBase64,
+          contentType: "application/pdf",
+        }];
+        console.log(`Invoice PDF generated for ${displayOrderId}: ${pdfBuffer.length} bytes`);
+      } catch (pdfErr) {
+        console.error("Failed to generate invoice PDF:", pdfErr);
+        // Don't block the email — send without attachment
+      }
+    }
+
     // Status-specific messages
     const statusMessages = {
       Accepted: {
@@ -626,11 +647,12 @@ exports.notifyOrderStatusChange = onCall(async (request) => {
     }
 
     // Build premium status email HTML
+    const cart = order.revisedFulfilledCart || order.revisedAcceptedCart || order.cart || [];
     const statusEmailData = {
       orderId: displayOrderId,
       customerName,
       newStatus,
-      cart: order.cart || [],
+      cart,
       totalValue: order.totalValue || "N/A",
       productCount: order.productCount || 0,
       statusInfo,
@@ -640,14 +662,19 @@ exports.notifyOrderStatusChange = onCall(async (request) => {
     // Queue email to buyer if they have email
     if (buyerEmail) {
       try {
-        await db.collection("mail").add({
+        const buyerMailDoc = {
           to: [buyerEmail],
           message: {
             subject: `${newStatus === "Accepted" ? "✅" : newStatus === "Fulfilled" ? "🚚" : "❌"} ${statusInfo.subject}`,
             html: emailHtml,
           },
           createdAt: FieldValue.serverTimestamp(),
-        });
+        };
+        // Attach invoice PDF for Fulfilled orders
+        if (pdfAttachments.length > 0) {
+          buyerMailDoc.attachments = pdfAttachments;
+        }
+        await db.collection("mail").add(buyerMailDoc);
       } catch (emailErr) {
         console.error("Failed to queue buyer email:", emailErr);
       }
@@ -902,12 +929,21 @@ exports.processMailQueue = onDocumentCreated(
     });
 
     try {
-      await transporter.sendMail({
+      const mailOptions = {
         from: `${smtp.fromName} <${smtp.user}>`,
         to: to.join(", "),
         subject: message.subject,
         html: message.html,
-      });
+      };
+      // Attach PDF files if present in the mail document
+      if (mailDoc.attachments && Array.isArray(mailDoc.attachments)) {
+        mailOptions.attachments = mailDoc.attachments.map((att) => ({
+          filename: att.filename,
+          content: Buffer.from(att.content, "base64"),
+          contentType: att.contentType || "application/pdf",
+        }));
+      }
+      await transporter.sendMail(mailOptions);
 
       await snap.ref.update({
         status: "sent",
@@ -915,7 +951,7 @@ exports.processMailQueue = onDocumentCreated(
         processedAt: FieldValue.serverTimestamp(),
         smtpUser: smtp.user,
       });
-      console.log(`Email sent to ${to.join(", ")} — subject: ${message.subject}`);
+      console.log(`Email sent to ${to.join(", ")} — subject: ${message.subject}${mailOptions.attachments ? ` (${mailOptions.attachments.length} attachment(s))` : ""}`);
     } catch (err) {
       console.error("Email send failed:", err);
       let errorCategory = "unknown";
