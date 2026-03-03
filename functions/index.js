@@ -5,7 +5,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getAuth } = require("firebase-admin/auth");
 // ─── Gmail SMTP config ───
-const GMAIL_USER = "kkr.groceries.hyd@gmail.com";
+const GMAIL_USER = "raju2uraju@gmail.com";
 
 initializeApp();
 const db = getFirestore();
