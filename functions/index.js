@@ -7,7 +7,7 @@ const { getAuth } = require("firebase-admin/auth");
 const { generateInvoicePdf } = require("./invoice");
 // ─── Default SMTP config (fallback if settings/smtp doc doesn't exist) ───
 const DEFAULT_SMTP = {
-  user: "raju2uraju@gmail.com",
+  user: "kkr.groceries.hyd@gmail.com",
   host: "smtp.gmail.com",
   port: 587,
   secure: false,
@@ -278,9 +278,11 @@ async function getSmtpConfig() {
     if (snap.exists) {
       const data = snap.data();
       if (data.user && data.password) {
+        // Strip spaces from Gmail app passwords (displayed as "xxxx xxxx xxxx xxxx"
+        // but must be sent as "xxxxxxxxxxxxxxxx" for SMTP AUTH)
         const config = {
-          user: data.user,
-          password: data.password,
+          user: data.user.trim(),
+          password: data.password.replace(/\s+/g, ""),
           host: data.host || DEFAULT_SMTP.host,
           port: data.port || DEFAULT_SMTP.port,
           secure: data.secure ?? DEFAULT_SMTP.secure,
@@ -296,7 +298,7 @@ async function getSmtpConfig() {
   // Fallback: use hardcoded defaults + env secret
   return {
     ...DEFAULT_SMTP,
-    password: process.env.GMAIL_APP_PASSWORD || "",
+    password: (process.env.GMAIL_APP_PASSWORD || "").replace(/\s+/g, ""),
   };
 }
 
