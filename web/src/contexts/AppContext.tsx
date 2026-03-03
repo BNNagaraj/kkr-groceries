@@ -107,8 +107,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             const newCart = { ...prev };
             const currentQty = newCart[product.id]?.qty || 0;
             const newQty = currentQty + change;
+            const moq = (product.moqRequired !== false && product.moq > 0) ? product.moq : 1;
 
             if (newQty <= 0) {
+                delete newCart[product.id];
+            } else if (newQty < moq) {
+                // Below MOQ — remove from cart (user must add at least MOQ)
                 delete newCart[product.id];
             } else {
                 newCart[product.id] = { ...product, qty: newQty };

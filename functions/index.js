@@ -488,6 +488,37 @@ exports.submitOrder = onCall(async (request) => {
       throw new HttpsError("invalid-argument", "Missing required customer details.");
     }
 
+    // Validate MOQ — fetch product definitions and check quantities
+    const productsSnap = await db.collection("products").get();
+    const productMap = {};
+    productsSnap.docs.forEach((doc) => {
+      const pData = doc.data();
+      productMap[doc.id] = pData;
+      // Also map by numeric id if present
+      if (pData.id !== undefined) productMap[String(pData.id)] = pData;
+    });
+
+    const moqViolations = [];
+    for (const item of data.cart) {
+      const productId = String(item.id);
+      const product = productMap[productId];
+      if (!product) continue; // skip unknown products
+
+      const moqRequired = product.moqRequired !== false;
+      const moq = product.moq > 0 ? product.moq : 1;
+
+      if (moqRequired && item.qty < moq) {
+        moqViolations.push(`${item.name || product.name}: minimum ${moq} ${product.unit || item.unit}, got ${item.qty}`);
+      }
+    }
+
+    if (moqViolations.length > 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        `Minimum order quantity not met: ${moqViolations.join("; ")}`
+      );
+    }
+
     const orderId = `ORD-${Date.now()}`;
     const orderDoc = {
       id: orderId,
