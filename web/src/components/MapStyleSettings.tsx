@@ -215,8 +215,15 @@ export default function MapStyleSettings({ mapInstance, position = "top-left" }:
   // Apply styles whenever settings or map instance changes
   useEffect(() => {
     if (!mapInstance) return;
-    mapInstance.setOptions({ styles: buildMapStyles(settings) });
-    mapInstance.setMapTypeId(settings.mapType);
+    try {
+      mapInstance.setOptions({ styles: buildMapStyles(settings) });
+      // Only change map type if it differs from current to avoid reload flicker
+      if (mapInstance.getMapTypeId && mapInstance.getMapTypeId() !== settings.mapType) {
+        mapInstance.setMapTypeId(settings.mapType);
+      }
+    } catch {
+      // Map instance may be stale/destroyed — ignore
+    }
   }, [settings, mapInstance]);
 
   const update = useCallback((partial: Partial<MapSettings>) => {

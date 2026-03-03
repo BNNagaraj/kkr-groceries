@@ -118,7 +118,7 @@ export function MapPicker({
                 zoomControl: true,
                 zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_CENTER },
                 gestureHandling: "greedy",
-                styles: buildMapStyles(loadMapSettings()),
+                styles: (() => { try { return buildMapStyles(loadMapSettings()); } catch { return []; } })(),
             });
 
             // Delivery Radius — subtle boundary ring (no fill to keep map fully visible)
@@ -226,6 +226,7 @@ export function MapPicker({
             initDoneRef.current = false;
             gMapRef.current = null;
             gMarkerRef.current = null;
+            setMapObj(null);
         };
     }, [isOpen, geocodePosition, checkGeofence]);
 
