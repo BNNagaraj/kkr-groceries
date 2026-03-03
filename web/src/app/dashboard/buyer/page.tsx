@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, functions } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc, getDoc, setDoc, addDoc, updateDoc } from "firebase/firestore";
@@ -188,10 +189,16 @@ function statusBadgeVariant(status: string): "default" | "secondary" | "destruct
     return "outline";
 }
 
+type TabKey = "overview" | "orders" | "addresses" | "profile";
+const VALID_TABS: TabKey[] = ["overview", "orders", "addresses", "profile"];
+
 export default function BuyerDashboard() {
     const { currentUser } = useAuth();
     const { col } = useMode();
-    const [activeTab, setActiveTab] = useState<"overview" | "orders" | "addresses" | "profile">("overview");
+    const searchParams = useSearchParams();
+    const tabParam = searchParams.get("tab") as TabKey | null;
+    const initialTab: TabKey = tabParam && VALID_TABS.includes(tabParam) ? tabParam : "overview";
+    const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
 
     const [orders, setOrders] = useState<Order[]>([]);
     const [addresses, setAddresses] = useState<Address[]>([]);
