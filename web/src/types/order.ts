@@ -52,6 +52,10 @@ export interface Order {
   revisedFulfilledCart?: OrderCartItem[];
   pendingModification?: PendingModification;
   modificationStatus?: string;
+  // GSTIN / billing details (attached at order submission if buyer has verified GSTIN)
+  buyerGstin?: string;
+  billingAddress?: string;
+  buyerLegalName?: string;
 }
 
 export const STATUS_TIMESTAMP_FIELDS: Record<OrderStatus, string> = {

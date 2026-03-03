@@ -519,6 +519,26 @@ exports.submitOrder = onCall(async (request) => {
       );
     }
 
+    // Fetch buyer profile for GSTIN / billing address
+    let buyerGstin = null;
+    let billingAddress = null;
+    let buyerLegalName = null;
+    if (request.auth?.uid) {
+      try {
+        const profileSnap = await db.collection("users").doc(request.auth.uid).get();
+        if (profileSnap.exists) {
+          const p = profileSnap.data();
+          if (p.gstin && p.gstinVerified) {
+            buyerGstin = p.gstin;
+            billingAddress = p.registeredAddress || null;
+            buyerLegalName = p.legalName || null;
+          }
+        }
+      } catch (e) {
+        console.warn("Could not fetch buyer profile:", e.message);
+      }
+    }
+
     const orderId = `ORD-${Date.now()}`;
     const orderDoc = {
       id: orderId,
@@ -539,6 +559,10 @@ exports.submitOrder = onCall(async (request) => {
       createdAt: FieldValue.serverTimestamp(),
       status: "Pending",
       source: "Cloud Function",
+      // GSTIN / billing details (if buyer profile has verified GSTIN)
+      ...(buyerGstin && { buyerGstin }),
+      ...(billingAddress && { billingAddress }),
+      ...(buyerLegalName && { buyerLegalName }),
     };
 
     const mode = await getAppMode();
@@ -1179,4 +1203,101 @@ exports.retryFailedEmail = onCall(async (request) => {
 
   console.log(`Retried mail ${mailId} as ${newDoc.id}`);
   return { success: true, newMailId: newDoc.id };
+});
+
+// ─── GSTIN Verification ─────────────────────────────────────────────────────
+/**
+ * Verify a GSTIN using a configurable external API.
+ * Reads API config from Firestore: settings/gstin { provider, apiKey }
+ * Supported providers: "appyflow" (default), "gstincheck"
+ * If no API key is configured, returns format validation only.
+ */
+const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
+exports.verifyGSTIN = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Must be signed in");
+  }
+
+  const gstin = (request.data.gstin || "").trim().toUpperCase();
+
+  // 1. Format validation
+  if (!gstin || !GSTIN_REGEX.test(gstin)) {
+    return { valid: false, formatValid: false, verified: false, message: "Invalid GSTIN format. Must be 15 characters (e.g. 22AAAAA0000A1Z5)." };
+  }
+
+  // 2. Read API config from Firestore
+  let config = {};
+  try {
+    const configSnap = await db.collection("settings").doc("gstin").get();
+    if (configSnap.exists) config = configSnap.data();
+  } catch (e) {
+    console.warn("Could not read GSTIN settings:", e.message);
+  }
+
+  if (!config.apiKey) {
+    return {
+      valid: true,
+      formatValid: true,
+      verified: false,
+      message: "GSTIN format is valid. Full verification is not configured — ask admin to set API key in settings/gstin.",
+    };
+  }
+
+  // 3. Call external API
+  const provider = config.provider || "appyflow";
+
+  try {
+    if (provider === "appyflow") {
+      const url = `https://appyflow.in/api/verifyGST?gstNo=${gstin}&key_secret=${config.apiKey}`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+
+      if (data.error) {
+        return { valid: false, formatValid: true, verified: true, message: data.message || "GSTIN not found or invalid." };
+      }
+
+      const info = data.taxpayerInfo || {};
+      return {
+        valid: true,
+        formatValid: true,
+        verified: true,
+        tradeName: info.tradeNam || "",
+        legalName: info.lgnm || "",
+        status: info.sts || "",
+        businessType: info.ctb || "",
+        address: info.pradr?.adr || "",
+        message: `Verified — ${info.sts || "Unknown status"}`,
+      };
+    }
+
+    // gstincheck provider
+    if (provider === "gstincheck") {
+      const url = `https://sheet.gstincheck.co.in/check/${config.apiKey}/${gstin}`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+
+      if (!data.flag) {
+        return { valid: false, formatValid: true, verified: true, message: "GSTIN not found." };
+      }
+
+      const d = data.data || {};
+      return {
+        valid: true,
+        formatValid: true,
+        verified: true,
+        tradeName: d.tradeNam || d.tradeName || "",
+        legalName: d.lgnm || d.legalName || "",
+        status: d.sts || d.status || "",
+        businessType: d.ctb || "",
+        address: d.pradr?.adr || "",
+        message: `Verified — ${d.sts || d.status || "Unknown"}`,
+      };
+    }
+
+    return { valid: true, formatValid: true, verified: false, message: `Unknown provider: ${provider}` };
+  } catch (err) {
+    console.error("GSTIN verification API error:", err);
+    return { valid: true, formatValid: true, verified: false, message: "Verification service unavailable. GSTIN format is valid." };
+  }
 });

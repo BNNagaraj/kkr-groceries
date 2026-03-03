@@ -313,8 +313,11 @@ export function downloadInvoice(order: Order): void {
 
   // Measure buyer content to determine dynamic height
   const hasShop = !!(order.shopName && order.shopName !== "Not specified");
-  const buyerAddrLines = doc.splitTextToSize(order.location || "N/A", halfW - 10);
-  const buyerContentH = 13 + (hasShop ? 5 : 0) + 5 + buyerAddrLines.length * 4 + 4;
+  const hasBuyerGstin = !!order.buyerGstin;
+  // Use billing address (GST registered) if available, otherwise delivery address
+  const buyerAddress = order.billingAddress || order.location || "N/A";
+  const buyerAddrLines = doc.splitTextToSize(buyerAddress, halfW - 10);
+  const buyerContentH = 13 + (hasShop ? 5 : 0) + 5 + buyerAddrLines.length * 4 + (hasBuyerGstin ? 5 : 0) + 4;
   const sellerContentH = IS_GST_REGISTERED ? 34 : 28;
   const boxH = Math.max(sellerContentH, buyerContentH, 28);
 
@@ -368,6 +371,12 @@ export function downloadInvoice(order: Order): void {
   doc.text("Ph: " + (order.phone || "N/A"), bx + 5, by);
   by += 5;
   doc.text(buyerAddrLines.slice(0, 3), bx + 5, by);
+  by += buyerAddrLines.slice(0, 3).length * 4;
+  if (hasBuyerGstin) {
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...hex(C.slate700));
+    doc.text("GSTIN: " + order.buyerGstin, bx + 5, by + 1);
+  }
 
   y += boxH + 6;
 

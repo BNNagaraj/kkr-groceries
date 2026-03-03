@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { db } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy, deleteDoc, doc, getDoc, setDoc, addDoc, updateDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { updateProfile } from "firebase/auth";
 import Link from "next/link";
-import { Package, MapPin, Trash2, LogOut, ArrowLeft, BarChart2, ChevronRight, User, Pencil, Plus, FileText } from "lucide-react";
+import { Package, MapPin, Trash2, LogOut, ArrowLeft, BarChart2, ChevronRight, User, Pencil, Plus, FileText, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useMode } from "@/contexts/ModeContext";
 import { markOffline } from "@/hooks/usePresence";
 import { Order } from "@/types/order";
@@ -50,6 +51,10 @@ interface BuyerProfile {
     phone: string;
     shopName: string;
     gstin: string;
+    gstinVerified?: boolean;
+    registeredAddress?: string;
+    legalName?: string;
+    businessType?: string;
 }
 
 const EMPTY_PROFILE: BuyerProfile = { displayName: "", phone: "", shopName: "", gstin: "" };
@@ -197,6 +202,10 @@ export default function BuyerDashboard() {
     const [profile, setProfile] = useState<BuyerProfile>(EMPTY_PROFILE);
     const [profileSaving, setProfileSaving] = useState(false);
 
+    // GSTIN verification state
+    const [gstinStatus, setGstinStatus] = useState<"idle" | "verifying" | "verified" | "error" | "format_only">("idle");
+    const [gstinMessage, setGstinMessage] = useState("");
+
     // Address dialog state
     const [addressDialogOpen, setAddressDialogOpen] = useState(false);
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
@@ -238,7 +247,16 @@ export default function BuyerDashboard() {
                         phone: p.phone || currentUser.phoneNumber || "",
                         shopName: p.shopName || "",
                         gstin: p.gstin || "",
+                        gstinVerified: p.gstinVerified || false,
+                        registeredAddress: p.registeredAddress || "",
+                        legalName: p.legalName || "",
+                        businessType: p.businessType || "",
                     });
+                    // Restore verified status if GSTIN was previously verified
+                    if (p.gstinVerified && p.gstin) {
+                        setGstinStatus("verified");
+                        setGstinMessage("Previously verified");
+                    }
                 } else {
                     setProfile({
                         displayName: currentUser.displayName || "",
@@ -275,13 +293,23 @@ export default function BuyerDashboard() {
         if (!currentUser) return;
         setProfileSaving(true);
         try {
-            await setDoc(doc(db, "users", currentUser.uid), {
+            const profileData: Record<string, unknown> = {
                 displayName: profile.displayName.trim(),
                 phone: profile.phone.trim(),
                 shopName: profile.shopName.trim(),
                 gstin: profile.gstin.trim(),
                 updatedAt: new Date().toISOString(),
-            }, { merge: true });
+            };
+
+            // Persist GSTIN verification data
+            if (profile.gstinVerified) {
+                profileData.gstinVerified = true;
+                if (profile.registeredAddress) profileData.registeredAddress = profile.registeredAddress;
+                if (profile.legalName) profileData.legalName = profile.legalName;
+                if (profile.businessType) profileData.businessType = profile.businessType;
+            }
+
+            await setDoc(doc(db, "users", currentUser.uid), profileData, { merge: true });
 
             if (profile.displayName.trim() && profile.displayName.trim() !== currentUser.displayName) {
                 await updateProfile(currentUser, { displayName: profile.displayName.trim() });
@@ -292,6 +320,71 @@ export default function BuyerDashboard() {
             toast.error("Failed to save profile.");
         } finally {
             setProfileSaving(false);
+        }
+    };
+
+    const handleVerifyGSTIN = async () => {
+        const gstin = profile.gstin.trim().toUpperCase();
+        if (!gstin || gstin.length !== 15) {
+            setGstinStatus("error");
+            setGstinMessage("GSTIN must be exactly 15 characters");
+            return;
+        }
+
+        setGstinStatus("verifying");
+        setGstinMessage("");
+        try {
+            const verifyFn = httpsCallable(functions, "verifyGSTIN");
+            const result = await verifyFn({ gstin });
+            const data = result.data as {
+                valid: boolean; formatValid: boolean; verified: boolean;
+                tradeName?: string; legalName?: string; status?: string;
+                businessType?: string; address?: string; message: string;
+            };
+
+            if (data.verified && data.valid) {
+                setGstinStatus("verified");
+                setGstinMessage(data.message);
+
+                // Auto-fill fields from verified data
+                const bizName = data.tradeName || data.legalName || "";
+                const updates: Partial<BuyerProfile> = {
+                    gstinVerified: true,
+                    legalName: data.legalName || "",
+                    businessType: data.businessType || "",
+                };
+
+                // Auto-fill registered address
+                if (data.address) {
+                    updates.registeredAddress = data.address;
+                }
+
+                // Auto-fill shop name from trade name
+                if (bizName && !profile.shopName.trim()) {
+                    updates.shopName = bizName;
+                    toast.success(`Business name auto-filled: ${bizName}`);
+                } else if (bizName && profile.shopName.trim() !== bizName) {
+                    toast(`Registered name: ${bizName}`, {
+                        action: {
+                            label: "Use this name",
+                            onClick: () => setProfile(p => ({ ...p, shopName: bizName })),
+                        },
+                    });
+                }
+
+                setProfile(p => ({ ...p, ...updates }));
+            } else if (data.formatValid && !data.verified) {
+                setGstinStatus("format_only");
+                setGstinMessage(data.message);
+            } else {
+                setGstinStatus("error");
+                setGstinMessage(data.message);
+                setProfile(p => ({ ...p, gstinVerified: false, registeredAddress: undefined }));
+            }
+        } catch (e) {
+            console.error("GSTIN verification error:", e);
+            setGstinStatus("error");
+            setGstinMessage("Verification failed. Please try again.");
         }
     };
 
@@ -535,12 +628,49 @@ export default function BuyerDashboard() {
                             </div>
                             <div>
                                 <label className="text-sm font-medium text-slate-700 mb-1.5 block">GSTIN</label>
-                                <Input
-                                    value={profile.gstin}
-                                    onChange={(e) => setProfile(p => ({ ...p, gstin: e.target.value.toUpperCase() }))}
-                                    placeholder="Optional — GST registration number"
-                                />
-                                <p className="text-xs text-slate-400 mt-1">Optional. Will appear on your invoices if provided.</p>
+                                <div className="flex gap-2">
+                                    <Input
+                                        value={profile.gstin}
+                                        onChange={(e) => {
+                                            const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15);
+                                            setProfile(p => ({ ...p, gstin: v }));
+                                            if (gstinStatus !== "idle") setGstinStatus("idle");
+                                        }}
+                                        placeholder="e.g. 22AAAAA0000A1Z5"
+                                        maxLength={15}
+                                        className="font-mono tracking-wider"
+                                    />
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleVerifyGSTIN}
+                                        disabled={gstinStatus === "verifying" || profile.gstin.trim().length !== 15}
+                                        className="shrink-0"
+                                    >
+                                        {gstinStatus === "verifying" ? (
+                                            <><Loader2 className="w-4 h-4 animate-spin mr-1" /> Verifying</>
+                                        ) : (
+                                            "Verify"
+                                        )}
+                                    </Button>
+                                </div>
+                                {gstinStatus === "verified" && (
+                                    <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> {gstinMessage}
+                                    </p>
+                                )}
+                                {gstinStatus === "error" && (
+                                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                        <AlertCircle className="w-3.5 h-3.5" /> {gstinMessage}
+                                    </p>
+                                )}
+                                {gstinStatus === "format_only" && (
+                                    <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> {gstinMessage}
+                                    </p>
+                                )}
+                                {gstinStatus === "idle" && (
+                                    <p className="text-xs text-slate-400 mt-1">Optional. Enter 15-character GSTIN and click Verify to auto-fill business name.</p>
+                                )}
                             </div>
                         </div>
                         <div className="mt-6 flex justify-end">
@@ -549,6 +679,37 @@ export default function BuyerDashboard() {
                             </Button>
                         </div>
                     </div>
+
+                    {/* GST Registered Details — shown after verification */}
+                    {profile.gstinVerified && (profile.registeredAddress || profile.legalName) && (
+                        <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-200 shadow-sm">
+                            <div className="flex items-center gap-2 mb-3">
+                                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                <h2 className="text-lg font-bold text-emerald-800">GST Registered Details</h2>
+                            </div>
+                            <div className="text-sm text-emerald-900 space-y-2">
+                                {profile.legalName && (
+                                    <div className="flex items-start gap-2">
+                                        <span className="font-medium text-emerald-700 w-28 shrink-0">Legal Name:</span>
+                                        <span>{profile.legalName}</span>
+                                    </div>
+                                )}
+                                {profile.businessType && (
+                                    <div className="flex items-start gap-2">
+                                        <span className="font-medium text-emerald-700 w-28 shrink-0">Business Type:</span>
+                                        <span>{profile.businessType}</span>
+                                    </div>
+                                )}
+                                {profile.registeredAddress && (
+                                    <div className="flex items-start gap-2">
+                                        <span className="font-medium text-emerald-700 w-28 shrink-0">Reg. Address:</span>
+                                        <span className="leading-relaxed">{profile.registeredAddress}</span>
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-xs text-emerald-600 mt-3">This address will be used as the billing address on your invoices.</p>
+                        </div>
+                    )}
 
                     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                         <h2 className="text-lg font-bold text-slate-800 mb-2">Account Info</h2>
