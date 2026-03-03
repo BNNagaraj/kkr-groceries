@@ -1230,11 +1230,18 @@ async function solveCaptcha(imageBuffer) {
 
 /** Build address string from GST portal address object */
 function buildAddress(pradr) {
-  if (!pradr?.addr) return "";
-  const a = pradr.addr;
-  return [a.bno, a.bnm, a.flno, a.st, a.loc, a.dst, a.stcd, a.pncd]
-    .filter(Boolean)
-    .join(", ");
+  if (!pradr) return "";
+  // GST portal may return address as a flat string in "adr" or structured object in "addr"
+  if (typeof pradr.adr === "string" && pradr.adr.trim()) {
+    return pradr.adr.trim();
+  }
+  if (pradr.addr && typeof pradr.addr === "object") {
+    const a = pradr.addr;
+    return [a.bno, a.bnm, a.flno, a.st, a.loc, a.dst, a.stcd, a.pncd]
+      .filter(Boolean)
+      .join(", ");
+  }
+  return "";
 }
 
 /** Query the GST portal with session + captcha flow (single attempt) */
