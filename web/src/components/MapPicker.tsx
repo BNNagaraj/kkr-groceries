@@ -244,9 +244,6 @@ export function MapPicker({
         }
     }, [geocodePosition]);
 
-    const [mounted, setMounted] = useState(false);
-    useEffect(() => { setMounted(true); }, []);
-
     const handleConfirm = () => {
         if (address && !isOutOfZone) {
             onLocationSelect(address, structuredDetails);
@@ -254,7 +251,10 @@ export function MapPicker({
         }
     };
 
-    if (!isOpen || !mounted) return null;
+    // SSR-safe guard (no "mounted" state needed — this component is only rendered
+    // client-side via mapOpen state, and removing the double-render avoids a race
+    // condition where initMap fires before the portal DOM exists)
+    if (!isOpen || typeof document === "undefined") return null;
 
     return createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col md:p-6 justify-end md:justify-center items-center" style={{ pointerEvents: "auto" }}>
