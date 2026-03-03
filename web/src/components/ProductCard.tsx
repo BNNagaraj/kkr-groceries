@@ -14,14 +14,17 @@ function InlineQtyInput({
     onConfirm,
     onCancel,
     variant = "add",
+    minQty = 1,
 }: {
     defaultValue: number;
     unit: string;
     onConfirm: (qty: number) => void;
     onCancel: () => void;
     variant?: "add" | "edit";
+    minQty?: number;
 }) {
     const [value, setValue] = useState(String(defaultValue));
+    const [error, setError] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -36,6 +39,13 @@ function InlineQtyInput({
     const handleConfirm = () => {
         const num = parseFloat(value);
         if (!isNaN(num) && num > 0) {
+            if (num < minQty) {
+                // Snap to MOQ and show hint
+                setValue(String(minQty));
+                setError(`Min: ${minQty}`);
+                onConfirm(minQty);
+                return;
+            }
             onConfirm(num);
         } else {
             onCancel();
@@ -61,28 +71,31 @@ function InlineQtyInput({
     }
 
     return (
-        <div className="flex items-center gap-1.5 h-10">
-            <div className="flex-1 flex items-center border-2 border-emerald-600 rounded-xl h-full overflow-hidden">
-                <input
-                    ref={inputRef}
-                    type="text"
-                    inputMode="decimal"
-                    value={value}
-                    onChange={(e) => setValue(e.target.value.replace(/[^0-9.]/g, ""))}
-                    onKeyDown={(e) => {
-                        if (e.key === "Enter") handleConfirm();
-                        if (e.key === "Escape") onCancel();
-                    }}
-                    className="flex-1 min-w-0 px-3 text-center font-bold text-emerald-700 outline-none bg-emerald-50 h-full"
-                />
-                <span className="text-[11px] text-emerald-600 font-medium pr-2 whitespace-nowrap">{unit}</span>
+        <div>
+            <div className="flex items-center gap-1.5 h-10">
+                <div className="flex-1 flex items-center border-2 border-emerald-600 rounded-xl h-full overflow-hidden">
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        inputMode="decimal"
+                        value={value}
+                        onChange={(e) => { setValue(e.target.value.replace(/[^0-9.]/g, "")); setError(""); }}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") handleConfirm();
+                            if (e.key === "Escape") onCancel();
+                        }}
+                        className="flex-1 min-w-0 px-3 text-center font-bold text-emerald-700 outline-none bg-emerald-50 h-full"
+                    />
+                    <span className="text-[11px] text-emerald-600 font-medium pr-2 whitespace-nowrap">{unit}</span>
+                </div>
+                <button
+                    onClick={handleConfirm}
+                    className="h-10 px-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors flex items-center gap-1 shrink-0"
+                >
+                    <Check className="w-4 h-4" /> Add
+                </button>
             </div>
-            <button
-                onClick={handleConfirm}
-                className="h-10 px-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors flex items-center gap-1 shrink-0"
-            >
-                <Check className="w-4 h-4" /> Add
-            </button>
+            {error && <p className="text-[11px] text-red-500 font-medium mt-1 text-center">{error}</p>}
         </div>
     );
 }
@@ -95,11 +108,13 @@ const CartControls = memo(function CartControls({ product }: { product: Product 
     const [showInput, setShowInput] = useState(false);
     const [editingQty, setEditingQty] = useState(false);
 
+    const moq = (product.moqRequired !== false && product.moq > 0) ? product.moq : 1;
+
     if (qty === 0) {
         if (showInput) {
             return (
                 <InlineQtyInput
-                    defaultValue={product.moqRequired !== false ? product.moq : 1}
+                    defaultValue={moq}
                     unit={product.unit}
                     onConfirm={(val) => {
                         addToCart(product, val);
@@ -107,6 +122,7 @@ const CartControls = memo(function CartControls({ product }: { product: Product 
                     }}
                     onCancel={() => setShowInput(false)}
                     variant="add"
+                    minQty={moq}
                 />
             );
         }
@@ -153,6 +169,7 @@ const CartControls = memo(function CartControls({ product }: { product: Product 
                             }}
                             onCancel={() => setEditingQty(false)}
                             variant="edit"
+                            minQty={moq}
                         />
                     ) : (
                         <>

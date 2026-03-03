@@ -70,9 +70,11 @@ function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
 function EditableQty({
     qty,
     onUpdate,
+    minQty = 1,
 }: {
     qty: number;
     onUpdate: (newQty: number) => void;
+    minQty?: number;
 }) {
     const [editing, setEditing] = useState(false);
     const [value, setValue] = useState(String(qty));
@@ -91,7 +93,9 @@ function EditableQty({
     const handleConfirm = () => {
         const num = parseFloat(value);
         if (!isNaN(num) && num > 0 && num !== qty) {
-            onUpdate(num);
+            // Enforce MOQ — snap to minimum if below
+            const finalQty = num < minQty ? minQty : num;
+            onUpdate(finalQty);
         }
         setEditing(false);
     };
@@ -411,6 +415,9 @@ export function CartDrawer({
                                                     <div className="flex items-center justify-between mt-2">
                                                         <div className="text-xs text-slate-500">
                                                             ₹{item.price}/{item.unit}
+                                                            {item.moqRequired !== false && item.moq > 1 && (
+                                                                <span className="text-slate-400 ml-1">(Min: {item.moq})</span>
+                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             <button
@@ -433,6 +440,7 @@ export function CartDrawer({
                                                                         const delta = newQty - item.qty;
                                                                         if (delta !== 0) addToCart(item, delta);
                                                                     }}
+                                                                    minQty={(item.moqRequired !== false && item.moq > 0) ? item.moq : 1}
                                                                 />
                                                                 <button
                                                                     onClick={() => addToCart(item, 1)}
