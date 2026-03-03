@@ -1205,16 +1205,87 @@ exports.retryFailedEmail = onCall(async (request) => {
   return { success: true, newMailId: newDoc.id };
 });
 
-// ─── GSTIN Verification ─────────────────────────────────────────────────────
+// ─── GSTIN Verification (Self-Hosted — Direct GST Portal) ──────────────────
 /**
- * Verify a GSTIN using a configurable external API.
- * Reads API config from Firestore: settings/gstin { provider, apiKey }
- * Supported providers: "appyflow" (default), "gstincheck"
- * If no API key is configured, returns format validation only.
+ * Verify a GSTIN by querying the official GST portal (services.gst.gov.in).
+ * Uses Google Cloud Vision API for captcha solving with retry logic.
+ * Results are cached in Firestore (gstin_cache/{gstin}) to avoid repeated lookups.
+ * No third-party API keys required — completely free and self-hosted.
  */
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{1}Z[0-9A-Z]{1}$/;
+const GST_PORTAL = "https://services.gst.gov.in";
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-exports.verifyGSTIN = onCall(async (request) => {
+/** Solve a captcha image using Google Cloud Vision OCR */
+async function solveCaptcha(imageBuffer) {
+  // Lazy-load vision library to avoid deployment timeout
+  const vision = require("@google-cloud/vision");
+  const client = new vision.ImageAnnotatorClient();
+  const [result] = await client.textDetection({
+    image: { content: imageBuffer.toString("base64") },
+  });
+  const text = result.textAnnotations?.[0]?.description || "";
+  return text.replace(/[\n\r\s]/g, "").trim();
+}
+
+/** Build address string from GST portal address object */
+function buildAddress(pradr) {
+  if (!pradr?.addr) return "";
+  const a = pradr.addr;
+  return [a.bno, a.bnm, a.flno, a.st, a.loc, a.dst, a.stcd, a.pncd]
+    .filter(Boolean)
+    .join(", ");
+}
+
+/** Query the GST portal with session + captcha flow (single attempt) */
+async function queryGSTPortal(gstin) {
+  // Step 1: Initialize session — get cookies
+  const sessionRes = await axios.get(GST_PORTAL + "/services/searchtp", {
+    headers: { "User-Agent": UA },
+    timeout: 15000,
+  });
+  const sessionCookies = (sessionRes.headers["set-cookie"] || [])
+    .map((c) => c.split(";")[0])
+    .join("; ");
+
+  // Step 2: Fetch captcha image
+  const captchaRes = await axios.get(GST_PORTAL + "/services/captcha", {
+    responseType: "arraybuffer",
+    headers: { Cookie: sessionCookies, "User-Agent": UA },
+    timeout: 15000,
+  });
+  const captchaCookies = (captchaRes.headers["set-cookie"] || [])
+    .map((c) => c.split(";")[0]);
+  const allCookies =
+    sessionCookies + (captchaCookies.length ? "; " + captchaCookies.join("; ") : "");
+  const imageBuffer = Buffer.from(captchaRes.data);
+
+  // Step 3: Solve captcha with Google Cloud Vision
+  const captchaText = await solveCaptcha(imageBuffer);
+  if (!captchaText) throw new Error("Empty captcha OCR result");
+
+  // Step 4: Query taxpayer details
+  const queryRes = await axios.post(
+    GST_PORTAL + "/services/api/search/taxpayerDetails",
+    { gstin, captcha: captchaText },
+    {
+      headers: {
+        Cookie: allCookies,
+        "User-Agent": UA,
+        "Content-Type": "application/json",
+        Referer: GST_PORTAL + "/services/searchtp",
+      },
+      timeout: 15000,
+    }
+  );
+
+  const data = queryRes.data;
+  // The portal returns taxpayer JSON on success, or an error message string on captcha failure
+  if (data && data.gstin) return data;
+  throw new Error(typeof data === "string" ? data : "Captcha verification failed");
+}
+
+exports.verifyGSTIN = onCall({ timeoutSeconds: 60 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Must be signed in");
   }
@@ -1223,81 +1294,77 @@ exports.verifyGSTIN = onCall(async (request) => {
 
   // 1. Format validation
   if (!gstin || !GSTIN_REGEX.test(gstin)) {
-    return { valid: false, formatValid: false, verified: false, message: "Invalid GSTIN format. Must be 15 characters (e.g. 22AAAAA0000A1Z5)." };
-  }
-
-  // 2. Read API config from Firestore
-  let config = {};
-  try {
-    const configSnap = await db.collection("settings").doc("gstin").get();
-    if (configSnap.exists) config = configSnap.data();
-  } catch (e) {
-    console.warn("Could not read GSTIN settings:", e.message);
-  }
-
-  if (!config.apiKey) {
     return {
-      valid: true,
-      formatValid: true,
+      valid: false,
+      formatValid: false,
       verified: false,
-      message: "GSTIN format is valid. Full verification is not configured — ask admin to set API key in settings/gstin.",
+      message: "Invalid GSTIN format. Must be 15 characters (e.g. 22AAAAA0000A1Z5).",
     };
   }
 
-  // 3. Call external API
-  const provider = config.provider || "appyflow";
-
+  // 2. Check Firestore cache first
   try {
-    if (provider === "appyflow") {
-      const url = `https://appyflow.in/api/verifyGST?gstNo=${gstin}&key_secret=${config.apiKey}`;
-      const resp = await fetch(url);
-      const data = await resp.json();
-
-      if (data.error) {
-        return { valid: false, formatValid: true, verified: true, message: data.message || "GSTIN not found or invalid." };
+    const cacheSnap = await db.collection("gstin_cache").doc(gstin).get();
+    if (cacheSnap.exists) {
+      const cached = cacheSnap.data();
+      // Cache is valid for 30 days
+      const cacheAge = Date.now() - new Date(cached.cachedAt).getTime();
+      if (cacheAge < 30 * 24 * 60 * 60 * 1000) {
+        console.log(`GSTIN ${gstin}: returning cached result`);
+        return { ...cached, fromCache: true };
       }
-
-      const info = data.taxpayerInfo || {};
-      return {
-        valid: true,
-        formatValid: true,
-        verified: true,
-        tradeName: info.tradeNam || "",
-        legalName: info.lgnm || "",
-        status: info.sts || "",
-        businessType: info.ctb || "",
-        address: info.pradr?.adr || "",
-        message: `Verified — ${info.sts || "Unknown status"}`,
-      };
     }
-
-    // gstincheck provider
-    if (provider === "gstincheck") {
-      const url = `https://sheet.gstincheck.co.in/check/${config.apiKey}/${gstin}`;
-      const resp = await fetch(url);
-      const data = await resp.json();
-
-      if (!data.flag) {
-        return { valid: false, formatValid: true, verified: true, message: "GSTIN not found." };
-      }
-
-      const d = data.data || {};
-      return {
-        valid: true,
-        formatValid: true,
-        verified: true,
-        tradeName: d.tradeNam || d.tradeName || "",
-        legalName: d.lgnm || d.legalName || "",
-        status: d.sts || d.status || "",
-        businessType: d.ctb || "",
-        address: d.pradr?.adr || "",
-        message: `Verified — ${d.sts || d.status || "Unknown"}`,
-      };
-    }
-
-    return { valid: true, formatValid: true, verified: false, message: `Unknown provider: ${provider}` };
-  } catch (err) {
-    console.error("GSTIN verification API error:", err);
-    return { valid: true, formatValid: true, verified: false, message: "Verification service unavailable. GSTIN format is valid." };
+  } catch (e) {
+    console.warn("Cache read error:", e.message);
   }
+
+  // 3. Query GST portal with retry logic (up to 5 attempts)
+  const MAX_RETRIES = 5;
+  let lastError = "";
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`GSTIN ${gstin}: attempt ${attempt}/${MAX_RETRIES}`);
+      const data = await queryGSTPortal(gstin);
+
+      const result = {
+        valid: true,
+        formatValid: true,
+        verified: true,
+        tradeName: data.tradeNam || "",
+        legalName: data.lgnm || "",
+        status: data.sts || "",
+        businessType: data.ctb || "",
+        address: buildAddress(data.pradr),
+        registrationDate: data.rgdt || "",
+        message: `Verified — ${data.sts || "Unknown status"}`,
+        cachedAt: new Date().toISOString(),
+      };
+
+      // 4. Cache the result in Firestore
+      try {
+        await db.collection("gstin_cache").doc(gstin).set(result);
+        console.log(`GSTIN ${gstin}: cached successfully`);
+      } catch (e) {
+        console.warn("Cache write error:", e.message);
+      }
+
+      return result;
+    } catch (err) {
+      lastError = err.message || "Unknown error";
+      console.warn(`GSTIN ${gstin}: attempt ${attempt} failed — ${lastError}`);
+      // Brief pause before retry
+      if (attempt < MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+  }
+
+  // All retries exhausted
+  return {
+    valid: true,
+    formatValid: true,
+    verified: false,
+    message: `GSTIN format is valid but verification failed after ${MAX_RETRIES} attempts. Please try again. (${lastError})`,
+  };
 });
