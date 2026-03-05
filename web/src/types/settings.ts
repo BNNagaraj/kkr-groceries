@@ -19,6 +19,7 @@ export interface CheckoutFormSettings {
   requireShopName: boolean;
   requirePincode: boolean;
   showMapPicker: boolean;
+  requireDeliveryOTP: boolean;
   customFields: CustomField[];
 }
 
@@ -51,5 +52,6 @@ export const DEFAULT_CHECKOUT: CheckoutFormSettings = {
   requireShopName: true,
   requirePincode: true,
   showMapPicker: true,
+  requireDeliveryOTP: false,
   customFields: [],
 };

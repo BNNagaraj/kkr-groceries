@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, Trash2, ZoomIn, X, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { resolveSlabPrice, formatTiersForDisplay } from "@/lib/pricing";
 
 // Inline editable quantity input used in both "Add to Cart" and qty display
 function InlineQtyInput({
@@ -137,53 +138,62 @@ const CartControls = memo(function CartControls({ product }: { product: Product 
         );
     }
 
+    const effectivePrice = product.priceTiers?.length ? resolveSlabPrice(qty, product.price, product.priceTiers) : null;
+
     return (
-        <div className="flex items-center gap-1.5">
-            <button
-                onClick={() => removeFromCart(product.id)}
-                className="w-9 h-10 flex items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors shrink-0"
-                aria-label="Remove from cart"
-            >
-                <Trash2 className="w-4 h-4" />
-            </button>
-            <div className="flex-1 flex items-center bg-emerald-700 text-white rounded-xl h-10 overflow-hidden shadow-sm shadow-emerald-700/20">
+        <div>
+            <div className="flex items-center gap-1.5">
                 <button
-                    onClick={() => addToCart(product, -1)}
-                    className="w-10 h-full flex items-center justify-center text-xl font-medium hover:bg-emerald-800 transition-colors"
+                    onClick={() => removeFromCart(product.id)}
+                    className="w-9 h-10 flex items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors shrink-0"
+                    aria-label="Remove from cart"
                 >
-                    −
+                    <Trash2 className="w-4 h-4" />
                 </button>
-                <div
-                    className="flex-1 text-center font-bold text-sm bg-emerald-800/20 h-full flex items-center justify-center cursor-pointer hover:bg-emerald-800/40 transition-colors"
-                    onClick={() => setEditingQty(true)}
-                    title="Click to edit quantity"
-                >
-                    {editingQty ? (
-                        <InlineQtyInput
-                            defaultValue={qty}
-                            unit={product.unit}
-                            onConfirm={(val) => {
-                                const delta = val - qty;
-                                if (delta !== 0) addToCart(product, delta);
-                                setEditingQty(false);
-                            }}
-                            onCancel={() => setEditingQty(false)}
-                            variant="edit"
-                            minQty={moq}
-                        />
-                    ) : (
-                        <>
-                            {qty} <span className="text-[11px] font-medium ml-1 text-emerald-100">{product.unit}</span>
-                        </>
-                    )}
+                <div className="flex-1 flex items-center bg-emerald-700 text-white rounded-xl h-10 overflow-hidden shadow-sm shadow-emerald-700/20">
+                    <button
+                        onClick={() => addToCart(product, -1)}
+                        className="w-10 h-full flex items-center justify-center text-xl font-medium hover:bg-emerald-800 transition-colors"
+                    >
+                        −
+                    </button>
+                    <div
+                        className="flex-1 text-center font-bold text-sm bg-emerald-800/20 h-full flex items-center justify-center cursor-pointer hover:bg-emerald-800/40 transition-colors"
+                        onClick={() => setEditingQty(true)}
+                        title="Click to edit quantity"
+                    >
+                        {editingQty ? (
+                            <InlineQtyInput
+                                defaultValue={qty}
+                                unit={product.unit}
+                                onConfirm={(val) => {
+                                    const delta = val - qty;
+                                    if (delta !== 0) addToCart(product, delta);
+                                    setEditingQty(false);
+                                }}
+                                onCancel={() => setEditingQty(false)}
+                                variant="edit"
+                                minQty={moq}
+                            />
+                        ) : (
+                            <>
+                                {qty} <span className="text-[11px] font-medium ml-1 text-emerald-100">{product.unit}</span>
+                            </>
+                        )}
+                    </div>
+                    <button
+                        onClick={() => addToCart(product, 1)}
+                        className="w-10 h-full flex items-center justify-center text-xl font-medium hover:bg-emerald-800 transition-colors"
+                    >
+                        +
+                    </button>
                 </div>
-                <button
-                    onClick={() => addToCart(product, 1)}
-                    className="w-10 h-full flex items-center justify-center text-xl font-medium hover:bg-emerald-800 transition-colors"
-                >
-                    +
-                </button>
             </div>
+            {effectivePrice !== null && (
+                <div className="text-[11px] text-emerald-600 font-medium text-center mt-1">
+                    Rate: ₹{effectivePrice}/{product.unit} = ₹{(effectivePrice * qty).toLocaleString("en-IN")}
+                </div>
+            )}
         </div>
     );
 });
@@ -271,14 +281,34 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
 
                         <div className="mt-2.5 flex items-end justify-between">
                             <div>
-                                <div className="flex items-baseline gap-1">
-                                    <span className="text-lg font-bold text-emerald-700 leading-none">
-                                        ₹{product.price}
-                                    </span>
-                                    <span className="text-[13px] text-slate-500 font-medium">
-                                        /{product.unit}
-                                    </span>
-                                </div>
+                                {product.priceTiers && product.priceTiers.length > 0 ? (
+                                    <>
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-sm font-bold text-emerald-700 leading-none">
+                                                From ₹{Math.min(...product.priceTiers.map(t => t.price))}
+                                            </span>
+                                            <span className="text-[13px] text-slate-500 font-medium">
+                                                /{product.unit}
+                                            </span>
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+                                            {formatTiersForDisplay(product.priceTiers).map((tier, i) => (
+                                                <span key={i} className="text-[10px] text-slate-500">
+                                                    {tier.range}: <span className="font-semibold text-slate-700">₹{tier.price}</span>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-lg font-bold text-emerald-700 leading-none">
+                                            ₹{product.price}
+                                        </span>
+                                        <span className="text-[13px] text-slate-500 font-medium">
+                                            /{product.unit}
+                                        </span>
+                                    </div>
+                                )}
                                 {product.moqRequired !== false && (
                                     <div className="text-[11px] text-slate-400 mt-1">
                                         Min Order: {product.moq} {product.moq > 1 ? product.unit + "s" : product.unit}

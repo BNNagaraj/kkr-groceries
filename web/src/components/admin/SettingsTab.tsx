@@ -766,6 +766,27 @@ export default function SettingsTab() {
                 Show Map Picker
               </span>
             </label>
+            <label className="flex items-center gap-3 p-3 rounded-xl border border-amber-100 bg-amber-50/50 hover:bg-amber-50 cursor-pointer sm:col-span-3">
+              <input
+                type="checkbox"
+                checked={checkout.requireDeliveryOTP}
+                onChange={(e) =>
+                  setCheckout((p) => ({
+                    ...p,
+                    requireDeliveryOTP: e.target.checked,
+                  }))
+                }
+                className="rounded text-amber-600 focus:ring-amber-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-slate-700">
+                  Require Delivery OTP
+                </span>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Send OTP to customer email before marking order as Fulfilled
+                </p>
+              </div>
+            </label>
           </div>
 
           {/* Custom Fields */}

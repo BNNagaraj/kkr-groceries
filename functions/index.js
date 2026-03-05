@@ -17,6 +17,22 @@ const DEFAULT_SMTP = {
 initializeApp();
 const db = getFirestore();
 
+// ─── Slab/Tiered Pricing Resolution ───
+function resolveSlabPrice(qty, basePrice, priceTiers) {
+  if (!priceTiers || !Array.isArray(priceTiers) || priceTiers.length === 0) {
+    return basePrice;
+  }
+  const sorted = [...priceTiers].sort((a, b) => a.minQty - b.minQty);
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const tier = sorted[i];
+    const maxQty = tier.maxQty === 0 ? Infinity : tier.maxQty;
+    if (qty >= tier.minQty && qty <= maxQty) {
+      return tier.price;
+    }
+  }
+  return basePrice;
+}
+
 // ─── Premium Email Template Builder ───
 function emailLayout(bodyContent, preheader = "") {
   return `<!DOCTYPE html>
@@ -183,9 +199,9 @@ function buildOrderEmailHtml({ orderId, customerName, phone, shopName, deliveryA
 }
 
 function buildStatusEmailHtml({ orderId, customerName, newStatus, cart, totalValue, productCount, statusInfo }) {
-  const statusColors = { Accepted: "#2563eb", Fulfilled: "#059669", Rejected: "#dc2626" };
-  const statusBg = { Accepted: "#eff6ff", Fulfilled: "#f0fdf4", Rejected: "#fef2f2" };
-  const statusEmoji = { Accepted: "✅", Fulfilled: "🚚", Rejected: "❌" };
+  const statusColors = { Accepted: "#2563eb", Shipped: "#6366f1", Fulfilled: "#059669", Rejected: "#dc2626" };
+  const statusBg = { Accepted: "#eff6ff", Shipped: "#eef2ff", Fulfilled: "#f0fdf4", Rejected: "#fef2f2" };
+  const statusEmoji = { Accepted: "✅", Shipped: "🚚", Fulfilled: "📦", Rejected: "❌" };
   const color = statusColors[newStatus] || "#475569";
   const bg = statusBg[newStatus] || "#f8fafc";
   const emoji = statusEmoji[newStatus] || "📦";
@@ -521,19 +537,47 @@ exports.submitOrder = onCall(async (request) => {
       );
     }
 
+    // Validate slab pricing — ensure client-sent price matches server-resolved slab
+    const priceViolations = [];
+    for (const item of data.cart) {
+      const productId = String(item.id);
+      const product = productMap[productId];
+      if (!product) continue;
+
+      const expectedPrice = resolveSlabPrice(item.qty, product.price, product.priceTiers);
+      if (Math.abs(item.price - expectedPrice) > 0.01) {
+        priceViolations.push(
+          `${item.name || product.name}: expected ₹${expectedPrice} for qty ${item.qty}, got ₹${item.price}`
+        );
+      }
+    }
+
+    if (priceViolations.length > 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        `Price mismatch: ${priceViolations.join("; ")}`
+      );
+    }
+
     // Fetch buyer profile for GSTIN / billing address
-    let buyerGstin = null;
+    // Checkout-supplied GSTIN (already verified on client) takes precedence over profile
+    let buyerGstin = data.gstin || null;
     let billingAddress = null;
-    let buyerLegalName = null;
+    let buyerLegalName = data.gstinLegalName || null;
+    let buyerEntityType = data.gstinEntityType || null;
     if (request.auth?.uid) {
       try {
         const profileSnap = await db.collection("users").doc(request.auth.uid).get();
         if (profileSnap.exists) {
           const p = profileSnap.data();
-          if (p.gstin && p.gstinVerified) {
+          // Only use profile GSTIN if none was supplied at checkout
+          if (!buyerGstin && p.gstin && p.gstinVerified) {
             buyerGstin = p.gstin;
-            billingAddress = p.registeredAddress || null;
             buyerLegalName = p.legalName || null;
+            buyerEntityType = p.entityType || null;
+          }
+          if (!billingAddress && p.registeredAddress) {
+            billingAddress = p.registeredAddress;
           }
         }
       } catch (e) {
@@ -561,10 +605,11 @@ exports.submitOrder = onCall(async (request) => {
       createdAt: FieldValue.serverTimestamp(),
       status: "Pending",
       source: "Cloud Function",
-      // GSTIN / billing details (if buyer profile has verified GSTIN)
+      // GSTIN / billing details (from checkout or buyer profile)
       ...(buyerGstin && { buyerGstin }),
       ...(billingAddress && { billingAddress }),
       ...(buyerLegalName && { buyerLegalName }),
+      ...(buyerEntityType && { buyerEntityType }),
     };
 
     const mode = await getAppMode();
@@ -684,10 +729,16 @@ exports.notifyOrderStatusChange = onCall(async (request) => {
         body: `Great news, ${customerName}! Your order has been accepted and is being prepared for delivery.`,
         color: "#2563eb",
       },
+      Shipped: {
+        subject: `Order ${displayOrderId} Shipped`,
+        heading: "Your order has been shipped!",
+        body: `Hi ${customerName}, your order has been shipped and is on its way to you. You will be notified once it is delivered.`,
+        color: "#6366f1",
+      },
       Fulfilled: {
-        subject: `Order ${displayOrderId} Fulfilled`,
-        heading: "Your order has been fulfilled!",
-        body: `Hi ${customerName}, your order has been fulfilled and is on its way. Thank you for choosing KKR Groceries!`,
+        subject: `Order ${displayOrderId} Delivered`,
+        heading: "Your order has been delivered!",
+        body: `Hi ${customerName}, your order has been delivered successfully. Thank you for choosing KKR Groceries!`,
         color: "#059669",
       },
       Rejected: {
@@ -722,7 +773,7 @@ exports.notifyOrderStatusChange = onCall(async (request) => {
         const buyerMailDoc = {
           to: [buyerEmail],
           message: {
-            subject: `${newStatus === "Accepted" ? "✅" : newStatus === "Fulfilled" ? "🚚" : "❌"} ${statusInfo.subject}`,
+            subject: `${newStatus === "Accepted" ? "✅" : newStatus === "Shipped" ? "🚚" : newStatus === "Fulfilled" ? "📦" : "❌"} ${statusInfo.subject}`,
             html: emailHtml,
           },
           createdAt: FieldValue.serverTimestamp(),
@@ -1045,6 +1096,8 @@ exports.testSmtpConfig = onCall({ secrets: ["GMAIL_APP_PASSWORD"] }, async (requ
     // Read SMTP config from Firestore
     const smtp = await getSmtpConfig();
 
+    console.log(`[SMTP-DEBUG] user="${smtp.user}", passLen=${smtp.password?.length || 0}, host=${smtp.host}, port=${smtp.port}, secure=${smtp.secure}`);
+
     if (!smtp.user || !smtp.password) {
       throw new HttpsError("failed-precondition", "SMTP credentials not configured. Save Gmail address and App Password first.");
     }
@@ -1347,9 +1400,9 @@ exports.verifyGSTIN = onCall({ timeoutSeconds: 60 }, async (request) => {
     const cacheSnap = await db.collection("gstin_cache").doc(gstin).get();
     if (cacheSnap.exists) {
       const cached = cacheSnap.data();
-      // Cache is valid for 30 days
+      // Cache is valid for 30 days AND must have entityType (added in v2)
       const cacheAge = Date.now() - new Date(cached.cachedAt).getTime();
-      if (cacheAge < 30 * 24 * 60 * 60 * 1000) {
+      if (cacheAge < 30 * 24 * 60 * 60 * 1000 && cached.entityType) {
         console.log(`GSTIN ${gstin}: returning cached result`);
         return { ...cached, fromCache: true };
       }
@@ -1367,12 +1420,36 @@ exports.verifyGSTIN = onCall({ timeoutSeconds: 60 }, async (request) => {
       console.log(`GSTIN ${gstin}: attempt ${attempt}/${MAX_RETRIES}`);
       const data = await queryGSTPortal(gstin);
 
+      // Extract entity type from PAN embedded in GSTIN
+      // GSTIN format: 2-digit state + 10-char PAN + 1 entity + 1 Z + 1 check
+      // PAN's 4th character (index 3 of PAN = index 5 of GSTIN) indicates entity type
+      const panEntityChar = gstin.charAt(5);
+      const ENTITY_TYPE_MAP = {
+        P: "Proprietorship",
+        C: "Company",
+        H: "HUF",
+        F: "Partnership Firm",
+        A: "AOP (Association of Persons)",
+        T: "Trust",
+        B: "BOI (Body of Individuals)",
+        L: "Local Authority",
+        J: "Artificial Juridical Person",
+        G: "Government",
+      };
+      const entityType = ENTITY_TYPE_MAP[panEntityChar] || data.ctb || "Other";
+
+      // For Proprietorships, the legal name (lgnm) IS the owner's personal name
+      const isProprietorship = panEntityChar === "P";
+      const ownerName = isProprietorship ? (data.lgnm || "") : "";
+
       const result = {
         valid: true,
         formatValid: true,
         verified: true,
         tradeName: data.tradeNam || "",
         legalName: data.lgnm || "",
+        entityType,
+        ownerName,
         status: data.sts || "",
         businessType: data.ctb || "",
         address: buildAddress(data.pradr),
@@ -1407,4 +1484,127 @@ exports.verifyGSTIN = onCall({ timeoutSeconds: 60 }, async (request) => {
     verified: false,
     message: `GSTIN format is valid but verification failed after ${MAX_RETRIES} attempts. Please try again. (${lastError})`,
   };
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Delivery OTP — Send & Verify
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * sendDeliveryOTP — generates a 6-digit OTP, stores it in Firestore,
+ * and emails it to the customer.
+ */
+exports.sendDeliveryOTP = onCall(async (request) => {
+  const caller = await requireAdmin(request);
+  const { orderId, orderCollection } = request.data;
+  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId.");
+
+  const mode = await getAppMode();
+  const colName = orderCollection || resolveCol("orders", mode);
+
+  const orderSnap = await db.collection(colName).doc(orderId).get();
+  if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found.");
+  const order = orderSnap.data();
+
+  const buyerEmail = order.userEmail || null;
+  if (!buyerEmail) {
+    throw new HttpsError("failed-precondition", "Customer has no email on file. Cannot send OTP.");
+  }
+
+  // Generate 6-digit OTP
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  // Store OTP in Firestore
+  await db.collection("delivery_otps").doc(orderId).set({
+    otp,
+    orderId,
+    buyerEmail,
+    expiresAt: expiresAt.toISOString(),
+    createdAt: FieldValue.serverTimestamp(),
+    createdBy: caller.uid,
+    verified: false,
+    attempts: 0,
+  });
+
+  // Build OTP email
+  const customerName = order.customerName || "Customer";
+  const displayOrderId = order.orderId || orderId;
+  const otpEmailHtml = emailLayout(`
+    <div style="padding:32px 24px;text-align:center;">
+      <div style="width:64px;height:64px;background:#f0fdf4;border-radius:50%;line-height:64px;font-size:28px;margin:0 auto 16px;">🔐</div>
+      <h2 style="color:#1e293b;font-size:22px;font-weight:700;margin:0 0 8px;">Delivery Verification</h2>
+      <p style="color:#64748b;font-size:14px;line-height:1.6;margin:0 0 24px;">
+        Hi ${customerName}, please share this OTP with the delivery person to confirm receipt of your order.
+      </p>
+      <div style="background:#064e3b;border-radius:16px;padding:24px;margin:0 auto;max-width:280px;">
+        <div style="color:#a7f3d0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">Your OTP</div>
+        <div style="color:#ffffff;font-size:36px;font-weight:800;letter-spacing:8px;font-family:'Courier New',monospace;">${otp}</div>
+      </div>
+      <p style="color:#94a3b8;font-size:12px;margin:20px 0 0;">
+        Order: <strong>${displayOrderId}</strong> &bull; Valid for 10 minutes
+      </p>
+      <p style="color:#ef4444;font-size:12px;font-weight:600;margin:8px 0 0;">
+        Do not share this code with anyone other than the delivery person.
+      </p>
+    </div>
+  `, `Your delivery OTP for order ${displayOrderId}`);
+
+  // Queue email
+  await db.collection("mail").add({
+    to: [buyerEmail],
+    message: {
+      subject: `🔐 Delivery OTP for Order ${displayOrderId}`,
+      html: otpEmailHtml,
+    },
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  console.log(`Delivery OTP sent for ${orderId} to ${buyerEmail} by admin ${caller.uid}`);
+  return { success: true, message: `OTP sent to ${buyerEmail}` };
+});
+
+/**
+ * verifyDeliveryOTP — checks the OTP entered by admin against the stored value.
+ */
+exports.verifyDeliveryOTP = onCall(async (request) => {
+  await requireAdmin(request);
+  const { orderId, otp } = request.data;
+  if (!orderId || !otp) throw new HttpsError("invalid-argument", "Missing orderId or otp.");
+
+  const otpSnap = await db.collection("delivery_otps").doc(orderId).get();
+  if (!otpSnap.exists) {
+    throw new HttpsError("not-found", "No OTP found for this order. Please send a new one.");
+  }
+
+  const otpDoc = otpSnap.data();
+
+  // Check expiry
+  if (new Date(otpDoc.expiresAt) < new Date()) {
+    throw new HttpsError("deadline-exceeded", "OTP has expired. Please send a new one.");
+  }
+
+  // Check attempts (max 5)
+  if (otpDoc.attempts >= 5) {
+    throw new HttpsError("resource-exhausted", "Too many attempts. Please send a new OTP.");
+  }
+
+  // Increment attempts
+  await db.collection("delivery_otps").doc(orderId).update({
+    attempts: FieldValue.increment(1),
+  });
+
+  // Verify
+  if (otpDoc.otp !== otp.trim()) {
+    const remaining = 4 - otpDoc.attempts;
+    throw new HttpsError("permission-denied", `Incorrect OTP. ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining.`);
+  }
+
+  // Mark as verified
+  await db.collection("delivery_otps").doc(orderId).update({
+    verified: true,
+    verifiedAt: FieldValue.serverTimestamp(),
+  });
+
+  return { success: true, message: "OTP verified successfully." };
 });

@@ -9,6 +9,7 @@ import {
   orderBy,
   limit,
   getDocs,
+  getDoc,
   updateDoc,
   doc,
   startAfter,
@@ -32,6 +33,9 @@ import {
   MapPin,
   Clock,
   Calendar,
+  Truck,
+  ShieldCheck,
+  Loader2,
 } from "lucide-react";
 import { Order, OrderStatus, STATUS_TIMESTAMP_FIELDS, OrderCartItem } from "@/types/order";
 import { downloadInvoice } from "@/lib/invoice";
@@ -43,6 +47,14 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 const ORDERS_PER_PAGE = 50;
 const DAY = 86400000;
@@ -61,7 +73,7 @@ const DATE_FILTERS = [
 
 type DateFilterKey = (typeof DATE_FILTERS)[number]["key"];
 
-const STATUS_FILTERS: Array<OrderStatus | "all"> = ["all", "Pending", "Accepted", "Fulfilled", "Rejected"];
+const STATUS_FILTERS: Array<OrderStatus | "all"> = ["all", "Pending", "Accepted", "Shipped", "Fulfilled", "Rejected"];
 
 const DATE_MS_MAP: Record<string, number> = {
   today: DAY,
@@ -75,6 +87,7 @@ const DATE_MS_MAP: Record<string, number> = {
 
 function statusBadgeVariant(status: OrderStatus, hasPendingMod: boolean): "default" | "secondary" | "destructive" | "outline" {
   if (status === "Fulfilled") return "default";
+  if (status === "Shipped") return "secondary";
   if (status === "Accepted") return "secondary";
   if (status === "Rejected") return "destructive";
   if (hasPendingMod) return "outline";
@@ -102,6 +115,29 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
   const [customTo, setCustomTo] = useState<string>("");
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const lastDocRef = useRef<DocumentSnapshot | null>(null);
+
+  // OTP on Fulfill
+  const [otpRequired, setOtpRequired] = useState(false);
+  const [otpDialogOrder, setOtpDialogOrder] = useState<Order | null>(null);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpError, setOtpError] = useState("");
+
+  // Fetch requireDeliveryOTP setting
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, col("settings"), "checkout"));
+        if (snap.exists()) {
+          setOtpRequired(snap.data().requireDeliveryOTP === true);
+        }
+      } catch (e) {
+        console.warn("Failed to fetch OTP setting:", e);
+      }
+    })();
+  }, [col]);
 
   const loadOrders = useCallback(async (reset = true) => {
     if (reset) {
@@ -182,9 +218,6 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
       const timestampField = STATUS_TIMESTAMP_FIELDS[newStatus];
       if (timestampField) {
         updates[timestampField] = serverTimestamp();
-      }
-      if (newStatus === "Fulfilled") {
-        updates.shippedAt = serverTimestamp();
       }
 
       await updateDoc(doc(db, col("orders"), orderId), updates);
@@ -292,6 +325,53 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
     );
     setEditingOrder(null);
     toast.success("Changes sent to buyer for approval.");
+  };
+
+  const handleFulfillClick = (order: Order) => {
+    if (otpRequired && order.userEmail) {
+      setOtpDialogOrder(order);
+      setOtpCode("");
+      setOtpSent(false);
+      setOtpError("");
+    } else {
+      handleStatusChange(order.id, "Fulfilled");
+    }
+  };
+
+  const handleSendOtp = async () => {
+    if (!otpDialogOrder) return;
+    setOtpSending(true);
+    setOtpError("");
+    try {
+      const sendFn = httpsCallable(functions, "sendDeliveryOTP");
+      await sendFn({ orderId: otpDialogOrder.id, orderCollection: col("orders") });
+      setOtpSent(true);
+      toast.success("OTP sent to customer email.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to send OTP";
+      setOtpError(msg);
+      toast.error("Failed to send OTP.");
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpDialogOrder || !otpCode) return;
+    setOtpVerifying(true);
+    setOtpError("");
+    try {
+      const verifyFn = httpsCallable(functions, "verifyDeliveryOTP");
+      await verifyFn({ orderId: otpDialogOrder.id, otp: otpCode });
+      toast.success("OTP verified! Marking as fulfilled.");
+      await handleStatusChange(otpDialogOrder.id, "Fulfilled");
+      setOtpDialogOrder(null);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Invalid OTP";
+      setOtpError(msg);
+    } finally {
+      setOtpVerifying(false);
+    }
   };
 
   return (
@@ -537,7 +617,19 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
                     </>
                   ) : o.status === "Accepted" ? (
                     <>
-                      <Button size="sm" onClick={() => handleStatusChange(o.id, "Fulfilled")}>
+                      <Button size="sm" onClick={() => handleStatusChange(o.id, "Shipped")} className="bg-indigo-500 hover:bg-indigo-600">
+                        <Truck className="w-3.5 h-3.5" /> Ship
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => downloadInvoice(o)}>
+                        <FileText className="w-3.5 h-3.5" /> Invoice
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingOrder(o)} className="text-amber-600 border-amber-300 hover:bg-amber-50">
+                        <Pencil className="w-3.5 h-3.5" /> Edit
+                      </Button>
+                    </>
+                  ) : o.status === "Shipped" ? (
+                    <>
+                      <Button size="sm" onClick={() => handleFulfillClick(o)}>
                         <CheckCircle2 className="w-3.5 h-3.5" /> Fulfill
                       </Button>
                       <Button size="sm" variant="secondary" onClick={() => downloadInvoice(o)}>
@@ -591,6 +683,103 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
           onSave={handleSaveEdit}
         />
       )}
+
+      {/* OTP Verification Dialog */}
+      <Dialog open={!!otpDialogOrder} onOpenChange={(open) => { if (!open) setOtpDialogOrder(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-amber-500" />
+              Delivery OTP Verification
+            </DialogTitle>
+            <DialogDescription>
+              Send a one-time password to the customer&apos;s email to confirm delivery of order{" "}
+              <span className="font-mono font-semibold text-slate-700">
+                {otpDialogOrder?.orderId || otpDialogOrder?.id}
+              </span>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Customer info */}
+            <div className="rounded-lg bg-slate-50 p-3 text-sm space-y-1">
+              <div><span className="text-slate-400">Customer:</span> <span className="font-medium">{otpDialogOrder?.customerName}</span></div>
+              <div><span className="text-slate-400">Email:</span> <span className="font-medium">{otpDialogOrder?.userEmail || "N/A"}</span></div>
+            </div>
+
+            {!otpSent ? (
+              /* Step 1: Send OTP */
+              <Button
+                onClick={handleSendOtp}
+                disabled={otpSending || !otpDialogOrder?.userEmail}
+                className="w-full bg-amber-500 hover:bg-amber-600"
+              >
+                {otpSending ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP...</>
+                ) : (
+                  <><ShieldCheck className="w-4 h-4" /> Send OTP to Customer Email</>
+                )}
+              </Button>
+            ) : (
+              /* Step 2: Enter & Verify OTP */
+              <div className="space-y-3">
+                <div className="text-sm text-emerald-600 font-medium">
+                  OTP sent to {otpDialogOrder?.userEmail}. Valid for 10 minutes.
+                </div>
+                <Input
+                  placeholder="Enter 6-digit OTP"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  inputMode="numeric"
+                  maxLength={6}
+                  className="text-center text-2xl tracking-[0.5em] font-mono"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleVerifyOtp}
+                    disabled={otpVerifying || otpCode.length !== 6}
+                    className="flex-1"
+                  >
+                    {otpVerifying ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</>
+                    ) : (
+                      <><CheckCircle2 className="w-4 h-4" /> Verify &amp; Fulfill</>
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={handleSendOtp} disabled={otpSending} size="sm">
+                    Resend
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Error message */}
+            {otpError && (
+              <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2">
+                {otpError}
+              </div>
+            )}
+
+            {/* No email warning */}
+            {otpDialogOrder && !otpDialogOrder.userEmail && (
+              <div className="text-sm text-amber-600 bg-amber-50 rounded-lg p-2">
+                This customer has no email on file. OTP cannot be sent. You can fulfill directly.
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2 w-full"
+                  onClick={() => {
+                    handleStatusChange(otpDialogOrder.id, "Fulfilled");
+                    setOtpDialogOrder(null);
+                  }}
+                >
+                  Fulfill Without OTP
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -190,7 +190,7 @@ export default function OrderLocationMap({ orders }: Props) {
       marker.addListener("click", () => {
         const totalVal = parseTotal(order.totalValue);
         const date = order.timestamp || "";
-        const statusBg = { Pending: "#fbbf24", Accepted: "#60a5fa", Fulfilled: "#34d399", Rejected: "#f87171" }[status] || "#94a3b8";
+        const statusBg = { Pending: "#fbbf24", Accepted: "#60a5fa", Shipped: "#818cf8", Fulfilled: "#34d399", Rejected: "#f87171" }[status] || "#94a3b8";
 
         infoWindow.setContent(`
           <div style="font-family:'Outfit',system-ui,sans-serif;max-width:280px;padding:2px 0;">

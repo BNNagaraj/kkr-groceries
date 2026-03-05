@@ -38,6 +38,7 @@ import {
 
 function statusBadgeVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   if (status === "Fulfilled") return "default";
+  if (status === "Shipped") return "secondary";
   if (status === "Accepted") return "secondary";
   if (status === "Rejected") return "destructive";
   return "outline";

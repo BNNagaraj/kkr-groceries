@@ -20,6 +20,7 @@ import UsersTab from "@/components/admin/UsersTab";
 import BuyingStockTab from "@/components/admin/BuyingStockTab";
 import AccountsTab from "@/components/admin/AccountsTab";
 import AddProductModal from "@/components/admin/AddProductModal";
+import PriceTierEditor from "@/components/admin/PriceTierEditor";
 import { markOffline } from "@/hooks/usePresence";
 import { toast } from "sonner";
 
@@ -50,6 +51,7 @@ export default function AdminDashboard() {
     const [uploadingId, setUploadingId] = useState<number | null>(null);
     const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
     const [addProductOpen, setAddProductOpen] = useState(false);
+    const [tierEditProduct, setTierEditProduct] = useState<Product | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploadTargetId = useRef<number | null>(null);
 
@@ -325,6 +327,7 @@ export default function AdminDashboard() {
                                                         <span>MOQ Req.</span>
                                                     </label>
                                                 </th>
+                                                <th className="px-4 py-3 text-center">Tiers</th>
                                                 <th className="px-4 py-3">Badging</th>
                                             </tr>
                                         </thead>
@@ -416,6 +419,20 @@ export default function AdminDashboard() {
                                                             className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
                                                         />
                                                     </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <button
+                                                            onClick={() => setTierEditProduct(p)}
+                                                            className={`text-xs px-2 py-1 rounded-lg font-semibold transition-colors ${
+                                                                p.priceTiers && p.priceTiers.length > 0
+                                                                    ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                                                    : "bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                                                            }`}
+                                                        >
+                                                            {p.priceTiers && p.priceTiers.length > 0
+                                                                ? `${p.priceTiers.length} tiers`
+                                                                : "+ Add"}
+                                                        </button>
+                                                    </td>
                                                     <td className="px-4 py-3">
                                                         <div className="flex gap-3">
                                                             <label className="flex items-center gap-1 text-xs cursor-pointer">
@@ -464,6 +481,22 @@ export default function AdminDashboard() {
                         existingIds={editingProducts.map(p => p.id)}
                         onProductAdded={(p) => setEditingProducts(prev => [...prev, p])}
                     />
+
+                    {/* Price Tier Editor Modal */}
+                    {tierEditProduct && (
+                        <PriceTierEditor
+                            product={tierEditProduct}
+                            onSave={(productId, tiers) => {
+                                setEditingProducts(prev =>
+                                    prev.map(p => p.id === productId
+                                        ? { ...p, priceTiers: tiers.length > 0 ? tiers : undefined }
+                                        : p
+                                    )
+                                );
+                            }}
+                            onClose={() => setTierEditProduct(null)}
+                        />
+                    )}
                 </div>
             </div>
         </div>

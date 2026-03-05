@@ -56,6 +56,8 @@ interface BuyerProfile {
     registeredAddress?: string;
     legalName?: string;
     businessType?: string;
+    entityType?: string;
+    ownerName?: string;
 }
 
 const EMPTY_PROFILE: BuyerProfile = { displayName: "", phone: "", shopName: "", gstin: "" };
@@ -184,6 +186,7 @@ function displayTotal(v: unknown): string {
 
 function statusBadgeVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
     if (status === "Fulfilled") return "default";
+    if (status === "Shipped") return "secondary";
     if (status === "Accepted") return "secondary";
     if (status === "Rejected") return "destructive";
     return "outline";
@@ -249,15 +252,20 @@ export default function BuyerDashboard() {
                 const profileSnap = await getDoc(doc(db, "users", currentUser.uid));
                 if (profileSnap.exists()) {
                     const p = profileSnap.data();
+                    const rawPhone = p.phone || currentUser.phoneNumber || "";
+                    // Strip +91 country code from Firebase auth phone to get 10-digit form
+                    const normalizedPhone = rawPhone.replace(/^\+91/, "").replace(/\D/g, "").slice(0, 10);
                     setProfile({
                         displayName: p.displayName || currentUser.displayName || "",
-                        phone: p.phone || currentUser.phoneNumber || "",
+                        phone: normalizedPhone,
                         shopName: p.shopName || "",
                         gstin: p.gstin || "",
                         gstinVerified: p.gstinVerified || false,
                         registeredAddress: p.registeredAddress || "",
                         legalName: p.legalName || "",
                         businessType: p.businessType || "",
+                        entityType: p.entityType || "",
+                        ownerName: p.ownerName || "",
                     });
                     // Restore verified status if GSTIN was previously verified
                     if (p.gstinVerified && p.gstin) {
@@ -265,9 +273,10 @@ export default function BuyerDashboard() {
                         setGstinMessage("Previously verified");
                     }
                 } else {
+                    const fallbackPhone = (currentUser.phoneNumber || "").replace(/^\+91/, "").replace(/\D/g, "").slice(0, 10);
                     setProfile({
                         displayName: currentUser.displayName || "",
-                        phone: currentUser.phoneNumber || "",
+                        phone: fallbackPhone,
                         shopName: "",
                         gstin: "",
                     });
@@ -314,6 +323,8 @@ export default function BuyerDashboard() {
                 if (profile.registeredAddress) profileData.registeredAddress = profile.registeredAddress;
                 if (profile.legalName) profileData.legalName = profile.legalName;
                 if (profile.businessType) profileData.businessType = profile.businessType;
+                if (profile.entityType) profileData.entityType = profile.entityType;
+                if (profile.ownerName) profileData.ownerName = profile.ownerName;
             }
 
             await setDoc(doc(db, "users", currentUser.uid), profileData, { merge: true });
@@ -346,7 +357,8 @@ export default function BuyerDashboard() {
             const data = result.data as {
                 valid: boolean; formatValid: boolean; verified: boolean;
                 tradeName?: string; legalName?: string; status?: string;
-                businessType?: string; address?: string; message: string;
+                businessType?: string; entityType?: string; ownerName?: string;
+                address?: string; message: string;
             };
 
             if (data.verified && data.valid) {
@@ -359,6 +371,8 @@ export default function BuyerDashboard() {
                     gstinVerified: true,
                     legalName: data.legalName || "",
                     businessType: data.businessType || "",
+                    entityType: data.entityType || "",
+                    ownerName: data.ownerName || "",
                 };
 
                 // Auto-fill registered address
@@ -519,7 +533,7 @@ export default function BuyerDashboard() {
                                 <div className="flex justify-between items-center mt-3 pt-1">
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm font-medium text-slate-500">{o.productCount || 0} items</span>
-                                        {(o.status === "Fulfilled" || o.status === "Accepted") && (
+                                        {(o.status === "Fulfilled" || o.status === "Shipped" || o.status === "Accepted") && (
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
@@ -697,19 +711,27 @@ export default function BuyerDashboard() {
                             <div className="text-sm text-emerald-900 space-y-2">
                                 {profile.legalName && (
                                     <div className="flex items-start gap-2">
-                                        <span className="font-medium text-emerald-700 w-28 shrink-0">Legal Name:</span>
+                                        <span className="font-medium text-emerald-700 w-32 shrink-0">
+                                            {profile.entityType === "Proprietorship" ? "Proprietor Name:" : "Legal Name:"}
+                                        </span>
                                         <span>{profile.legalName}</span>
                                     </div>
                                 )}
-                                {profile.businessType && (
+                                {profile.entityType && (
                                     <div className="flex items-start gap-2">
-                                        <span className="font-medium text-emerald-700 w-28 shrink-0">Business Type:</span>
+                                        <span className="font-medium text-emerald-700 w-32 shrink-0">Entity Type:</span>
+                                        <span>{profile.entityType}</span>
+                                    </div>
+                                )}
+                                {profile.businessType && profile.businessType !== profile.entityType && (
+                                    <div className="flex items-start gap-2">
+                                        <span className="font-medium text-emerald-700 w-32 shrink-0">Business Type:</span>
                                         <span>{profile.businessType}</span>
                                     </div>
                                 )}
                                 {profile.registeredAddress && (
                                     <div className="flex items-start gap-2">
-                                        <span className="font-medium text-emerald-700 w-28 shrink-0">Reg. Address:</span>
+                                        <span className="font-medium text-emerald-700 w-32 shrink-0">Reg. Address:</span>
                                         <span className="leading-relaxed">{profile.registeredAddress}</span>
                                     </div>
                                 )}

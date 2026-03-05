@@ -8,6 +8,8 @@ export interface OrderCartItem {
   image?: string;
   telugu?: string;
   hindi?: string;
+  basePrice?: number;
+  appliedTier?: string;
 }
 
 export interface PendingModification {
@@ -21,7 +23,7 @@ export interface PendingModification {
   status: "PendingBuyerApproval";
 }
 
-export type OrderStatus = "Pending" | "Accepted" | "Fulfilled" | "Rejected";
+export type OrderStatus = "Pending" | "Accepted" | "Shipped" | "Fulfilled" | "Rejected";
 
 export interface Order {
   id: string;
@@ -61,6 +63,7 @@ export interface Order {
 export const STATUS_TIMESTAMP_FIELDS: Record<OrderStatus, string> = {
   Pending: "placedAt",
   Accepted: "acceptedAt",
+  Shipped: "shippedAt",
   Fulfilled: "deliveredAt",
   Rejected: "rejectedAt",
 };
