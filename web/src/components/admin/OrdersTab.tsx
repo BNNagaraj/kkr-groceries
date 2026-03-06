@@ -407,9 +407,17 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
     if (wantSms && hasPhone) {
       try {
         // Normalize phone to +91XXXXXXXXXX
-        let cleanPhone = otpDialogOrder.phone.replace(/\s/g, "");
+        // Indian numbers are always 10 digits. If 12 digits starting with "91",
+        // treat "91" as country code. If 10 digits starting with "91", it's
+        // the actual number (e.g. 9188441334) — prepend +91.
+        let cleanPhone = otpDialogOrder.phone.replace(/[\s\-()]/g, "");
         if (!cleanPhone.startsWith("+")) {
-          cleanPhone = cleanPhone.startsWith("91") ? `+${cleanPhone}` : `+91${cleanPhone}`;
+          if (cleanPhone.length === 12 && cleanPhone.startsWith("91")) {
+            cleanPhone = `+${cleanPhone}`;
+          } else {
+            // 10-digit number (may or may not start with 91) — prepend +91
+            cleanPhone = `+91${cleanPhone}`;
+          }
         }
 
         const otpAuthInstance = getOtpAuth();
