@@ -2,7 +2,14 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { db, functions } from "@/lib/firebase";
+import { getOtpAuth } from "@/lib/firebase-otp";
 import { httpsCallable } from "firebase/functions";
+import {
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  signOut,
+  ConfirmationResult,
+} from "firebase/auth";
 import {
   collection,
   query,
@@ -36,8 +43,12 @@ import {
   Truck,
   ShieldCheck,
   Loader2,
+  Phone as PhoneIcon,
+  Mail,
+  MessageSquare,
 } from "lucide-react";
 import { Order, OrderStatus, STATUS_TIMESTAMP_FIELDS, OrderCartItem } from "@/types/order";
+import type { OtpChannel } from "@/types/settings";
 import { downloadInvoice } from "@/lib/invoice";
 import { useMode } from "@/contexts/ModeContext";
 import { Product } from "@/contexts/AppContext";
@@ -55,6 +66,12 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+
+declare global {
+  interface Window {
+    otpRecaptchaVerifier?: RecaptchaVerifier;
+  }
+}
 
 const ORDERS_PER_PAGE = 50;
 const DAY = 86400000;
@@ -118,26 +135,44 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
 
   // OTP on Fulfill
   const [otpRequired, setOtpRequired] = useState(false);
+  const [otpChannels, setOtpChannels] = useState<OtpChannel>("email");
   const [otpDialogOrder, setOtpDialogOrder] = useState<Order | null>(null);
   const [otpCode, setOtpCode] = useState("");
   const [otpSending, setOtpSending] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpError, setOtpError] = useState("");
+  // SMS via Firebase Phone Auth (second project)
+  const [smsConfirmation, setSmsConfirmation] = useState<ConfirmationResult | null>(null);
+  const [smsSent, setSmsSent] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch requireDeliveryOTP setting
+  // Fetch requireDeliveryOTP + otpChannels setting
   useEffect(() => {
     (async () => {
       try {
         const snap = await getDoc(doc(db, col("settings"), "checkout"));
         if (snap.exists()) {
-          setOtpRequired(snap.data().requireDeliveryOTP === true);
+          const data = snap.data();
+          setOtpRequired(data.requireDeliveryOTP === true);
+          if (data.otpChannels) setOtpChannels(data.otpChannels as OtpChannel);
         }
       } catch (e) {
         console.warn("Failed to fetch OTP setting:", e);
       }
     })();
   }, [col]);
+
+  // Cleanup recaptcha on unmount
+  useEffect(() => {
+    return () => {
+      if (window.otpRecaptchaVerifier) {
+        window.otpRecaptchaVerifier.clear();
+        window.otpRecaptchaVerifier = undefined;
+      }
+    };
+  }, []);
 
   const loadOrders = useCallback(async (reset = true) => {
     if (reset) {
@@ -328,10 +363,14 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
   };
 
   const handleFulfillClick = (order: Order) => {
-    if (otpRequired && order.userEmail) {
+    // Open OTP dialog if OTP is required AND buyer has phone or email
+    if (otpRequired && (order.userEmail || order.phone)) {
       setOtpDialogOrder(order);
       setOtpCode("");
       setOtpSent(false);
+      setSmsSent(false);
+      setEmailSent(false);
+      setSmsConfirmation(null);
       setOtpError("");
     } else {
       handleStatusChange(order.id, "Fulfilled");
@@ -342,36 +381,135 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
     if (!otpDialogOrder) return;
     setOtpSending(true);
     setOtpError("");
-    try {
-      const sendFn = httpsCallable(functions, "sendDeliveryOTP");
-      await sendFn({ orderId: otpDialogOrder.id, orderCollection: col("orders") });
-      setOtpSent(true);
-      toast.success("OTP sent to customer email.");
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to send OTP";
-      setOtpError(msg);
-      toast.error("Failed to send OTP.");
-    } finally {
-      setOtpSending(false);
+
+    const wantEmail = otpChannels === "email" || otpChannels === "both";
+    const wantSms = otpChannels === "sms" || otpChannels === "both";
+    const hasEmail = !!otpDialogOrder.userEmail;
+    const hasPhone = !!otpDialogOrder.phone;
+
+    let emailOk = false;
+    let smsOk = false;
+    const errors: string[] = [];
+
+    // 1. Send Email OTP (existing Cloud Function)
+    if (wantEmail && hasEmail) {
+      try {
+        const sendFn = httpsCallable(functions, "sendDeliveryOTP");
+        await sendFn({ orderId: otpDialogOrder.id, orderCollection: col("orders") });
+        emailOk = true;
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Email OTP failed";
+        errors.push(`Email: ${msg}`);
+      }
     }
+
+    // 2. Send SMS OTP via Firebase Phone Auth (second project)
+    if (wantSms && hasPhone) {
+      try {
+        // Normalize phone to +91XXXXXXXXXX
+        let cleanPhone = otpDialogOrder.phone.replace(/\s/g, "");
+        if (!cleanPhone.startsWith("+")) {
+          cleanPhone = cleanPhone.startsWith("91") ? `+${cleanPhone}` : `+91${cleanPhone}`;
+        }
+
+        const otpAuthInstance = getOtpAuth();
+
+        // Create RecaptchaVerifier — on localhost with appVerificationDisabledForTesting=true,
+        // this renders a mock reCAPTCHA that auto-resolves. In production, it uses real invisible reCAPTCHA.
+        if (!window.otpRecaptchaVerifier && recaptchaContainerRef.current) {
+          window.otpRecaptchaVerifier = new RecaptchaVerifier(otpAuthInstance, recaptchaContainerRef.current, {
+            size: "invisible",
+          });
+        }
+
+        const appVerifier = window.otpRecaptchaVerifier!;
+        const confirmation = await signInWithPhoneNumber(otpAuthInstance, cleanPhone, appVerifier);
+        setSmsConfirmation(confirmation);
+        smsOk = true;
+      } catch (err: unknown) {
+        const error = err as { code?: string; message?: string };
+        // Cleanup recaptcha on error
+        if (window.otpRecaptchaVerifier) {
+          window.otpRecaptchaVerifier.clear();
+          window.otpRecaptchaVerifier = undefined;
+        }
+
+        if (error.code === "auth/too-many-requests") {
+          errors.push("SMS: Too many attempts. Wait a few minutes.");
+        } else if (error.code === "auth/invalid-phone-number") {
+          errors.push("SMS: Invalid phone number.");
+        } else {
+          errors.push(`SMS: ${error.message || "Failed to send"}`);
+        }
+      }
+    }
+
+    // Update state based on results
+    setSmsSent(smsOk);
+    setEmailSent(emailOk);
+    setOtpSent(emailOk || smsOk);
+
+    if (emailOk || smsOk) {
+      const channels: string[] = [];
+      if (smsOk) channels.push("SMS");
+      if (emailOk) channels.push("Email");
+      toast.success(`OTP sent via ${channels.join(" & ")}`);
+    }
+
+    if (errors.length > 0 && !emailOk && !smsOk) {
+      setOtpError(errors.join("\n"));
+      toast.error("Failed to send OTP.");
+    } else if (errors.length > 0) {
+      // Partial success — show warning
+      setOtpError(errors.join("\n"));
+    }
+
+    setOtpSending(false);
   };
 
   const handleVerifyOtp = async () => {
     if (!otpDialogOrder || !otpCode) return;
     setOtpVerifying(true);
     setOtpError("");
-    try {
-      const verifyFn = httpsCallable(functions, "verifyDeliveryOTP");
-      await verifyFn({ orderId: otpDialogOrder.id, otp: otpCode });
+
+    let verified = false;
+
+    // Try 1: SMS verification via Firebase Phone Auth (if SMS was sent)
+    if (smsConfirmation) {
+      try {
+        await smsConfirmation.confirm(otpCode);
+        // Clean up ghost auth session on second project
+        try { await signOut(getOtpAuth()); } catch { /* ignore */ }
+        verified = true;
+      } catch {
+        // SMS code didn't match — try email next
+      }
+    }
+
+    // Try 2: Email OTP verification via Cloud Function (if email was sent)
+    if (!verified && emailSent) {
+      try {
+        const verifyFn = httpsCallable(functions, "verifyDeliveryOTP");
+        await verifyFn({ orderId: otpDialogOrder.id, otp: otpCode });
+        verified = true;
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Invalid OTP";
+        if (!smsConfirmation) {
+          // Only email was available, show email-specific error
+          setOtpError(msg);
+        }
+      }
+    }
+
+    if (verified) {
       toast.success("OTP verified! Marking as fulfilled.");
       await handleStatusChange(otpDialogOrder.id, "Fulfilled");
       setOtpDialogOrder(null);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Invalid OTP";
-      setOtpError(msg);
-    } finally {
-      setOtpVerifying(false);
+    } else if (!otpError) {
+      setOtpError("Incorrect OTP. Please check the code and try again.");
     }
+
+    setOtpVerifying(false);
   };
 
   return (
@@ -685,7 +823,16 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
       )}
 
       {/* OTP Verification Dialog */}
-      <Dialog open={!!otpDialogOrder} onOpenChange={(open) => { if (!open) setOtpDialogOrder(null); }}>
+      <Dialog open={!!otpDialogOrder} onOpenChange={(open) => {
+        if (!open) {
+          setOtpDialogOrder(null);
+          // Cleanup recaptcha when closing dialog
+          if (window.otpRecaptchaVerifier) {
+            window.otpRecaptchaVerifier.clear();
+            window.otpRecaptchaVerifier = undefined;
+          }
+        }
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -693,7 +840,7 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
               Delivery OTP Verification
             </DialogTitle>
             <DialogDescription>
-              Send a one-time password to the customer&apos;s email to confirm delivery of order{" "}
+              Send OTP to confirm delivery of order{" "}
               <span className="font-mono font-semibold text-slate-700">
                 {otpDialogOrder?.orderId || otpDialogOrder?.id}
               </span>.
@@ -702,81 +849,131 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
 
           <div className="space-y-4">
             {/* Customer info */}
-            <div className="rounded-lg bg-slate-50 p-3 text-sm space-y-1">
+            <div className="rounded-lg bg-slate-50 p-3 text-sm space-y-1.5">
               <div><span className="text-slate-400">Customer:</span> <span className="font-medium">{otpDialogOrder?.customerName}</span></div>
-              <div><span className="text-slate-400">Email:</span> <span className="font-medium">{otpDialogOrder?.userEmail || "N/A"}</span></div>
+              <div className="flex items-center gap-1.5">
+                <PhoneIcon className="w-3 h-3 text-slate-400" />
+                <span className="text-slate-400">Phone:</span>
+                <span className="font-medium">{otpDialogOrder?.phone || "N/A"}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Mail className="w-3 h-3 text-slate-400" />
+                <span className="text-slate-400">Email:</span>
+                <span className="font-medium">{otpDialogOrder?.userEmail || "N/A"}</span>
+              </div>
+              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-200">
+                <MessageSquare className="w-3 h-3 text-slate-400" />
+                <span className="text-slate-400">Channel:</span>
+                <span className="font-medium text-xs uppercase tracking-wider">
+                  {otpChannels === "both" ? "SMS & Email" : otpChannels === "sms" ? "SMS" : "Email"}
+                </span>
+              </div>
             </div>
 
-            {!otpSent ? (
-              /* Step 1: Send OTP */
-              <Button
-                onClick={handleSendOtp}
-                disabled={otpSending || !otpDialogOrder?.userEmail}
-                className="w-full bg-amber-500 hover:bg-amber-600"
-              >
-                {otpSending ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP...</>
-                ) : (
-                  <><ShieldCheck className="w-4 h-4" /> Send OTP to Customer Email</>
-                )}
-              </Button>
-            ) : (
-              /* Step 2: Enter & Verify OTP */
-              <div className="space-y-3">
-                <div className="text-sm text-emerald-600 font-medium">
-                  OTP sent to {otpDialogOrder?.userEmail}. Valid for 10 minutes.
-                </div>
-                <Input
-                  placeholder="Enter 6-digit OTP"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  inputMode="numeric"
-                  maxLength={6}
-                  className="text-center text-2xl tracking-[0.5em] font-mono"
-                />
-                <div className="flex gap-2">
+            {(() => {
+              const wantEmail = otpChannels === "email" || otpChannels === "both";
+              const wantSms = otpChannels === "sms" || otpChannels === "both";
+              const hasEmail = !!otpDialogOrder?.userEmail;
+              const hasPhone = !!otpDialogOrder?.phone;
+              const canSend = (wantEmail && hasEmail) || (wantSms && hasPhone);
+
+              // Build dynamic button label
+              const channelParts: string[] = [];
+              if (wantSms && hasPhone) channelParts.push("SMS");
+              if (wantEmail && hasEmail) channelParts.push("Email");
+              const channelLabel = channelParts.length > 0 ? channelParts.join(" & ") : "N/A";
+
+              return !otpSent ? (
+                /* Step 1: Send OTP */
+                <div className="space-y-3">
                   <Button
-                    onClick={handleVerifyOtp}
-                    disabled={otpVerifying || otpCode.length !== 6}
-                    className="flex-1"
+                    onClick={handleSendOtp}
+                    disabled={otpSending || !canSend}
+                    className="w-full bg-amber-500 hover:bg-amber-600"
                   >
-                    {otpVerifying ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</>
+                    {otpSending ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP...</>
                     ) : (
-                      <><CheckCircle2 className="w-4 h-4" /> Verify &amp; Fulfill</>
+                      <><ShieldCheck className="w-4 h-4" /> Send OTP via {channelLabel}</>
                     )}
                   </Button>
-                  <Button variant="outline" onClick={handleSendOtp} disabled={otpSending} size="sm">
-                    Resend
-                  </Button>
+                  {!canSend && (
+                    <div className="text-sm text-amber-600 bg-amber-50 rounded-lg p-2">
+                      No contact info available for the selected channel{otpChannels === "both" ? "s" : ""}.
+                      {!hasPhone && wantSms && <span className="block text-xs mt-0.5">Phone number missing.</span>}
+                      {!hasEmail && wantEmail && <span className="block text-xs mt-0.5">Email missing.</span>}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-2 w-full"
+                        onClick={() => {
+                          handleStatusChange(otpDialogOrder!.id, "Fulfilled");
+                          setOtpDialogOrder(null);
+                        }}
+                      >
+                        Fulfill Without OTP
+                      </Button>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              ) : (
+                /* Step 2: Enter & Verify OTP */
+                <div className="space-y-3">
+                  {/* Show which channels succeeded */}
+                  <div className="space-y-1">
+                    {smsSent && (
+                      <div className="text-sm text-emerald-600 font-medium flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> SMS sent to {otpDialogOrder?.phone}
+                      </div>
+                    )}
+                    {emailSent && (
+                      <div className="text-sm text-emerald-600 font-medium flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Email sent to {otpDialogOrder?.userEmail}
+                      </div>
+                    )}
+                    {smsSent && emailSent && (
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        SMS and Email have different codes. Enter either one to verify.
+                      </p>
+                    )}
+                  </div>
+                  <Input
+                    placeholder="Enter 6-digit OTP"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    inputMode="numeric"
+                    maxLength={6}
+                    className="text-center text-2xl tracking-[0.5em] font-mono"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleVerifyOtp}
+                      disabled={otpVerifying || otpCode.length !== 6}
+                      className="flex-1"
+                    >
+                      {otpVerifying ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</>
+                      ) : (
+                        <><CheckCircle2 className="w-4 h-4" /> Verify &amp; Fulfill</>
+                      )}
+                    </Button>
+                    <Button variant="outline" onClick={handleSendOtp} disabled={otpSending} size="sm">
+                      Resend
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Error message */}
             {otpError && (
-              <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2">
+              <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2 whitespace-pre-line">
                 {otpError}
               </div>
             )}
 
-            {/* No email warning */}
-            {otpDialogOrder && !otpDialogOrder.userEmail && (
-              <div className="text-sm text-amber-600 bg-amber-50 rounded-lg p-2">
-                This customer has no email on file. OTP cannot be sent. You can fulfill directly.
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-2 w-full"
-                  onClick={() => {
-                    handleStatusChange(otpDialogOrder.id, "Fulfilled");
-                    setOtpDialogOrder(null);
-                  }}
-                >
-                  Fulfill Without OTP
-                </Button>
-              </div>
-            )}
+            {/* Invisible reCAPTCHA container for SMS OTP */}
+            <div ref={recaptchaContainerRef} id="otp-recaptcha-container" />
           </div>
         </DialogContent>
       </Dialog>

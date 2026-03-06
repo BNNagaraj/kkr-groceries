@@ -1507,8 +1507,9 @@ exports.sendDeliveryOTP = onCall(async (request) => {
   const order = orderSnap.data();
 
   const buyerEmail = order.userEmail || null;
+  const buyerPhone = order.phone || null;
   if (!buyerEmail) {
-    throw new HttpsError("failed-precondition", "Customer has no email on file. Cannot send OTP.");
+    throw new HttpsError("failed-precondition", "Customer has no email on file. Cannot send email OTP.");
   }
 
   // Generate 6-digit OTP
@@ -1520,6 +1521,7 @@ exports.sendDeliveryOTP = onCall(async (request) => {
     otp,
     orderId,
     buyerEmail,
+    buyerPhone: buyerPhone || "",
     expiresAt: expiresAt.toISOString(),
     createdAt: FieldValue.serverTimestamp(),
     createdBy: caller.uid,
