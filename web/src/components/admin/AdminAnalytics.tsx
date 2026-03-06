@@ -180,6 +180,19 @@ export default function AdminAnalytics() {
     return unsub;
   }, []);
 
+  // Resolve online user locations from recent orders
+  const onlineUsersWithLocation = useMemo(() => {
+    return onlineUsers.map((u) => {
+      const userOrder = orders.find(
+        (o) =>
+          (o.userId && o.userId === u.uid) ||
+          (o.userEmail && u.email && o.userEmail === u.email) ||
+          (o.phone && u.phone && o.phone === u.phone)
+      );
+      return { ...u, location: userOrder?.location || "" };
+    });
+  }, [onlineUsers, orders]);
+
   // Load registered users when Users tab is activated
   useEffect(() => {
     if (activeSubTab !== "users" || usersLoaded.current) return;
@@ -473,18 +486,21 @@ export default function AdminAnalytics() {
                 </h3>
               </div>
               <div className="flex flex-wrap gap-2">
-                {onlineUsers.slice(0, 8).map((u, i) => (
+                {onlineUsersWithLocation.slice(0, 8).map((u, i) => (
                   <div
                     key={i}
                     className="flex items-center gap-2 bg-green-50 px-3 py-1.5 rounded-full text-xs font-medium text-green-700 border border-green-100"
                   >
                     <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    {u.displayName || u.email || u.phone || u.uid.slice(0, 8)}
+                    <span>{u.displayName || u.email || u.phone || u.uid.slice(0, 8)}</span>
+                    {u.location && (
+                      <span className="text-[10px] text-green-500 font-normal">{u.location}</span>
+                    )}
                   </div>
                 ))}
-                {onlineUsers.length > 8 && (
+                {onlineUsersWithLocation.length > 8 && (
                   <span className="text-xs text-slate-400 self-center">
-                    +{onlineUsers.length - 8} more
+                    +{onlineUsersWithLocation.length - 8} more
                   </span>
                 )}
               </div>
@@ -593,7 +609,7 @@ export default function AdminAnalytics() {
               </p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {onlineUsers.map((u, i) => (
+                {onlineUsersWithLocation.map((u, i) => (
                   <div
                     key={i}
                     className="flex items-center gap-3 p-3 bg-green-50 rounded-xl border border-green-100"
@@ -605,6 +621,9 @@ export default function AdminAnalytics() {
                       <div className="font-medium text-sm text-slate-800 truncate">
                         {u.displayName || u.email || u.phone || "Anonymous"}
                       </div>
+                      {u.location && (
+                        <div className="text-xs text-green-600 truncate">{u.location}</div>
+                      )}
                       {u.phone && (
                         <div className="text-xs text-slate-500 flex items-center gap-1">
                           <Phone className="w-3 h-3" /> {u.phone}
