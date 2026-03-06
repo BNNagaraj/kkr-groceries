@@ -57,7 +57,7 @@ function parseOrderTotal(v: unknown): number {
 // ─── Activity Feed Component ──────────────────────────────────────────────
 interface ActivityFeedProps {
   orders: Order[];
-  onlineUsers: { uid: string; displayName: string | null; email: string | null }[];
+  onlineUsers: { uid: string; displayName: string | null; email: string | null; location?: string }[];
   theme: C2Theme;
 }
 
@@ -133,7 +133,7 @@ export default function ActivityFeed({ orders, onlineUsers }: ActivityFeedProps)
           type: "user_online",
           emoji: "\uD83D\uDC64",
           label: "USER ONLINE",
-          detail: u.displayName || u.email || u.uid.slice(0, 8),
+          detail: `${u.displayName || u.email || u.uid.slice(0, 8)}${u.location ? ` \u2022 ${u.location}` : ""}`,
           color: "#22c55e",
         });
       }

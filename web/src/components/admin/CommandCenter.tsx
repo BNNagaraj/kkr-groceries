@@ -536,7 +536,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
                 borderRight: "1px solid var(--c2-border-subtle)",
               }}
             >
-              <ActivityFeed orders={orders} onlineUsers={onlineUsers} theme={c2Theme} />
+              <ActivityFeed orders={orders} onlineUsers={onlineUsersWithLocation} theme={c2Theme} />
             </div>
 
             {/* Mini Charts */}
