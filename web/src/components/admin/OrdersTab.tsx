@@ -111,7 +111,13 @@ function statusBadgeVariant(status: OrderStatus, hasPendingMod: boolean): "defau
   return "outline";
 }
 
-export default function OrdersTab({ products = [] }: { products?: Product[] }) {
+interface OrdersTabProps {
+  products?: Product[];
+  highlightOrderId?: string | null;
+  onHighlightClear?: () => void;
+}
+
+export default function OrdersTab({ products = [], highlightOrderId, onHighlightClear }: OrdersTabProps) {
   const { col } = useMode();
 
   // Lookup map: product name → image URL (for backfilling orders missing images)
@@ -242,6 +248,30 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
   useEffect(() => {
     loadOrders(true);
   }, [loadOrders]);
+
+  // Cross-tab navigation: scroll to and highlight a specific order card
+  useEffect(() => {
+    if (!highlightOrderId) return;
+
+    // Reset filters to show all orders so the target card is visible
+    setDateFilter("all");
+    setStatusFilter("all");
+
+    // Wait for orders to render, then scroll
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`order-card-${highlightOrderId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      // Clear highlight after animation completes (3s)
+      const clearTimer = setTimeout(() => {
+        onHighlightClear?.();
+      }, 3000);
+      return () => clearTimeout(clearTimer);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [highlightOrderId, onHighlightClear]);
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     try {
@@ -614,7 +644,10 @@ export default function OrdersTab({ products = [] }: { products?: Product[] }) {
           return (
             <div
               key={o.id}
-              className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
+              id={`order-card-${o.id}`}
+              className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden${
+                highlightOrderId === o.id ? " c2-order-highlight" : ""
+              }`}
             >
               {/* Header */}
               <div className="p-4 border-b border-slate-100">
