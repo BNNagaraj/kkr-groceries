@@ -5,8 +5,8 @@ export interface ValidationResult {
 
 export function validatePhone(phone: string): ValidationResult {
     const cleaned = phone.replace(/[\s\-+]/g, "");
-    // Strip +91 or 91 prefix
-    const digits = cleaned.replace(/^91/, "");
+    // Strip 91 country code prefix only when number has >10 digits (e.g. 919876543210)
+    const digits = cleaned.length > 10 ? cleaned.replace(/^91/, "") : cleaned;
 
     if (!digits) {
         return { valid: false, error: "Phone number is required" };

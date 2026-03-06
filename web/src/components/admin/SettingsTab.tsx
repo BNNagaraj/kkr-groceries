@@ -13,14 +13,17 @@ import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import ThemeSettingsSection from "./ThemeSettingsSection";
 import {
   DeliverySettings,
   BusinessSettings,
   CheckoutFormSettings,
   CustomField,
+  SmsGatewaySettings,
   DEFAULT_DELIVERY,
   DEFAULT_BUSINESS,
   DEFAULT_CHECKOUT,
+  DEFAULT_SMS_GATEWAY,
 } from "@/types/settings";
 
 interface SmtpSettings {
@@ -94,11 +97,13 @@ export default function SettingsTab() {
   const [business, setBusiness] = useState<BusinessSettings>(DEFAULT_BUSINESS);
   const [checkout, setCheckout] = useState<CheckoutFormSettings>(DEFAULT_CHECKOUT);
   const [smtp, setSmtp] = useState<SmtpSettings>(DEFAULT_SMTP);
+  const [smsGateway, setSmsGateway] = useState<SmsGatewaySettings>(DEFAULT_SMS_GATEWAY);
   const [loading, setLoading] = useState(true);
   const [savingDelivery, setSavingDelivery] = useState(false);
   const [savingBusiness, setSavingBusiness] = useState(false);
   const [savingCheckout, setSavingCheckout] = useState(false);
   const [savingSmtp, setSavingSmtp] = useState(false);
+  const [savingSmsGateway, setSavingSmsGateway] = useState(false);
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [emailSubTab, setEmailSubTab] = useState<"config" | "activity" | "test">("config");
@@ -125,17 +130,19 @@ export default function SettingsTab() {
   useEffect(() => {
     (async () => {
       try {
-        const [dSnap, bSnap, cSnap, sSnap, aSnap] = await Promise.all([
+        const [dSnap, bSnap, cSnap, sSnap, aSnap, sgSnap] = await Promise.all([
           getDoc(doc(db, "settings", "delivery")),
           getDoc(doc(db, "settings", "business")),
           getDoc(doc(db, "settings", "checkout")),
           getDoc(doc(db, "settings", "smtp")),
           getDoc(doc(db, "settings", "admins")),
+          getDoc(doc(db, "settings", "smsGateway")),
         ]);
         if (dSnap.exists()) setDelivery({ ...DEFAULT_DELIVERY, ...dSnap.data() });
         if (bSnap.exists()) setBusiness({ ...DEFAULT_BUSINESS, ...bSnap.data() });
         if (cSnap.exists()) setCheckout({ ...DEFAULT_CHECKOUT, ...cSnap.data() });
         if (sSnap.exists()) setSmtp({ ...DEFAULT_SMTP, ...sSnap.data() });
+        if (sgSnap.exists()) setSmsGateway({ ...DEFAULT_SMS_GATEWAY, ...sgSnap.data() });
         if (aSnap.exists()) {
           const ad = aSnap.data();
           setNotificationEmails(ad.notificationEmails || ad.emails || []);
@@ -766,6 +773,55 @@ export default function SettingsTab() {
                 Show Map Picker
               </span>
             </label>
+            <label className="flex items-center gap-3 p-3 rounded-xl border border-amber-100 bg-amber-50/50 hover:bg-amber-50 cursor-pointer sm:col-span-3">
+              <input
+                type="checkbox"
+                checked={checkout.requireDeliveryOTP}
+                onChange={(e) =>
+                  setCheckout((p) => ({
+                    ...p,
+                    requireDeliveryOTP: e.target.checked,
+                  }))
+                }
+                className="rounded text-amber-600 focus:ring-amber-500"
+              />
+              <div>
+                <span className="text-sm font-medium text-slate-700">
+                  Require Delivery OTP
+                </span>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Send OTP to customer before marking order as Fulfilled
+                </p>
+              </div>
+            </label>
+
+            {/* OTP Channel Selector — visible when OTP is enabled */}
+            {checkout.requireDeliveryOTP && (
+              <div className="sm:col-span-3 p-3 rounded-xl border border-amber-100 bg-amber-50/30 space-y-2">
+                <label className="text-sm font-medium text-slate-700 block">OTP Delivery Channel</label>
+                <select
+                  value={checkout.otpChannels || "email"}
+                  onChange={(e) =>
+                    setCheckout((p) => ({
+                      ...p,
+                      otpChannels: e.target.value as "email" | "sms" | "both",
+                    }))
+                  }
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="email">Email Only</option>
+                  <option value="sms">SMS Only (Firebase Phone Auth)</option>
+                  <option value="both">Both SMS &amp; Email</option>
+                </select>
+                <p className="text-[11px] text-slate-400">
+                  {checkout.otpChannels === "sms"
+                    ? "SMS OTP via Firebase Phone Auth (second project). Buyer receives Firebase's auto-generated code."
+                    : checkout.otpChannels === "both"
+                    ? "Email sends a custom OTP code. SMS sends a separate Firebase-generated code. Either code verifies delivery."
+                    : "Custom OTP code sent to customer's email address."}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Custom Fields */}
@@ -1382,6 +1438,121 @@ export default function SettingsTab() {
           )}
         </div>
       </div>
+
+      {/* SMS Gateway Settings (MSG91 — Future Use) */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                <Mail className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                  SMS Gateway (MSG91)
+                  <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Future Use
+                  </span>
+                </h3>
+                <p className="text-sm text-slate-500">
+                  Configure MSG91 API for sending SMS OTP with a custom code (same code as email)
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={async () => {
+                setSavingSmsGateway(true);
+                try {
+                  await setDoc(doc(db, "settings", "smsGateway"), smsGateway, { merge: true });
+                  toast.success("SMS gateway settings saved!");
+                } catch (e) {
+                  console.error("[Settings] Save SMS gateway error:", e);
+                  toast.error("Failed to save SMS gateway settings.");
+                } finally {
+                  setSavingSmsGateway(false);
+                }
+              }}
+              disabled={savingSmsGateway}
+              size="sm"
+            >
+              <Save className="w-4 h-4 mr-1" />
+              {savingSmsGateway ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </div>
+        <div className="p-6 space-y-4">
+          {/* Enable toggle */}
+          <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:bg-slate-50 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={smsGateway.enabled}
+              onChange={(e) =>
+                setSmsGateway((p) => ({ ...p, enabled: e.target.checked }))
+              }
+              className="rounded text-blue-600 focus:ring-blue-500"
+            />
+            <div>
+              <span className="text-sm font-medium text-slate-700">Enable MSG91 Gateway</span>
+              <p className="text-xs text-slate-400 mt-0.5">
+                When enabled, delivery OTP will use MSG91 to send SMS with the same code as email
+              </p>
+            </div>
+          </label>
+
+          {/* Config fields (always visible for pre-configuration) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm text-slate-500 mb-1 block">API Key</label>
+              <Input
+                type="password"
+                value={smsGateway.apiKey}
+                onChange={(e) =>
+                  setSmsGateway((p) => ({ ...p, apiKey: e.target.value }))
+                }
+                placeholder="Enter MSG91 API key"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-500 mb-1 block">Sender ID (6 chars)</label>
+              <Input
+                value={smsGateway.senderId}
+                onChange={(e) =>
+                  setSmsGateway((p) => ({
+                    ...p,
+                    senderId: e.target.value.slice(0, 6).toUpperCase(),
+                  }))
+                }
+                placeholder="KKRGRO"
+                maxLength={6}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-sm text-slate-500 mb-1 block">DLT Template ID</label>
+              <Input
+                value={smsGateway.templateId}
+                onChange={(e) =>
+                  setSmsGateway((p) => ({ ...p, templateId: e.target.value }))
+                }
+                placeholder="Enter DLT-registered template ID"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                DLT registration is mandatory in India for transactional SMS. Template must include variables for OTP code.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-blue-50 border border-blue-100 p-3">
+            <p className="text-xs text-blue-600">
+              <strong>Note:</strong> MSG91 integration is for future use. Currently, SMS OTP uses Firebase Phone Auth
+              from the second project (kkr-groceries-02-otp). When MSG91 is configured and enabled, it will allow sending
+              the same OTP code via both SMS and Email.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Store Theme Settings */}
+      <ThemeSettingsSection />
     </div>
   );
 }

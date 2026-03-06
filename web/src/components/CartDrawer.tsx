@@ -4,12 +4,13 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { useAppStore } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { MapPin, Truck, ChevronRight, User, Trash2, BookMarked, Check, ShoppingCart, ClipboardList } from "lucide-react";
+import { MapPin, Truck, ChevronRight, User, Trash2, BookMarked, Check, ShoppingCart, ClipboardList, FileText, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { functions, db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
-import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
+import { collection, query, where, orderBy, limit, getDocs, doc, getDoc } from "firebase/firestore";
 import { MapPicker, LocationDetails } from "./MapPicker";
 import { validateName, validatePhone, validateAddress, sanitizeInput } from "@/lib/validation";
+import { resolveSlabPrice, getAppliedTierLabel } from "@/lib/pricing";
 import { useMode } from "@/contexts/ModeContext";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -70,9 +71,11 @@ function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
 function EditableQty({
     qty,
     onUpdate,
+    minQty = 1,
 }: {
     qty: number;
     onUpdate: (newQty: number) => void;
+    minQty?: number;
 }) {
     const [editing, setEditing] = useState(false);
     const [value, setValue] = useState(String(qty));
@@ -91,7 +94,9 @@ function EditableQty({
     const handleConfirm = () => {
         const num = parseFloat(value);
         if (!isNaN(num) && num > 0 && num !== qty) {
-            onUpdate(num);
+            // Enforce MOQ — snap to minimum if below
+            const finalQty = num < minQty ? minQty : num;
+            onUpdate(finalQty);
         }
         setEditing(false);
     };
@@ -159,13 +164,38 @@ export function CartDrawer({
     const [loading, setLoading] = useState(false);
     const [mapOpen, setMapOpen] = useState(false);
 
+    // Ref-based guard: stays true for a brief window AFTER mapOpen becomes false
+    // so that delayed mobile touch/focus events don't leak through to the Sheet.
+    const mapOpenRef = useRef(false);
+    useEffect(() => {
+        if (mapOpen) {
+            mapOpenRef.current = true;
+        } else {
+            // Keep ref true for 500 ms after close to absorb ghost events
+            const t = setTimeout(() => { mapOpenRef.current = false; }, 500);
+            return () => clearTimeout(t);
+        }
+    }, [mapOpen]);
+
     // Form State
     const [customerName, setCustomerName] = useState("");
     const [shopName, setShopName] = useState("");
-    const [phone, setPhone] = useState(currentUser?.phoneNumber || "");
+    const [phone, setPhone] = useState(() => {
+        const raw = currentUser?.phoneNumber || "";
+        // Strip +91 country code from Firebase auth phone numbers to get 10-digit form
+        return raw.replace(/^\+91/, "").replace(/\D/g, "").slice(0, 10);
+    });
     const [address, setAddress] = useState("");
     const [locationDetails, setLocationDetails] = useState<LocationDetails | null>(null);
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+    // GSTIN (optional, verify-only)
+    const [gstin, setGstin] = useState("");
+    const [gstinStatus, setGstinStatus] = useState<"idle" | "verifying" | "verified" | "error">("idle");
+    const [gstinMessage, setGstinMessage] = useState("");
+    const [gstinLegalName, setGstinLegalName] = useState("");
+    const [gstinEntityType, setGstinEntityType] = useState("");
+    const gstinLoadedRef = useRef(false);
 
     // Saved Addresses State
     const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
@@ -256,12 +286,78 @@ export function CartDrawer({
         }
     }, [step, currentUser, loadSavedAddresses]);
 
+    // Pre-fill GSTIN from user profile (once per cart open)
+    useEffect(() => {
+        if (step >= 2 && currentUser && !gstinLoadedRef.current) {
+            gstinLoadedRef.current = true;
+            (async () => {
+                try {
+                    const snap = await getDoc(doc(db, "users", currentUser.uid));
+                    if (snap.exists()) {
+                        const p = snap.data();
+                        if (p.gstin && p.gstinVerified) {
+                            setGstin(p.gstin);
+                            setGstinStatus("verified");
+                            setGstinLegalName(p.legalName || "");
+                            setGstinEntityType(p.entityType || "");
+                            setGstinMessage("Verified");
+                        } else if (p.gstin) {
+                            setGstin(p.gstin);
+                        }
+                    }
+                } catch (e) {
+                    console.warn("[CartDrawer] Failed to load GSTIN from profile:", e);
+                }
+            })();
+        }
+    }, [step, currentUser]);
+
     // Reset addressesLoaded when cart drawer closes so fresh fetch next time
     useEffect(() => {
         if (!isOpen) {
             setAddressesLoaded(false);
+            gstinLoadedRef.current = false;
         }
     }, [isOpen]);
+
+    // Verify GSTIN via cloud function
+    const handleVerifyGSTIN = async () => {
+        const value = gstin.trim().toUpperCase();
+        if (!value || value.length !== 15) {
+            setGstinStatus("error");
+            setGstinMessage("GSTIN must be exactly 15 characters");
+            return;
+        }
+        setGstinStatus("verifying");
+        setGstinMessage("");
+        try {
+            const verifyFn = httpsCallable(functions, "verifyGSTIN");
+            const result = await verifyFn({ gstin: value });
+            const data = result.data as {
+                valid: boolean; verified: boolean;
+                legalName?: string; tradeName?: string;
+                entityType?: string; message: string;
+            };
+            if (data.verified && data.valid) {
+                setGstin(value);
+                setGstinStatus("verified");
+                setGstinMessage(data.message);
+                setGstinLegalName(data.legalName || "");
+                setGstinEntityType(data.entityType || "");
+                // Auto-fill shop name from trade name if empty
+                if (data.tradeName && !shopName.trim()) {
+                    setShopName(data.tradeName);
+                }
+            } else {
+                setGstinStatus("error");
+                setGstinMessage(data.message || "Verification failed");
+            }
+        } catch (e) {
+            console.error("[CartDrawer] GSTIN verify error:", e);
+            setGstinStatus("error");
+            setGstinMessage("Verification failed. Please try again.");
+        }
+    };
 
     // Validate form and advance to step 3
     const handleProceedToConfirm = () => {
@@ -272,6 +368,11 @@ export function CartDrawer({
         if (!phoneResult.valid) errors.phone = phoneResult.error!;
         const addressResult = validateAddress(address);
         if (!addressResult.valid) errors.address = addressResult.error!;
+
+        // GSTIN is optional, but if entered it must be verified
+        if (gstin.trim() && gstinStatus !== "verified") {
+            errors.gstin = "Please verify your GSTIN before proceeding, or clear the field to skip.";
+        }
 
         if (Object.keys(errors).length > 0) {
             setFormErrors(errors);
@@ -299,8 +400,24 @@ export function CartDrawer({
                 .map((i) => `${i.name} (${i.qty} ${i.unit})`)
                 .join(", ");
 
-            const payload = {
-                cart: cartItems,
+            // Resolve slab pricing for each cart item
+            const resolvedCart = cartItems.map((item) => {
+                const effectivePrice = resolveSlabPrice(item.qty, item.price, item.priceTiers);
+                return {
+                    name: item.name,
+                    qty: item.qty,
+                    price: effectivePrice,
+                    unit: item.unit,
+                    image: item.image || "",
+                    telugu: item.telugu || "",
+                    hindi: item.hindi || "",
+                    basePrice: item.price,
+                    appliedTier: getAppliedTierLabel(item.qty, item.price, item.priceTiers, item.unit) || "",
+                };
+            });
+
+            const payload: Record<string, unknown> = {
+                cart: resolvedCart,
                 customerName: sanitizeInput(customerName),
                 customerPhone: sanitizeInput(phone),
                 shopName: sanitizeInput(shopName),
@@ -310,6 +427,13 @@ export function CartDrawer({
                 productCount: cartItems.length,
                 totalValue: `₹${total.toLocaleString("en-IN")}`,
             };
+
+            // Include verified GSTIN if present
+            if (gstin && gstinStatus === "verified") {
+                payload.gstin = gstin;
+                if (gstinLegalName) payload.gstinLegalName = gstinLegalName;
+                if (gstinEntityType) payload.gstinEntityType = gstinEntityType;
+            }
 
             const result = await submitOrderApi(payload);
 
@@ -332,8 +456,16 @@ export function CartDrawer({
 
     return (
         <>
-            <Sheet open={isOpen} onOpenChange={(open) => { if (!open) { setStep(1); onClose(); } }}>
-                <SheetContent side="right" showCloseButton={step === 1} className="flex flex-col p-0 w-full sm:max-w-md">
+            <Sheet open={isOpen} onOpenChange={(open) => { if (!open) { if (mapOpenRef.current) return; setStep(1); onClose(); } }}>
+                <SheetContent
+                    side="right"
+                    showCloseButton={step === 1}
+                    className="flex flex-col p-0 w-full sm:max-w-md"
+                    onInteractOutside={(e) => { if (mapOpenRef.current) e.preventDefault(); }}
+                    onPointerDownOutside={(e) => { if (mapOpenRef.current) e.preventDefault(); }}
+                    onFocusOutside={(e) => { if (mapOpenRef.current) e.preventDefault(); }}
+                    onEscapeKeyDown={(e) => { if (mapOpenRef.current) e.preventDefault(); }}
+                >
                     <SheetHeader className="p-4 border-b border-slate-100 shrink-0">
                         <SheetTitle className="flex items-center gap-2">
                             {step > 1 ? (
@@ -405,12 +537,20 @@ export function CartDrawer({
                                                             {item.name}
                                                         </span>
                                                         <span className="font-bold text-emerald-700 whitespace-nowrap">
-                                                            ₹{(item.price * item.qty).toLocaleString("en-IN")}
+                                                            ₹{(resolveSlabPrice(item.qty, item.price, item.priceTiers) * item.qty).toLocaleString("en-IN")}
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center justify-between mt-2">
                                                         <div className="text-xs text-slate-500">
-                                                            ₹{item.price}/{item.unit}
+                                                            ₹{resolveSlabPrice(item.qty, item.price, item.priceTiers)}/{item.unit}
+                                                            {item.priceTiers?.length ? (
+                                                                <span className="text-emerald-600 ml-1 font-medium">
+                                                                    ({getAppliedTierLabel(item.qty, item.price, item.priceTiers, item.unit)})
+                                                                </span>
+                                                            ) : null}
+                                                            {item.moqRequired !== false && item.moq > 1 && (
+                                                                <span className="text-slate-400 ml-1">(Min: {item.moq})</span>
+                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             <button
@@ -433,6 +573,7 @@ export function CartDrawer({
                                                                         const delta = newQty - item.qty;
                                                                         if (delta !== 0) addToCart(item, delta);
                                                                     }}
+                                                                    minQty={(item.moqRequired !== false && item.moq > 0) ? item.moq : 1}
                                                                 />
                                                                 <button
                                                                     onClick={() => addToCart(item, 1)}
@@ -511,13 +652,14 @@ export function CartDrawer({
                                         <Input
                                             required
                                             type="tel"
+                                            inputMode="numeric"
                                             value={phone}
                                             onChange={(e) => {
-                                                setPhone(e.target.value);
+                                                setPhone(e.target.value.replace(/\D/g, "").slice(0, 10));
                                                 setFormErrors((prev) => { const n = { ...prev }; delete n.phone; return n; });
                                             }}
                                             className={formErrors.phone ? "border-destructive" : ""}
-                                            placeholder="+91"
+                                            placeholder="10-digit phone"
                                         />
                                         {formErrors.phone && <p className="text-destructive text-xs mt-1">{formErrors.phone}</p>}
                                     </div>
@@ -593,7 +735,7 @@ export function CartDrawer({
                                                 setAddress("");
                                                 setCustomerName("");
                                                 setShopName("");
-                                                setPhone(currentUser?.phoneNumber || "");
+                                                setPhone((currentUser?.phoneNumber || "").replace(/^\+91/, "").replace(/\D/g, "").slice(0, 10));
                                             }}
                                             className="w-full mt-2 text-xs text-primary font-semibold py-1.5 hover:bg-primary/5 rounded-lg transition-colors"
                                         >
@@ -626,6 +768,101 @@ export function CartDrawer({
                                     >
                                         <MapPin className="w-4 h-4" /> Pick on Map
                                     </Button>
+                                </div>
+
+                                {/* ── GSTIN (Optional) ─────────────────────── */}
+                                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                                    <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-1">
+                                        <FileText className="w-5 h-5 text-primary" /> GSTIN
+                                        <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                                    </h3>
+                                    <p className="text-xs text-slate-400 mb-3">For GST invoice. Must be verified to apply.</p>
+
+                                    <div className="flex gap-2">
+                                        <Input
+                                            value={gstin}
+                                            onChange={(e) => {
+                                                const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15);
+                                                setGstin(v);
+                                                if (gstinStatus !== "idle") {
+                                                    setGstinStatus("idle");
+                                                    setGstinMessage("");
+                                                    setGstinLegalName("");
+                                                    setGstinEntityType("");
+                                                }
+                                                setFormErrors((prev) => { const n = { ...prev }; delete n.gstin; return n; });
+                                            }}
+                                            className={`flex-1 font-mono text-sm tracking-wider ${
+                                                gstinStatus === "verified" ? "border-emerald-400 bg-emerald-50/50" :
+                                                gstinStatus === "error" ? "border-destructive" : ""
+                                            }`}
+                                            placeholder="e.g. 29AANCS5446E1ZZ"
+                                            disabled={gstinStatus === "verifying"}
+                                        />
+                                        {gstinStatus === "verified" ? (
+                                            <div className="flex items-center gap-1 text-emerald-600 px-3 shrink-0">
+                                                <CheckCircle2 className="w-5 h-5" />
+                                            </div>
+                                        ) : (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleVerifyGSTIN}
+                                                disabled={gstinStatus === "verifying" || gstin.trim().length !== 15}
+                                                className="shrink-0 h-10"
+                                            >
+                                                {gstinStatus === "verifying" ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : "Verify"}
+                                            </Button>
+                                        )}
+                                    </div>
+
+                                    {/* Status messages */}
+                                    {gstinStatus === "verified" && gstinLegalName && (
+                                        <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 text-xs text-emerald-800 space-y-1">
+                                            <div className="flex gap-2">
+                                                <span className="font-semibold text-emerald-600 w-20 shrink-0">
+                                                    {gstinEntityType === "Proprietorship" ? "Proprietor:" : "Legal Name:"}
+                                                </span>
+                                                <span className="font-medium">{gstinLegalName}</span>
+                                            </div>
+                                            {gstinEntityType && (
+                                                <div className="flex gap-2">
+                                                    <span className="font-semibold text-emerald-600 w-20 shrink-0">Entity:</span>
+                                                    <span>{gstinEntityType}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    {gstinStatus === "error" && gstinMessage && (
+                                        <p className="text-destructive text-xs mt-1.5 flex items-center gap-1">
+                                            <AlertCircle className="w-3 h-3" /> {gstinMessage}
+                                        </p>
+                                    )}
+                                    {formErrors.gstin && (
+                                        <p className="text-destructive text-xs mt-1.5 flex items-center gap-1">
+                                            <AlertCircle className="w-3 h-3" /> {formErrors.gstin}
+                                        </p>
+                                    )}
+
+                                    {/* Quick clear if verified */}
+                                    {gstinStatus === "verified" && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setGstin("");
+                                                setGstinStatus("idle");
+                                                setGstinMessage("");
+                                                setGstinLegalName("");
+                                                setGstinEntityType("");
+                                            }}
+                                            className="mt-2 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                                        >
+                                            Remove GSTIN from this order
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
@@ -668,6 +905,15 @@ export function CartDrawer({
                                             <span className="text-slate-400 w-16 shrink-0">Address</span>
                                             <span className="font-medium text-slate-800 leading-relaxed">{address}</span>
                                         </div>
+                                        {gstin && gstinStatus === "verified" && (
+                                            <div className="flex gap-3 pt-1 border-t border-slate-100 mt-1">
+                                                <span className="text-slate-400 w-16 shrink-0">GSTIN</span>
+                                                <span className="font-medium text-slate-800 font-mono text-xs tracking-wider flex items-center gap-1.5">
+                                                    {gstin}
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                     <button
                                         onClick={() => setStep(2)}
@@ -704,11 +950,11 @@ export function CartDrawer({
                                                     </div>
                                                     <div className="min-w-0">
                                                         <div className="font-semibold text-sm text-slate-800 truncate">{item.name}</div>
-                                                        <div className="text-xs text-slate-400">{item.qty} {item.unit} × ₹{item.price}</div>
+                                                        <div className="text-xs text-slate-400">{item.qty} {item.unit} × ₹{resolveSlabPrice(item.qty, item.price, item.priceTiers)}</div>
                                                     </div>
                                                 </div>
                                                 <span className="font-bold text-sm text-emerald-700 shrink-0 ml-2">
-                                                    ₹{(item.price * item.qty).toLocaleString("en-IN")}
+                                                    ₹{(resolveSlabPrice(item.qty, item.price, item.priceTiers) * item.qty).toLocaleString("en-IN")}
                                                 </span>
                                             </div>
                                         ))}

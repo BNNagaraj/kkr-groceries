@@ -118,10 +118,11 @@ export function EnquiryModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                                     <Input
                                         required
                                         type="tel"
+                                        inputMode="numeric"
                                         value={formData.phone}
-                                        onChange={e => { setFormData({ ...formData, phone: e.target.value }); setFormErrors(p => { const n = { ...p }; delete n.phone; return n; }); }}
+                                        onChange={e => { setFormData({ ...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }); setFormErrors(p => { const n = { ...p }; delete n.phone; return n; }); }}
                                         className={formErrors.phone ? "border-destructive" : ""}
-                                        placeholder="+91"
+                                        placeholder="10-digit phone"
                                     />
                                     {formErrors.phone && <p className="text-destructive text-xs mt-1">{formErrors.phone}</p>}
                                 </div>

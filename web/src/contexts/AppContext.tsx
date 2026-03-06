@@ -3,6 +3,13 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { resolveSlabPrice } from "@/lib/pricing";
+
+export interface PriceTier {
+    minQty: number;
+    maxQty: number; // 0 = unlimited
+    price: number;
+}
 
 export interface Product {
     id: number;
@@ -18,6 +25,7 @@ export interface Product {
     hot?: boolean;
     fresh?: boolean;
     moqRequired?: boolean;
+    priceTiers?: PriceTier[];
 }
 
 interface CartItem extends Product {
@@ -107,8 +115,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             const newCart = { ...prev };
             const currentQty = newCart[product.id]?.qty || 0;
             const newQty = currentQty + change;
+            const moq = (product.moqRequired !== false && product.moq > 0) ? product.moq : 1;
 
             if (newQty <= 0) {
+                delete newCart[product.id];
+            } else if (newQty < moq) {
+                // Below MOQ — remove from cart (user must add at least MOQ)
                 delete newCart[product.id];
             } else {
                 newCart[product.id] = { ...product, qty: newQty };
@@ -133,7 +145,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const getCartTotal = () => {
         let total = 0;
         Object.values(cart).forEach((item) => {
-            total += item.price * item.qty;
+            const effectivePrice = resolveSlabPrice(item.qty, item.price, item.priceTiers);
+            total += effectivePrice * item.qty;
         });
         return total;
     };

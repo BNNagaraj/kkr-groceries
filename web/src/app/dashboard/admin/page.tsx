@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppStore, Product } from "@/contexts/AppContext";
 import { db, functions } from "@/lib/firebase";
@@ -8,7 +8,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import Link from "next/link";
 import Image from "next/image";
-import { Settings, PackageSearch, Activity, ArrowLeft, LogOut, Save, Upload, Loader2, Search, Cog, Users, ShoppingBasket, BookOpen, FlaskConical, Plus } from "lucide-react";
+import { Settings, PackageSearch, Activity, ArrowLeft, LogOut, Save, Upload, Loader2, Search, Cog, Users, ShoppingBasket, BookOpen, FlaskConical, Plus, Zap } from "lucide-react";
 import { PRODUCT_CATEGORIES } from "@/lib/constants";
 import { useMode } from "@/contexts/ModeContext";
 import { ModeToggle } from "@/components/admin/ModeToggle";
@@ -19,7 +19,9 @@ import SettingsTab from "@/components/admin/SettingsTab";
 import UsersTab from "@/components/admin/UsersTab";
 import BuyingStockTab from "@/components/admin/BuyingStockTab";
 import AccountsTab from "@/components/admin/AccountsTab";
+import CommandCenter from "@/components/admin/CommandCenter";
 import AddProductModal from "@/components/admin/AddProductModal";
+import PriceTierEditor from "@/components/admin/PriceTierEditor";
 import { markOffline } from "@/hooks/usePresence";
 import { toast } from "sonner";
 
@@ -42,7 +44,26 @@ export default function AdminDashboard() {
     const { mode } = useMode();
     const router = useRouter();
 
-    const [activeTab, setActiveTab] = useState<"prices" | "orders" | "stats" | "users" | "stock" | "accounts" | "settings">("prices");
+    const [activeTab, setActiveTab] = useState<"command" | "prices" | "orders" | "stats" | "users" | "stock" | "accounts" | "settings">("command");
+    const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
+
+    // Navigate from C2 map to Orders tab, highlighting a specific order
+    const navigateToOrder = useCallback((orderId: string) => {
+        setHighlightOrderId(orderId);
+        setActiveTab("orders");
+    }, []);
+
+    // F2 keyboard shortcut to jump to Command Center
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === "F2") {
+                e.preventDefault();
+                setActiveTab("command");
+            }
+        };
+        window.addEventListener("keydown", handler);
+        return () => window.removeEventListener("keydown", handler);
+    }, []);
     const [editingProducts, setEditingProducts] = useState<Product[]>([]);
     const [globalCommission, setGlobalCommission] = useState(15);
     const [loading, setLoading] = useState(false);
@@ -50,6 +71,7 @@ export default function AdminDashboard() {
     const [uploadingId, setUploadingId] = useState<number | null>(null);
     const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
     const [addProductOpen, setAddProductOpen] = useState(false);
+    const [tierEditProduct, setTierEditProduct] = useState<Product | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploadTargetId = useRef<number | null>(null);
 
@@ -194,6 +216,12 @@ export default function AdminDashboard() {
 
                 <nav className="p-4 flex flex-row md:flex-col gap-2 overflow-x-auto no-scrollbar flex-1">
                     <button
+                        onClick={() => setActiveTab("command")}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'command' ? 'bg-gradient-to-r from-amber-500/20 to-emerald-500/20 text-amber-400 shadow-inner border border-amber-500/20' : 'hover:bg-slate-800/50 hover:text-amber-300'}`}
+                    >
+                        <Zap className="w-5 h-5" /> Command Center
+                    </button>
+                    <button
                         onClick={() => setActiveTab("prices")}
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'prices' ? 'bg-slate-800 text-white shadow-inner' : 'hover:bg-slate-800/50 hover:text-white'}`}
                     >
@@ -253,9 +281,20 @@ export default function AdminDashboard() {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 p-4 md:p-8 max-h-screen overflow-y-auto">
-                <div className="max-w-6xl mx-auto">
-                    {mode === "test" && (
+            <div className={`flex-1 max-h-screen overflow-y-auto ${activeTab === 'command' ? 'p-2 md:p-3' : 'p-4 md:p-8'}`}>
+                {activeTab === "command" && (
+                    <>
+                        {mode === "test" && (
+                            <div className="bg-amber-950/50 border border-amber-500/30 text-amber-400 px-4 py-2 rounded-lg mb-2 text-[11px] font-semibold flex items-center justify-center gap-2">
+                                <FlaskConical className="w-3.5 h-3.5" />
+                                TEST MODE — Monitoring test data
+                            </div>
+                        )}
+                        <CommandCenter onNavigateToOrder={navigateToOrder} />
+                    </>
+                )}
+                <div className={`max-w-6xl mx-auto ${activeTab === 'command' ? 'hidden' : ''}`}>
+                    {mode === "test" && activeTab !== "command" && (
                         <div className="bg-amber-50 border border-amber-300 text-amber-800 px-4 py-2.5 rounded-xl mb-4 text-sm font-semibold flex items-center justify-center gap-2">
                             <FlaskConical className="w-4 h-4" />
                             TEST MODE — Data shown is for testing purposes only
@@ -325,6 +364,7 @@ export default function AdminDashboard() {
                                                         <span>MOQ Req.</span>
                                                     </label>
                                                 </th>
+                                                <th className="px-4 py-3 text-center">Tiers</th>
                                                 <th className="px-4 py-3">Badging</th>
                                             </tr>
                                         </thead>
@@ -416,6 +456,20 @@ export default function AdminDashboard() {
                                                             className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
                                                         />
                                                     </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <button
+                                                            onClick={() => setTierEditProduct(p)}
+                                                            className={`text-xs px-2 py-1 rounded-lg font-semibold transition-colors ${
+                                                                p.priceTiers && p.priceTiers.length > 0
+                                                                    ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                                                    : "bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                                                            }`}
+                                                        >
+                                                            {p.priceTiers && p.priceTiers.length > 0
+                                                                ? `${p.priceTiers.length} tiers`
+                                                                : "+ Add"}
+                                                        </button>
+                                                    </td>
                                                     <td className="px-4 py-3">
                                                         <div className="flex gap-3">
                                                             <label className="flex items-center gap-1 text-xs cursor-pointer">
@@ -445,7 +499,13 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
-                    {activeTab === "orders" && <OrdersTab products={products} />}
+                    {activeTab === "orders" && (
+                        <OrdersTab
+                            products={products}
+                            highlightOrderId={highlightOrderId}
+                            onHighlightClear={() => setHighlightOrderId(null)}
+                        />
+                    )}
 
                     {activeTab === "stats" && <AdminAnalytics />}
 
@@ -464,6 +524,22 @@ export default function AdminDashboard() {
                         existingIds={editingProducts.map(p => p.id)}
                         onProductAdded={(p) => setEditingProducts(prev => [...prev, p])}
                     />
+
+                    {/* Price Tier Editor Modal */}
+                    {tierEditProduct && (
+                        <PriceTierEditor
+                            product={tierEditProduct}
+                            onSave={(productId, tiers) => {
+                                setEditingProducts(prev =>
+                                    prev.map(p => p.id === productId
+                                        ? { ...p, priceTiers: tiers.length > 0 ? tiers : undefined }
+                                        : p
+                                    )
+                                );
+                            }}
+                            onClose={() => setTierEditProduct(null)}
+                        />
+                    )}
                 </div>
             </div>
         </div>

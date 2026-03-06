@@ -4,9 +4,10 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getAuth } = require("firebase-admin/auth");
+const { generateInvoicePdf } = require("./invoice");
 // ─── Default SMTP config (fallback if settings/smtp doc doesn't exist) ───
 const DEFAULT_SMTP = {
-  user: "raju2uraju@gmail.com",
+  user: "kkr.groceries.hyd@gmail.com",
   host: "smtp.gmail.com",
   port: 587,
   secure: false,
@@ -15,6 +16,22 @@ const DEFAULT_SMTP = {
 
 initializeApp();
 const db = getFirestore();
+
+// ─── Slab/Tiered Pricing Resolution ───
+function resolveSlabPrice(qty, basePrice, priceTiers) {
+  if (!priceTiers || !Array.isArray(priceTiers) || priceTiers.length === 0) {
+    return basePrice;
+  }
+  const sorted = [...priceTiers].sort((a, b) => a.minQty - b.minQty);
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const tier = sorted[i];
+    const maxQty = tier.maxQty === 0 ? Infinity : tier.maxQty;
+    if (qty >= tier.minQty && qty <= maxQty) {
+      return tier.price;
+    }
+  }
+  return basePrice;
+}
 
 // ─── Premium Email Template Builder ───
 function emailLayout(bodyContent, preheader = "") {
@@ -182,9 +199,9 @@ function buildOrderEmailHtml({ orderId, customerName, phone, shopName, deliveryA
 }
 
 function buildStatusEmailHtml({ orderId, customerName, newStatus, cart, totalValue, productCount, statusInfo }) {
-  const statusColors = { Accepted: "#2563eb", Fulfilled: "#059669", Rejected: "#dc2626" };
-  const statusBg = { Accepted: "#eff6ff", Fulfilled: "#f0fdf4", Rejected: "#fef2f2" };
-  const statusEmoji = { Accepted: "✅", Fulfilled: "🚚", Rejected: "❌" };
+  const statusColors = { Accepted: "#2563eb", Shipped: "#6366f1", Fulfilled: "#059669", Rejected: "#dc2626" };
+  const statusBg = { Accepted: "#eff6ff", Shipped: "#eef2ff", Fulfilled: "#f0fdf4", Rejected: "#fef2f2" };
+  const statusEmoji = { Accepted: "✅", Shipped: "🚚", Fulfilled: "📦", Rejected: "❌" };
   const color = statusColors[newStatus] || "#475569";
   const bg = statusBg[newStatus] || "#f8fafc";
   const emoji = statusEmoji[newStatus] || "📦";
@@ -277,9 +294,11 @@ async function getSmtpConfig() {
     if (snap.exists) {
       const data = snap.data();
       if (data.user && data.password) {
+        // Strip spaces from Gmail app passwords (displayed as "xxxx xxxx xxxx xxxx"
+        // but must be sent as "xxxxxxxxxxxxxxxx" for SMTP AUTH)
         const config = {
-          user: data.user,
-          password: data.password,
+          user: data.user.trim(),
+          password: data.password.replace(/\s+/g, ""),
           host: data.host || DEFAULT_SMTP.host,
           port: data.port || DEFAULT_SMTP.port,
           secure: data.secure ?? DEFAULT_SMTP.secure,
@@ -295,7 +314,7 @@ async function getSmtpConfig() {
   // Fallback: use hardcoded defaults + env secret
   return {
     ...DEFAULT_SMTP,
-    password: process.env.GMAIL_APP_PASSWORD || "",
+    password: (process.env.GMAIL_APP_PASSWORD || "").replace(/\s+/g, ""),
   };
 }
 
@@ -487,6 +506,85 @@ exports.submitOrder = onCall(async (request) => {
       throw new HttpsError("invalid-argument", "Missing required customer details.");
     }
 
+    // Validate MOQ — fetch product definitions and check quantities
+    const productsSnap = await db.collection("products").get();
+    const productMap = {};
+    productsSnap.docs.forEach((doc) => {
+      const pData = doc.data();
+      productMap[doc.id] = pData;
+      // Also map by numeric id if present
+      if (pData.id !== undefined) productMap[String(pData.id)] = pData;
+    });
+
+    const moqViolations = [];
+    for (const item of data.cart) {
+      const productId = String(item.id);
+      const product = productMap[productId];
+      if (!product) continue; // skip unknown products
+
+      const moqRequired = product.moqRequired !== false;
+      const moq = product.moq > 0 ? product.moq : 1;
+
+      if (moqRequired && item.qty < moq) {
+        moqViolations.push(`${item.name || product.name}: minimum ${moq} ${product.unit || item.unit}, got ${item.qty}`);
+      }
+    }
+
+    if (moqViolations.length > 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        `Minimum order quantity not met: ${moqViolations.join("; ")}`
+      );
+    }
+
+    // Validate slab pricing — ensure client-sent price matches server-resolved slab
+    const priceViolations = [];
+    for (const item of data.cart) {
+      const productId = String(item.id);
+      const product = productMap[productId];
+      if (!product) continue;
+
+      const expectedPrice = resolveSlabPrice(item.qty, product.price, product.priceTiers);
+      if (Math.abs(item.price - expectedPrice) > 0.01) {
+        priceViolations.push(
+          `${item.name || product.name}: expected ₹${expectedPrice} for qty ${item.qty}, got ₹${item.price}`
+        );
+      }
+    }
+
+    if (priceViolations.length > 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        `Price mismatch: ${priceViolations.join("; ")}`
+      );
+    }
+
+    // Fetch buyer profile for GSTIN / billing address
+    // Checkout-supplied GSTIN (already verified on client) takes precedence over profile
+    let buyerGstin = data.gstin || null;
+    let billingAddress = null;
+    let buyerLegalName = data.gstinLegalName || null;
+    let buyerEntityType = data.gstinEntityType || null;
+    if (request.auth?.uid) {
+      try {
+        const profileSnap = await db.collection("users").doc(request.auth.uid).get();
+        if (profileSnap.exists) {
+          const p = profileSnap.data();
+          // Only use profile GSTIN if none was supplied at checkout
+          if (!buyerGstin && p.gstin && p.gstinVerified) {
+            buyerGstin = p.gstin;
+            buyerLegalName = p.legalName || null;
+            buyerEntityType = p.entityType || null;
+          }
+          if (!billingAddress && p.registeredAddress) {
+            billingAddress = p.registeredAddress;
+          }
+        }
+      } catch (e) {
+        console.warn("Could not fetch buyer profile:", e.message);
+      }
+    }
+
     const orderId = `ORD-${Date.now()}`;
     const orderDoc = {
       id: orderId,
@@ -507,6 +605,11 @@ exports.submitOrder = onCall(async (request) => {
       createdAt: FieldValue.serverTimestamp(),
       status: "Pending",
       source: "Cloud Function",
+      // GSTIN / billing details (from checkout or buyer profile)
+      ...(buyerGstin && { buyerGstin }),
+      ...(billingAddress && { billingAddress }),
+      ...(buyerLegalName && { buyerLegalName }),
+      ...(buyerEntityType && { buyerEntityType }),
     };
 
     const mode = await getAppMode();
@@ -598,6 +701,26 @@ exports.notifyOrderStatusChange = onCall(async (request) => {
     const customerName = order.customerName || "Customer";
     const displayOrderId = order.orderId || orderId;
 
+    // Generate invoice PDF attachment for Fulfilled orders
+    let pdfAttachments = [];
+    if (newStatus === "Fulfilled") {
+      try {
+        const bizSnap = await db.collection("settings").doc("business").get();
+        const bizData = bizSnap.exists ? bizSnap.data() : {};
+        const pdfBuffer = generateInvoicePdf(order, bizData);
+        const pdfBase64 = pdfBuffer.toString("base64");
+        pdfAttachments = [{
+          filename: `Invoice_${displayOrderId}.pdf`,
+          content: pdfBase64,
+          contentType: "application/pdf",
+        }];
+        console.log(`Invoice PDF generated for ${displayOrderId}: ${pdfBuffer.length} bytes`);
+      } catch (pdfErr) {
+        console.error("Failed to generate invoice PDF:", pdfErr);
+        // Don't block the email — send without attachment
+      }
+    }
+
     // Status-specific messages
     const statusMessages = {
       Accepted: {
@@ -606,10 +729,16 @@ exports.notifyOrderStatusChange = onCall(async (request) => {
         body: `Great news, ${customerName}! Your order has been accepted and is being prepared for delivery.`,
         color: "#2563eb",
       },
+      Shipped: {
+        subject: `Order ${displayOrderId} Shipped`,
+        heading: "Your order has been shipped!",
+        body: `Hi ${customerName}, your order has been shipped and is on its way to you. You will be notified once it is delivered.`,
+        color: "#6366f1",
+      },
       Fulfilled: {
-        subject: `Order ${displayOrderId} Fulfilled`,
-        heading: "Your order has been fulfilled!",
-        body: `Hi ${customerName}, your order has been fulfilled and is on its way. Thank you for choosing KKR Groceries!`,
+        subject: `Order ${displayOrderId} Delivered`,
+        heading: "Your order has been delivered!",
+        body: `Hi ${customerName}, your order has been delivered successfully. Thank you for choosing KKR Groceries!`,
         color: "#059669",
       },
       Rejected: {
@@ -626,11 +755,12 @@ exports.notifyOrderStatusChange = onCall(async (request) => {
     }
 
     // Build premium status email HTML
+    const cart = order.revisedFulfilledCart || order.revisedAcceptedCart || order.cart || [];
     const statusEmailData = {
       orderId: displayOrderId,
       customerName,
       newStatus,
-      cart: order.cart || [],
+      cart,
       totalValue: order.totalValue || "N/A",
       productCount: order.productCount || 0,
       statusInfo,
@@ -640,14 +770,19 @@ exports.notifyOrderStatusChange = onCall(async (request) => {
     // Queue email to buyer if they have email
     if (buyerEmail) {
       try {
-        await db.collection("mail").add({
+        const buyerMailDoc = {
           to: [buyerEmail],
           message: {
-            subject: `${newStatus === "Accepted" ? "✅" : newStatus === "Fulfilled" ? "🚚" : "❌"} ${statusInfo.subject}`,
+            subject: `${newStatus === "Accepted" ? "✅" : newStatus === "Shipped" ? "🚚" : newStatus === "Fulfilled" ? "📦" : "❌"} ${statusInfo.subject}`,
             html: emailHtml,
           },
           createdAt: FieldValue.serverTimestamp(),
-        });
+        };
+        // Attach invoice PDF for Fulfilled orders
+        if (pdfAttachments.length > 0) {
+          buyerMailDoc.attachments = pdfAttachments;
+        }
+        await db.collection("mail").add(buyerMailDoc);
       } catch (emailErr) {
         console.error("Failed to queue buyer email:", emailErr);
       }
@@ -902,12 +1037,21 @@ exports.processMailQueue = onDocumentCreated(
     });
 
     try {
-      await transporter.sendMail({
+      const mailOptions = {
         from: `${smtp.fromName} <${smtp.user}>`,
         to: to.join(", "),
         subject: message.subject,
         html: message.html,
-      });
+      };
+      // Attach PDF files if present in the mail document
+      if (mailDoc.attachments && Array.isArray(mailDoc.attachments)) {
+        mailOptions.attachments = mailDoc.attachments.map((att) => ({
+          filename: att.filename,
+          content: Buffer.from(att.content, "base64"),
+          contentType: att.contentType || "application/pdf",
+        }));
+      }
+      await transporter.sendMail(mailOptions);
 
       await snap.ref.update({
         status: "sent",
@@ -915,7 +1059,7 @@ exports.processMailQueue = onDocumentCreated(
         processedAt: FieldValue.serverTimestamp(),
         smtpUser: smtp.user,
       });
-      console.log(`Email sent to ${to.join(", ")} — subject: ${message.subject}`);
+      console.log(`Email sent to ${to.join(", ")} — subject: ${message.subject}${mailOptions.attachments ? ` (${mailOptions.attachments.length} attachment(s))` : ""}`);
     } catch (err) {
       console.error("Email send failed:", err);
       let errorCategory = "unknown";
@@ -951,6 +1095,8 @@ exports.testSmtpConfig = onCall({ secrets: ["GMAIL_APP_PASSWORD"] }, async (requ
 
     // Read SMTP config from Firestore
     const smtp = await getSmtpConfig();
+
+    console.log(`[SMTP-DEBUG] user="${smtp.user}", passLen=${smtp.password?.length || 0}, host=${smtp.host}, port=${smtp.port}, secure=${smtp.secure}`);
 
     if (!smtp.user || !smtp.password) {
       throw new HttpsError("failed-precondition", "SMTP credentials not configured. Save Gmail address and App Password first.");
@@ -1112,4 +1258,355 @@ exports.retryFailedEmail = onCall(async (request) => {
 
   console.log(`Retried mail ${mailId} as ${newDoc.id}`);
   return { success: true, newMailId: newDoc.id };
+});
+
+// ─── GSTIN Verification (Self-Hosted — Direct GST Portal) ──────────────────
+/**
+ * Verify a GSTIN by querying the official GST portal (services.gst.gov.in).
+ * Uses Google Cloud Vision API for captcha solving with retry logic.
+ * Results are cached in Firestore (gstin_cache/{gstin}) to avoid repeated lookups.
+ * No third-party API keys required — completely free and self-hosted.
+ */
+const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{1}Z[0-9A-Z]{1}$/;
+const GST_PORTAL = "https://services.gst.gov.in";
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+/** Solve a captcha image using Google Cloud Vision OCR */
+async function solveCaptcha(imageBuffer) {
+  // Lazy-load vision library to avoid deployment timeout
+  const vision = require("@google-cloud/vision");
+  const client = new vision.ImageAnnotatorClient();
+  const [result] = await client.textDetection({
+    image: { content: imageBuffer.toString("base64") },
+  });
+  const text = result.textAnnotations?.[0]?.description || "";
+  return text.replace(/[\n\r\s]/g, "").trim();
+}
+
+/** Build address string from GST portal address object */
+function buildAddress(pradr) {
+  if (!pradr) return "";
+  // GST portal may return address as a flat string in "adr" or structured object in "addr"
+  if (typeof pradr.adr === "string" && pradr.adr.trim()) {
+    return pradr.adr.trim();
+  }
+  if (pradr.addr && typeof pradr.addr === "object") {
+    const a = pradr.addr;
+    return [a.bno, a.bnm, a.flno, a.st, a.loc, a.dst, a.stcd, a.pncd]
+      .filter(Boolean)
+      .join(", ");
+  }
+  return "";
+}
+
+/** Query the GST portal with session + captcha flow (single attempt) */
+/** HTTP helper using Node.js built-in https (no external dependency) */
+function httpsRequest(url, options = {}) {
+  const https = require("https");
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(url);
+    const reqOptions = {
+      hostname: parsedUrl.hostname,
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: options.method || "GET",
+      headers: options.headers || {},
+    };
+    const req = https.request(reqOptions, (res) => {
+      const chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => {
+        const body = Buffer.concat(chunks);
+        const cookies = (res.headers["set-cookie"] || [])
+          .map((c) => c.split(";")[0]);
+        resolve({ statusCode: res.statusCode, headers: res.headers, cookies, body });
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(options.timeout || 15000, () => {
+      req.destroy();
+      reject(new Error("Request timeout"));
+    });
+    if (options.body) req.write(options.body);
+    req.end();
+  });
+}
+
+async function queryGSTPortal(gstin) {
+  // Step 1: Initialize session — get cookies
+  const sessionRes = await httpsRequest(GST_PORTAL + "/services/searchtp", {
+    headers: { "User-Agent": UA },
+  });
+  const sessionCookies = sessionRes.cookies.join("; ");
+
+  // Step 2: Fetch captcha image
+  const captchaRes = await httpsRequest(GST_PORTAL + "/services/captcha", {
+    headers: { Cookie: sessionCookies, "User-Agent": UA },
+  });
+  const allCookies = sessionCookies +
+    (captchaRes.cookies.length ? "; " + captchaRes.cookies.join("; ") : "");
+  const imageBuffer = captchaRes.body;
+
+  // Step 3: Solve captcha with Google Cloud Vision
+  const captchaText = await solveCaptcha(imageBuffer);
+  if (!captchaText) throw new Error("Empty captcha OCR result");
+
+  // Step 4: Query taxpayer details
+  const postBody = JSON.stringify({ gstin, captcha: captchaText });
+  const queryRes = await httpsRequest(
+    GST_PORTAL + "/services/api/search/taxpayerDetails",
+    {
+      method: "POST",
+      headers: {
+        Cookie: allCookies,
+        "User-Agent": UA,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(postBody),
+        Referer: GST_PORTAL + "/services/searchtp",
+      },
+      body: postBody,
+    }
+  );
+
+  let data;
+  try {
+    data = JSON.parse(queryRes.body.toString("utf8"));
+  } catch {
+    throw new Error("Invalid response from GST portal");
+  }
+  // The portal returns taxpayer JSON on success, or an error message string on captcha failure
+  if (data && data.gstin) return data;
+  throw new Error(typeof data === "string" ? data : data?.error || "Captcha verification failed");
+}
+
+exports.verifyGSTIN = onCall({ timeoutSeconds: 60 }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Must be signed in");
+  }
+
+  const gstin = (request.data.gstin || "").trim().toUpperCase();
+
+  // 1. Format validation
+  if (!gstin || !GSTIN_REGEX.test(gstin)) {
+    return {
+      valid: false,
+      formatValid: false,
+      verified: false,
+      message: "Invalid GSTIN format. Must be 15 characters (e.g. 22AAAAA0000A1Z5).",
+    };
+  }
+
+  // 2. Check Firestore cache first
+  try {
+    const cacheSnap = await db.collection("gstin_cache").doc(gstin).get();
+    if (cacheSnap.exists) {
+      const cached = cacheSnap.data();
+      // Cache is valid for 30 days AND must have entityType (added in v2)
+      const cacheAge = Date.now() - new Date(cached.cachedAt).getTime();
+      if (cacheAge < 30 * 24 * 60 * 60 * 1000 && cached.entityType) {
+        console.log(`GSTIN ${gstin}: returning cached result`);
+        return { ...cached, fromCache: true };
+      }
+    }
+  } catch (e) {
+    console.warn("Cache read error:", e.message);
+  }
+
+  // 3. Query GST portal with retry logic (up to 5 attempts)
+  const MAX_RETRIES = 5;
+  let lastError = "";
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`GSTIN ${gstin}: attempt ${attempt}/${MAX_RETRIES}`);
+      const data = await queryGSTPortal(gstin);
+
+      // Extract entity type from PAN embedded in GSTIN
+      // GSTIN format: 2-digit state + 10-char PAN + 1 entity + 1 Z + 1 check
+      // PAN's 4th character (index 3 of PAN = index 5 of GSTIN) indicates entity type
+      const panEntityChar = gstin.charAt(5);
+      const ENTITY_TYPE_MAP = {
+        P: "Proprietorship",
+        C: "Company",
+        H: "HUF",
+        F: "Partnership Firm",
+        A: "AOP (Association of Persons)",
+        T: "Trust",
+        B: "BOI (Body of Individuals)",
+        L: "Local Authority",
+        J: "Artificial Juridical Person",
+        G: "Government",
+      };
+      const entityType = ENTITY_TYPE_MAP[panEntityChar] || data.ctb || "Other";
+
+      // For Proprietorships, the legal name (lgnm) IS the owner's personal name
+      const isProprietorship = panEntityChar === "P";
+      const ownerName = isProprietorship ? (data.lgnm || "") : "";
+
+      const result = {
+        valid: true,
+        formatValid: true,
+        verified: true,
+        tradeName: data.tradeNam || "",
+        legalName: data.lgnm || "",
+        entityType,
+        ownerName,
+        status: data.sts || "",
+        businessType: data.ctb || "",
+        address: buildAddress(data.pradr),
+        registrationDate: data.rgdt || "",
+        message: `Verified — ${data.sts || "Unknown status"}`,
+        cachedAt: new Date().toISOString(),
+      };
+
+      // 4. Cache the result in Firestore
+      try {
+        await db.collection("gstin_cache").doc(gstin).set(result);
+        console.log(`GSTIN ${gstin}: cached successfully`);
+      } catch (e) {
+        console.warn("Cache write error:", e.message);
+      }
+
+      return result;
+    } catch (err) {
+      lastError = err.message || "Unknown error";
+      console.warn(`GSTIN ${gstin}: attempt ${attempt} failed — ${lastError}`);
+      // Brief pause before retry
+      if (attempt < MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+  }
+
+  // All retries exhausted
+  return {
+    valid: true,
+    formatValid: true,
+    verified: false,
+    message: `GSTIN format is valid but verification failed after ${MAX_RETRIES} attempts. Please try again. (${lastError})`,
+  };
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Delivery OTP — Send & Verify
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * sendDeliveryOTP — generates a 6-digit OTP, stores it in Firestore,
+ * and emails it to the customer.
+ */
+exports.sendDeliveryOTP = onCall(async (request) => {
+  const caller = await requireAdmin(request);
+  const { orderId, orderCollection } = request.data;
+  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId.");
+
+  const mode = await getAppMode();
+  const colName = orderCollection || resolveCol("orders", mode);
+
+  const orderSnap = await db.collection(colName).doc(orderId).get();
+  if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found.");
+  const order = orderSnap.data();
+
+  const buyerEmail = order.userEmail || null;
+  const buyerPhone = order.phone || null;
+  if (!buyerEmail) {
+    throw new HttpsError("failed-precondition", "Customer has no email on file. Cannot send email OTP.");
+  }
+
+  // Generate 6-digit OTP
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  // Store OTP in Firestore
+  await db.collection("delivery_otps").doc(orderId).set({
+    otp,
+    orderId,
+    buyerEmail,
+    buyerPhone: buyerPhone || "",
+    expiresAt: expiresAt.toISOString(),
+    createdAt: FieldValue.serverTimestamp(),
+    createdBy: caller.uid,
+    verified: false,
+    attempts: 0,
+  });
+
+  // Build OTP email
+  const customerName = order.customerName || "Customer";
+  const displayOrderId = order.orderId || orderId;
+  const otpEmailHtml = emailLayout(`
+    <div style="padding:32px 24px;text-align:center;">
+      <div style="width:64px;height:64px;background:#f0fdf4;border-radius:50%;line-height:64px;font-size:28px;margin:0 auto 16px;">🔐</div>
+      <h2 style="color:#1e293b;font-size:22px;font-weight:700;margin:0 0 8px;">Delivery Verification</h2>
+      <p style="color:#64748b;font-size:14px;line-height:1.6;margin:0 0 24px;">
+        Hi ${customerName}, please share this OTP with the delivery person to confirm receipt of your order.
+      </p>
+      <div style="background:#064e3b;border-radius:16px;padding:24px;margin:0 auto;max-width:280px;">
+        <div style="color:#a7f3d0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">Your OTP</div>
+        <div style="color:#ffffff;font-size:36px;font-weight:800;letter-spacing:8px;font-family:'Courier New',monospace;">${otp}</div>
+      </div>
+      <p style="color:#94a3b8;font-size:12px;margin:20px 0 0;">
+        Order: <strong>${displayOrderId}</strong> &bull; Valid for 10 minutes
+      </p>
+      <p style="color:#ef4444;font-size:12px;font-weight:600;margin:8px 0 0;">
+        Do not share this code with anyone other than the delivery person.
+      </p>
+    </div>
+  `, `Your delivery OTP for order ${displayOrderId}`);
+
+  // Queue email
+  await db.collection("mail").add({
+    to: [buyerEmail],
+    message: {
+      subject: `🔐 Delivery OTP for Order ${displayOrderId}`,
+      html: otpEmailHtml,
+    },
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  console.log(`Delivery OTP sent for ${orderId} to ${buyerEmail} by admin ${caller.uid}`);
+  return { success: true, message: `OTP sent to ${buyerEmail}` };
+});
+
+/**
+ * verifyDeliveryOTP — checks the OTP entered by admin against the stored value.
+ */
+exports.verifyDeliveryOTP = onCall(async (request) => {
+  await requireAdmin(request);
+  const { orderId, otp } = request.data;
+  if (!orderId || !otp) throw new HttpsError("invalid-argument", "Missing orderId or otp.");
+
+  const otpSnap = await db.collection("delivery_otps").doc(orderId).get();
+  if (!otpSnap.exists) {
+    throw new HttpsError("not-found", "No OTP found for this order. Please send a new one.");
+  }
+
+  const otpDoc = otpSnap.data();
+
+  // Check expiry
+  if (new Date(otpDoc.expiresAt) < new Date()) {
+    throw new HttpsError("deadline-exceeded", "OTP has expired. Please send a new one.");
+  }
+
+  // Check attempts (max 5)
+  if (otpDoc.attempts >= 5) {
+    throw new HttpsError("resource-exhausted", "Too many attempts. Please send a new OTP.");
+  }
+
+  // Increment attempts
+  await db.collection("delivery_otps").doc(orderId).update({
+    attempts: FieldValue.increment(1),
+  });
+
+  // Verify
+  if (otpDoc.otp !== otp.trim()) {
+    const remaining = 4 - otpDoc.attempts;
+    throw new HttpsError("permission-denied", `Incorrect OTP. ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining.`);
+  }
+
+  // Mark as verified
+  await db.collection("delivery_otps").doc(orderId).update({
+    verified: true,
+    verifiedAt: FieldValue.serverTimestamp(),
+  });
+
+  return { success: true, message: "OTP verified successfully." };
 });

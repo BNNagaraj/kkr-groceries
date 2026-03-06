@@ -68,6 +68,7 @@ export const metadata: Metadata = {
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ModeProvider } from "@/contexts/ModeContext";
 import { AppProvider } from "@/contexts/AppContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -113,9 +114,11 @@ export default function RootLayout({
         <AuthProvider>
           <ModeProvider>
             <AppProvider>
-              <ErrorBoundary>
-                {children}
-              </ErrorBoundary>
+              <ThemeProvider>
+                <ErrorBoundary>
+                  {children}
+                </ErrorBoundary>
+              </ThemeProvider>
             </AppProvider>
           </ModeProvider>
         </AuthProvider>

@@ -1,11 +1,10 @@
-import { Order, OrderCartItem } from "@/types/order";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-
 /* ══════════════════════════════════════════════════════════════════
-   KKR GROCERIES — PROFESSIONAL INVOICE / BILL GENERATOR
+   KKR GROCERIES — SERVER-SIDE INVOICE / BILL OF SUPPLY PDF GENERATOR
+   Ported from web/src/lib/invoice.ts for Cloud Functions usage.
    Indian Standard compliant (GST Act Sec 31, Rules 46/49)
    ══════════════════════════════════════════════════════════════════ */
+
+const IS_GST_REGISTERED = false; // flip to true when GST applies
 
 /* ─── Colour palette (matches email template) ─── */
 const C = {
@@ -27,22 +26,10 @@ const C = {
   redBg: "#fee2e2",
   amber: "#92400e",
   amberBg: "#fef3c7",
-} as const;
-
-/* ─── Seller / Company info ─── */
-const SELLER = {
-  name: "KKR Groceries",
-  tagline: "B2B Vegetable Wholesale",
-  address: "Hyderabad, Telangana, India",
-  phone: "+91 93472 13498",
-  gstin: "Not Registered",
-  placeOfSupply: "Telangana (36)",
 };
 
-const IS_GST_REGISTERED = false; // flip to true when GST applies
-
 /* ─── Helpers ─── */
-function hex(h: string): [number, number, number] {
+function hex(h) {
   const s = h.replace("#", "");
   return [
     parseInt(s.substring(0, 2), 16),
@@ -51,26 +38,18 @@ function hex(h: string): [number, number, number] {
   ];
 }
 
-/** Check if string only contains characters renderable by Helvetica (Latin) */
-function isLatin(str: string): boolean {
-  // Allow basic Latin, Latin-1 supplement, common punctuation
+function isLatin(str) {
   return /^[\u0020-\u007E\u00A0-\u00FF]*$/.test(str);
 }
 
-/** Format currency with "Rs." prefix (Helvetica-safe, no Unicode rupee) */
-function cur(n: number): string {
+function cur(n) {
   return "Rs." + n.toLocaleString("en-IN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 }
 
-function curWhole(n: number): string {
-  return "Rs." + n.toLocaleString("en-IN");
-}
-
-/** Convert number to Indian-English words */
-function amountInWords(num: number): string {
+function amountInWords(num) {
   if (num === 0) return "Rupees Zero Only";
   const ones = [
     "", "One", "Two", "Three", "Four", "Five", "Six", "Seven",
@@ -81,8 +60,7 @@ function amountInWords(num: number): string {
     "", "", "Twenty", "Thirty", "Forty", "Fifty",
     "Sixty", "Seventy", "Eighty", "Ninety",
   ];
-
-  const toWords = (n: number): string => {
+  const toWords = (n) => {
     if (n === 0) return "";
     if (n < 20) return ones[n];
     if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "");
@@ -94,7 +72,6 @@ function amountInWords(num: number): string {
       return toWords(Math.floor(n / 100000)) + " Lakh" + (n % 100000 ? " " + toWords(n % 100000) : "");
     return toWords(Math.floor(n / 10000000)) + " Crore" + (n % 10000000 ? " " + toWords(n % 10000000) : "");
   };
-
   const whole = Math.floor(Math.abs(num));
   const paise = Math.round((Math.abs(num) - whole) * 100);
   let result = "Rupees " + toWords(whole);
@@ -102,13 +79,13 @@ function amountInWords(num: number): string {
   return result + " Only";
 }
 
-function getOrderDate(order: Order): Date {
-  if (order.createdAt?.toDate) return order.createdAt.toDate();
+function getOrderDate(order) {
+  if (order.createdAt && order.createdAt.toDate) return order.createdAt.toDate();
   if (order.timestamp) return new Date(order.timestamp);
   return new Date();
 }
 
-function formatDate(order: Order): string {
+function formatDate(order) {
   return getOrderDate(order).toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -116,38 +93,20 @@ function formatDate(order: Order): string {
   });
 }
 
-function getDateForFilename(order: Order): string {
-  const d = getOrderDate(order);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/**
- * Build the item description for the PDF table.
- * Line 1 (bold):  English name
- * Line 2 (italic): Telugu pronunciation / Hindi pronunciation  (only Latin-safe text)
- */
-function buildItemName(item: OrderCartItem): string {
-  const altNames: string[] = [];
+function buildItemName(item) {
+  const altNames = [];
   if (item.telugu && isLatin(item.telugu)) altNames.push(item.telugu.trim());
   if (item.hindi && isLatin(item.hindi)) altNames.push(item.hindi.trim());
   if (altNames.length > 0) {
     return item.name + "\n" + altNames.join(" / ");
   }
-  // If only hindi is Latin-safe (common case: telugu is script, hindi is romanized)
   if (item.hindi && isLatin(item.hindi)) {
     return item.name + "\n" + item.hindi.trim();
   }
   return item.name;
 }
 
-/* ─── Document type logic (Indian norms) ─── */
-interface DocType {
-  title: string;
-  disclaimer: string;
-  showWatermark: boolean;
-}
-
-function getDocumentType(status: string): DocType {
+function getDocumentType(status) {
   const isFulfilled = status === "Fulfilled" || status === "Delivered";
   if (isFulfilled) {
     if (IS_GST_REGISTERED) {
@@ -166,14 +125,13 @@ function getDocumentType(status: string): DocType {
   };
 }
 
-/* ─── Status badge styling ─── */
-function getStatusBadge(status: string) {
+function getStatusBadge(status) {
   switch (status) {
     case "Accepted":
       return { bg: hex(C.blueBg), fg: hex(C.blue), label: "ACCEPTED" };
     case "Fulfilled":
     case "Delivered":
-      return { bg: [220, 252, 231] as [number, number, number], fg: hex(C.greenLight), label: "FULFILLED" };
+      return { bg: [220, 252, 231], fg: hex(C.greenLight), label: "FULFILLED" };
     case "Rejected":
       return { bg: hex(C.redBg), fg: hex(C.red), label: "CANCELLED" };
     default:
@@ -182,11 +140,31 @@ function getStatusBadge(status: string) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   MAIN PDF GENERATOR
+   MAIN PDF GENERATOR — returns Buffer instead of downloading
    ══════════════════════════════════════════════════════════════════ */
-export function downloadInvoice(order: Order): void {
+
+/**
+ * Generate Invoice PDF for an order (server-side).
+ * @param {Object} order — Firestore order document data
+ * @param {Object} businessSettings — from settings/business (optional)
+ * @returns {Buffer} PDF file as Node.js Buffer
+ */
+function generateInvoicePdf(order, businessSettings = {}) {
+  const { jsPDF } = require("jspdf");
+  const autoTablePlugin = require("jspdf-autotable");
+  autoTablePlugin.applyPlugin(jsPDF);
+
+  const SELLER = {
+    name: businessSettings.storeName || "KKR Groceries",
+    tagline: "B2B Vegetable Wholesale",
+    address: businessSettings.address || "Hyderabad, Telangana, India",
+    phone: businessSettings.contactPhone || "+91 93472 13498",
+    gstin: businessSettings.gstNumber || "Not Registered",
+    placeOfSupply: "Telangana (36)",
+  };
+
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const W = doc.internal.pageSize.getWidth(); // 210
+  const W = doc.internal.pageSize.getWidth();  // 210
   const H = doc.internal.pageSize.getHeight(); // 297
   const M = 14; // margin
   const CW = W - M * 2; // content width
@@ -216,7 +194,6 @@ export function downloadInvoice(order: Order): void {
   /* ═══════════════════ PROFORMA WATERMARK ═══════════════════ */
   if (docType.showWatermark) {
     doc.saveGraphicsState();
-    // @ts-expect-error - jsPDF GState
     doc.setGState(new doc.GState({ opacity: 0.05 }));
     doc.setFont("helvetica", "bold");
     doc.setFontSize(68);
@@ -365,7 +342,7 @@ export function downloadInvoice(order: Order): void {
 
   let by = y + 19;
   if (hasShop) {
-    doc.text(order.shopName!, bx + 5, by);
+    doc.text(order.shopName, bx + 5, by);
     by += 5;
   }
   doc.text("Ph: " + (order.phone || "N/A"), bx + 5, by);
@@ -387,7 +364,6 @@ export function downloadInvoice(order: Order): void {
   doc.text("ORDER ITEMS", M, y);
   y += 2;
 
-  // Build table rows with multi-line item names
   const tableRows = cart.map((item, i) => {
     const amount = item.qty * item.price;
     return [
@@ -400,7 +376,7 @@ export function downloadInvoice(order: Order): void {
     ];
   });
 
-  autoTable(doc, {
+  doc.autoTable({
     startY: y,
     margin: { left: M, right: M },
     head: [["#", "Description of Goods", "Qty", "Unit", "Rate (Rs.)", "Amount (Rs.)"]],
@@ -429,30 +405,28 @@ export function downloadInvoice(order: Order): void {
     },
     alternateRowStyles: { fillColor: [248, 250, 252] },
     styles: { lineColor: [226, 232, 240], lineWidth: 0.2 },
-    // Custom cell rendering for italic alt names
     didParseCell: (data) => {
       if (data.section === "body" && data.column.index === 1) {
-        const raw = data.cell.raw as string;
-        if (raw.includes("\n")) {
-          // Store flag for didDrawCell
+        const raw = data.cell.raw;
+        if (typeof raw === "string" && raw.includes("\n")) {
           data.cell.styles.cellPadding = { top: 2, bottom: 2, left: 3, right: 3 };
         }
       }
     },
     didDrawCell: (data) => {
       if (data.section === "body" && data.column.index === 1) {
-        const raw = data.cell.raw as string;
-        if (raw.includes("\n")) {
+        const raw = data.cell.raw;
+        if (typeof raw === "string" && raw.includes("\n")) {
           const parts = raw.split("\n");
           const cellX = data.cell.x + 3;
           const cellY = data.cell.y;
           const cellH = data.cell.height;
-          const totalTextH = 4 + 3.5; // English line + alt line
+          const totalTextH = 4 + 3.5;
           const startY = cellY + (cellH - totalTextH) / 2 + 3.5;
 
           // Clear the auto-drawn text area
           doc.setFillColor(
-            ...(data.row.index % 2 === 0 ? hex(C.white) : ([248, 250, 252] as [number, number, number]))
+            ...(data.row.index % 2 === 0 ? hex(C.white) : [248, 250, 252])
           );
           doc.rect(data.cell.x + 0.5, data.cell.y + 0.5, data.cell.width - 1, data.cell.height - 1, "F");
 
@@ -472,8 +446,7 @@ export function downloadInvoice(order: Order): void {
     },
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  y = (doc as any).lastAutoTable.finalY + 2;
+  y = doc.lastAutoTable.finalY + 2;
 
   /* ═══════════════════ TAX SUMMARY ═══════════════════ */
   const sumX = M + CW * 0.52;
@@ -666,7 +639,8 @@ export function downloadInvoice(order: Order): void {
   doc.setFontSize(6);
   doc.text("Thank you for your business!", midX, y, { align: "center" });
 
-  /* ═══════════════════ DOWNLOAD ═══════════════════ */
-  const dateStr = getDateForFilename(order);
-  doc.save(`${orderId}_${dateStr}.pdf`);
+  /* ═══════════════════ RETURN BUFFER ═══════════════════ */
+  return Buffer.from(doc.output("arraybuffer"));
 }
+
+module.exports = { generateInvoicePdf };

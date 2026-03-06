@@ -105,7 +105,7 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                                     <div className="text-xs text-slate-500 truncate">{currentUser.email || currentUser.phoneNumber}</div>
                                                 </div>
                                             </div>
-                                            <Link href="/dashboard/buyer" className="block px-4 py-2 text-sm hover:bg-slate-50 transition-colors">
+                                            <Link href="/dashboard/buyer?tab=orders" className="block px-4 py-2 text-sm hover:bg-slate-50 transition-colors">
                                                 My Orders
                                             </Link>
                                             <button
