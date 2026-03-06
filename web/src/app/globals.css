@@ -70,4 +70,29 @@
   }
 }
 
+/* ─── Theme-driven responsive grid ─── */
+.theme-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(var(--grid-cols, 1), minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .theme-grid {
+    grid-template-columns: repeat(var(--grid-cols-sm, 2), minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .theme-grid {
+    grid-template-columns: repeat(var(--grid-cols-lg, 3), minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .theme-grid {
+    grid-template-columns: repeat(var(--grid-cols-xl, 4), minmax(0, 1fr));
+  }
+}
+
 /* End of globals.css */

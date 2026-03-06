@@ -6,6 +6,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { CartDrawer } from "@/components/CartDrawer";
 import { Footer } from "@/components/Footer";
 import { useAppStore } from "@/contexts/AppContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Search } from "lucide-react";
 
 const CATEGORIES = [
@@ -20,6 +21,7 @@ const CATEGORIES = [
 
 export default function Home() {
   const { products, loadingProducts } = useAppStore();
+  const { theme } = useTheme();
   const [cartOpen, setCartOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -89,7 +91,15 @@ export default function Home() {
             Loading APMC Prices...
           </div>
         ) : filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div
+            className="theme-grid"
+            style={{
+              "--grid-cols": theme.grid.mobile,
+              "--grid-cols-sm": theme.grid.tablet,
+              "--grid-cols-lg": theme.grid.desktop,
+              "--grid-cols-xl": theme.grid.wide,
+            } as React.CSSProperties}
+          >
             {filteredProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
