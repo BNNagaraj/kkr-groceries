@@ -9,10 +9,9 @@ import { functions, db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { collection, query, where, orderBy, limit, getDocs, doc, getDoc } from "firebase/firestore";
 import { MapPicker, LocationDetails } from "./MapPicker";
-import { validateName, validatePhone, validateAddress, sanitizeInput } from "@/lib/validation";
+import { validateName, validatePhone, validateAddress, sanitizeInput, normalizeIndianPhone } from "@/lib/validation";
 import { resolveSlabPrice, getAppliedTierLabel } from "@/lib/pricing";
 import { useMode } from "@/contexts/ModeContext";
-import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 
 import {
@@ -181,9 +180,7 @@ export function CartDrawer({
     const [customerName, setCustomerName] = useState("");
     const [shopName, setShopName] = useState("");
     const [phone, setPhone] = useState(() => {
-        const raw = currentUser?.phoneNumber || "";
-        // Strip +91 country code from Firebase auth phone numbers to get 10-digit form
-        return raw.replace(/^\+91/, "").replace(/\D/g, "").slice(0, 10);
+        return normalizeIndianPhone(currentUser?.phoneNumber || "");
     });
     const [address, setAddress] = useState("");
     const [locationDetails, setLocationDetails] = useState<LocationDetails | null>(null);
@@ -273,7 +270,7 @@ export function CartDrawer({
     // Apply a saved address to the form fields
     const applyAddress = (addr: SavedAddress) => {
         if (addr.name) setCustomerName(addr.name);
-        if (addr.phone) setPhone(addr.phone);
+        if (addr.phone) setPhone(normalizeIndianPhone(addr.phone));
         if (addr.loc) setAddress(addr.loc);
         if (addr.shopName) setShopName(addr.shopName);
         setFormErrors({});
@@ -419,7 +416,7 @@ export function CartDrawer({
             const payload: Record<string, unknown> = {
                 cart: resolvedCart,
                 customerName: sanitizeInput(customerName),
-                customerPhone: sanitizeInput(phone),
+                customerPhone: normalizeIndianPhone(phone),
                 shopName: sanitizeInput(shopName),
                 deliveryAddress: sanitizeInput(address),
                 locationDetails,
@@ -504,16 +501,11 @@ export function CartDrawer({
                                         </Button>
                                     </div>
                                 ) : (
-                                    <AnimatePresence initial={false}>
+                                    <>
                                         {cartItems.map((item) => (
-                                            <motion.div
+                                            <div
                                                 key={item.id}
-                                                layout
-                                                initial={{ opacity: 0, x: 40 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                exit={{ opacity: 0, x: -40, height: 0, marginBottom: 0 }}
-                                                transition={{ duration: 0.25, ease: "easeOut" }}
-                                                className="flex gap-3 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm"
+                                                className="flex gap-3 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm animate-[slideInRight_0.25s_ease-out]"
                                             >
                                                 <div className="w-16 h-16 bg-slate-50 rounded-xl overflow-hidden relative border border-slate-100 shrink-0">
                                                     {item.image ? (
@@ -585,9 +577,9 @@ export function CartDrawer({
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </motion.div>
+                                            </div>
                                         ))}
-                                    </AnimatePresence>
+                                    </>
                                 )}
                             </div>
 
@@ -655,7 +647,7 @@ export function CartDrawer({
                                             inputMode="numeric"
                                             value={phone}
                                             onChange={(e) => {
-                                                setPhone(e.target.value.replace(/\D/g, "").slice(0, 10));
+                                                setPhone(normalizeIndianPhone(e.target.value));
                                                 setFormErrors((prev) => { const n = { ...prev }; delete n.phone; return n; });
                                             }}
                                             className={formErrors.phone ? "border-destructive" : ""}
@@ -735,7 +727,7 @@ export function CartDrawer({
                                                 setAddress("");
                                                 setCustomerName("");
                                                 setShopName("");
-                                                setPhone((currentUser?.phoneNumber || "").replace(/^\+91/, "").replace(/\D/g, "").slice(0, 10));
+                                                setPhone(normalizeIndianPhone(currentUser?.phoneNumber || ""));
                                             }}
                                             className="w-full mt-2 text-xs text-primary font-semibold py-1.5 hover:bg-primary/5 rounded-lg transition-colors"
                                         >

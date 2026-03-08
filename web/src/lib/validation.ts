@@ -3,10 +3,29 @@ export interface ValidationResult {
     error: string | null;
 }
 
+/**
+ * Normalize any Indian phone input to a bare 10-digit number.
+ * Strips +91, 91, 0 prefixes and non-digit characters.
+ * Examples:
+ *   "+919876543210" → "9876543210"
+ *   "919876543210"  → "9876543210"
+ *   "09876543210"   → "9876543210"
+ *   "9188441334"    → "9188441334"  (10-digit number starting with 91 — kept as-is)
+ */
+export function normalizeIndianPhone(raw: string): string {
+    if (!raw) return "";
+    let digits = raw.replace(/\D/g, "");
+    // Strip leading country code only when number has >10 digits
+    if (digits.length > 10 && digits.startsWith("91")) {
+        digits = digits.slice(2);
+    } else if (digits.length > 10 && digits.startsWith("0")) {
+        digits = digits.slice(1);
+    }
+    return digits.slice(0, 10);
+}
+
 export function validatePhone(phone: string): ValidationResult {
-    const cleaned = phone.replace(/[\s\-+]/g, "");
-    // Strip 91 country code prefix only when number has >10 digits (e.g. 919876543210)
-    const digits = cleaned.length > 10 ? cleaned.replace(/^91/, "") : cleaned;
+    const digits = normalizeIndianPhone(phone);
 
     if (!digits) {
         return { valid: false, error: "Phone number is required" };

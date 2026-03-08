@@ -12,7 +12,12 @@ import { Package, MapPin, Trash2, LogOut, ArrowLeft, BarChart2, ChevronRight, Us
 import { useMode } from "@/contexts/ModeContext";
 import { markOffline } from "@/hooks/usePresence";
 import { Order } from "@/types/order";
-import { downloadInvoice } from "@/lib/invoice";
+// jsPDF lazy-loaded on click (~200KB kept out of initial bundle)
+const lazyDownloadInvoice = async (order: Order) => {
+  const { downloadInvoice } = await import("@/lib/invoice");
+  downloadInvoice(order);
+};
+import { normalizeIndianPhone } from "@/lib/validation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -136,7 +141,7 @@ function AddressFormDialog({
                     </div>
                     <div>
                         <label className="text-sm font-medium text-slate-700 mb-1 block">Phone *</label>
-                        <Input value={form.phone} onChange={(e) => setForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))} placeholder="10-digit phone" inputMode="tel" />
+                        <Input value={form.phone} onChange={(e) => setForm(p => ({ ...p, phone: normalizeIndianPhone(e.target.value) }))} placeholder="10-digit phone" inputMode="tel" />
                         {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
                     </div>
                     <div>
@@ -273,7 +278,7 @@ export default function BuyerDashboard() {
                         setGstinMessage("Previously verified");
                     }
                 } else {
-                    const fallbackPhone = (currentUser.phoneNumber || "").replace(/^\+91/, "").replace(/\D/g, "").slice(0, 10);
+                    const fallbackPhone = normalizeIndianPhone(currentUser.phoneNumber || "");
                     setProfile({
                         displayName: currentUser.displayName || "",
                         phone: fallbackPhone,
@@ -538,7 +543,7 @@ export default function BuyerDashboard() {
                                                 variant="ghost"
                                                 size="sm"
                                                 className="h-7 px-2 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); downloadInvoice(o); }}
+                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); lazyDownloadInvoice(o); }}
                                             >
                                                 <FileText className="w-3.5 h-3.5 mr-1" /> Invoice
                                             </Button>
@@ -634,7 +639,7 @@ export default function BuyerDashboard() {
                                 <label className="text-sm font-medium text-slate-700 mb-1.5 block">Phone Number</label>
                                 <Input
                                     value={profile.phone}
-                                    onChange={(e) => setProfile(p => ({ ...p, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
+                                    onChange={(e) => setProfile(p => ({ ...p, phone: normalizeIndianPhone(e.target.value) }))}
                                     placeholder="10-digit phone"
                                     inputMode="tel"
                                 />

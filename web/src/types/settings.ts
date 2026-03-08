@@ -80,7 +80,7 @@ export const DEFAULT_CHECKOUT: CheckoutFormSettings = {
 
 /* ─── Theme System ─── */
 
-export type ThemeId = "classic" | "premium" | "catalog";
+export type ThemeId = "classic" | "premium" | "catalog" | "elegant" | "storefront" | "magazine" | "listpro" | "metro" | "polaroid" | "glass" | "darkluxe" | "editorial" | "neonpop";
 
 export interface GridConfig {
   mobile: number;

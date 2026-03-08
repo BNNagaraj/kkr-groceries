@@ -4,7 +4,7 @@ import React, { useState, memo } from "react";
 import Image from "next/image";
 import { Product } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn } from "lucide-react";
-import { motion } from "framer-motion";
+
 import { formatTiersForDisplay } from "@/lib/pricing";
 import { CartControls, ImageLightbox } from "./shared";
 
@@ -15,16 +15,13 @@ export const ClassicCard = memo(function ClassicCard({ product }: { product: Pro
 
     return (
         <>
-            <motion.div
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                transition={{ duration: 0.15, ease: "easeOut" }}
-                className="bg-white shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow"
+            <div
+                className="bg-white shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 ease-out"
                 style={{ borderRadius: "var(--theme-card-radius, 1rem)" }}
             >
-                <div className="p-3 flex items-start gap-4 flex-grow">
+                <div className="p-2.5 sm:p-3 flex items-start gap-3 sm:gap-4 flex-grow">
                     <div
-                        className={`w-[70px] h-[70px] rounded-xl flex-shrink-0 bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden relative group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`w-[60px] h-[60px] sm:w-[70px] sm:h-[70px] rounded-xl flex-shrink-0 bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden relative group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                         role={hasImage ? "button" : undefined}
                         aria-label={hasImage ? `View ${product.name} image` : undefined}
@@ -118,7 +115,7 @@ export const ClassicCard = memo(function ClassicCard({ product }: { product: Pro
                 <div className="px-3 pb-3">
                     <CartControls product={product} />
                 </div>
-            </motion.div>
+            </div>
 
             <ImageLightbox
                 src={product.image}

@@ -19,7 +19,11 @@ import {
 } from "lucide-react";
 import { useMode } from "@/contexts/ModeContext";
 import { Order, OrderCartItem } from "@/types/order";
-import { downloadInvoice } from "@/lib/invoice";
+// jsPDF lazy-loaded on click (~200KB kept out of initial bundle)
+const lazyDownloadInvoice = async (order: Order) => {
+  const { downloadInvoice } = await import("@/lib/invoice");
+  lazyDownloadInvoice(order);
+};
 import { StatusTimeline, formatStatusTime } from "@/components/OrderTimeline";
 import { toast } from "sonner";
 
@@ -227,7 +231,7 @@ export default function OrderDetailPage() {
               <Badge variant={statusBadgeVariant(order.status || "Pending")}>
                 {order.status || "Pending"}
               </Badge>
-              <Button variant="secondary" size="sm" onClick={() => downloadInvoice(order)}>
+              <Button variant="secondary" size="sm" onClick={() => lazyDownloadInvoice(order)}>
                 <FileText className="w-4 h-4" /> Invoice
               </Button>
             </div>

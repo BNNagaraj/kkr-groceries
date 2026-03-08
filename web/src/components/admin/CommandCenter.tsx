@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { db, functions } from "@/lib/firebase";
 import {
   collection,
@@ -16,15 +17,27 @@ import { useMode } from "@/contexts/ModeContext";
 import { Order, OrderStatus, STATUS_TIMESTAMP_FIELDS } from "@/types/order";
 import type { DeliverySettings } from "@/types/settings";
 import { DEFAULT_DELIVERY } from "@/types/settings";
-import { parseTotal } from "@/lib/helpers";
+import { parseTotal, exportOrdersToCSV } from "@/lib/helpers";
+import { normalizeIndianPhone } from "@/lib/validation";
 import { toast } from "sonner";
+import type { OtpChannel } from "@/types/settings";
 import type { OnlineUserMarker } from "./c2/OrderMap";
 
 import LiveMetrics from "./c2/LiveMetrics";
-import OrderPipeline from "./c2/OrderPipeline";
-import ActivityFeed from "./c2/ActivityFeed";
-import OrderMap from "./c2/OrderMap";
-import MiniCharts from "./c2/MiniCharts";
+import OrderSearch from "./c2/OrderSearch";
+
+// Heavy components — lazy-loaded to reduce initial compile/bundle
+const OrderPipeline = dynamic(() => import("./c2/OrderPipeline"), { ssr: false });
+const ActivityFeed = dynamic(() => import("./c2/ActivityFeed"), { ssr: false });
+const OrderMap = dynamic(() => import("./c2/OrderMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-2xl bg-slate-100 animate-pulse flex items-center justify-center" style={{ minHeight: 400 }}>
+      <span className="text-slate-400 text-sm">Loading Map...</span>
+    </div>
+  ),
+});
+const MiniCharts = dynamic(() => import("./c2/MiniCharts"), { ssr: false });
 
 import {
   Zap,
@@ -35,10 +48,15 @@ import {
   LayoutGrid,
   FlaskConical,
   Database,
+  Volume2,
+  VolumeX,
+  Search,
+  Download,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type C2Theme = "light" | "dark";
+export type C2DateRange = "today" | "yesterday" | "7days" | "all";
 
 type C2LayoutKey = "balanced" | "map-focus" | "pipeline-focus" | "analytics-focus";
 
@@ -61,6 +79,14 @@ interface PresenceDoc {
   online?: boolean;
   status?: string;
 }
+
+// ─── Date Range Options ──────────────────────────────────────────────────────
+const C2_DATE_RANGES: { key: C2DateRange; label: string; shortLabel: string }[] = [
+  { key: "today", label: "Today", shortLabel: "Today" },
+  { key: "yesterday", label: "Yesterday", shortLabel: "Yest" },
+  { key: "7days", label: "7 Days", shortLabel: "7D" },
+  { key: "all", label: "All Time", shortLabel: "All" },
+];
 
 // ─── Layout Presets ──────────────────────────────────────────────────────────
 const C2_LAYOUTS: Record<C2LayoutKey, C2LayoutConfig> = {
@@ -87,30 +113,86 @@ function writeStorage(key: string, value: unknown) {
   } catch {}
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-function isToday(order: Order): boolean {
-  const raw = order.timestamp || "";
-  if (!raw) return false;
-  const today = new Date();
-  const todayStr = today.toLocaleDateString("en-IN", {
+// ─── Date Helpers ────────────────────────────────────────────────────────────
+function getDateStr(date: Date): string {
+  return date.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
-  return raw.startsWith(todayStr);
+}
+
+/** Extract a comparable YYYY-MM-DD string from an order using createdAt (Firestore Timestamp) first, falling back to timestamp string */
+function getOrderDateKey(order: Order): string {
+  // Prefer createdAt (Firestore Timestamp) — reliable and timezone-consistent
+  if (order.createdAt?.toDate) {
+    const d = order.createdAt.toDate();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  // Fallback: parse the timestamp string (format: "D/M/YYYY, ..." or "DD/MM/YYYY, ...")
+  const raw = order.timestamp || "";
+  if (!raw) return "";
+  try {
+    const datePart = raw.split(",")[0].trim();
+    const parts = datePart.split("/");
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+    }
+  } catch {}
+  return "";
+}
+
+function dateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function isToday(order: Order): boolean {
+  return getOrderDateKey(order) === dateKey(new Date());
 }
 
 function isYesterday(order: Order): boolean {
-  const raw = order.timestamp || "";
-  if (!raw) return false;
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yStr = yesterday.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-  return raw.startsWith(yStr);
+  return getOrderDateKey(order) === dateKey(yesterday);
+}
+
+function isWithin7Days(order: Order): boolean {
+  const orderKey = getOrderDateKey(order);
+  if (!orderKey) return false;
+  const now = new Date();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    if (orderKey === dateKey(d)) return true;
+  }
+  return false;
+}
+
+// ─── Sound Chime (Web Audio API) ─────────────────────────────────────────────
+function playNewOrderChime(audioCtxRef: React.MutableRefObject<AudioContext | null>) {
+  try {
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    const ctx = audioCtxRef.current;
+    const now = ctx.currentTime;
+
+    // Two-tone chime: C5 then E5
+    [523, 659].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.3, now + i * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.3);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + i * 0.15);
+      osc.stop(now + i * 0.15 + 0.3);
+    });
+  } catch (e) {
+    console.warn("[C2] Audio chime failed:", e);
+  }
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -140,13 +222,54 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
   );
   const layout = C2_LAYOUTS[layoutKey] || C2_LAYOUTS.balanced;
 
-  // ── Bottom panel height (custom via drag) ──
+  // ── Bottom panel height ──
   const [bottomHeight, setBottomHeight] = useState<number>(() =>
     readStorage<number>("kkr-c2-bottom-h", layout.bottomHeight)
   );
   const isDraggingRef = useRef(false);
   const dragStartY = useRef(0);
   const dragStartH = useRef(0);
+  const latestBottomH = useRef(bottomHeight);
+
+  // ── Feature 1: Date range ──
+  const [dateRange, setDateRange] = useState<C2DateRange>("today");
+
+  // ── Feature 2: Mute state ──
+  const [isMuted, setIsMuted] = useState<boolean>(() =>
+    readStorage<boolean>("kkr-c2-muted", false)
+  );
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const prevOrderIdsRef = useRef<Set<string>>(new Set());
+  const isInitialLoadRef = useRef(true);
+
+  // ── Feature 6: Search ──
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // ── OTP on Fulfill ──
+  const [otpRequired, setOtpRequired] = useState(false);
+  const [otpChannels, setOtpChannels] = useState<OtpChannel>("email");
+  const [otpDialogOrder, setOtpDialogOrder] = useState<Order | null>(null);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpError, setOtpError] = useState("");
+
+  // ── Load OTP settings ──
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, col("settings"), "checkout"));
+        if (snap.exists()) {
+          const data = snap.data();
+          setOtpRequired(data.requireDeliveryOTP === true);
+          if (data.otpChannels) setOtpChannels(data.otpChannels as OtpChannel);
+        }
+      } catch (e) {
+        console.warn("[C2] Failed to fetch OTP settings:", e);
+      }
+    })();
+  }, [col]);
 
   // Sync bottom height when layout preset changes
   useEffect(() => {
@@ -218,16 +341,50 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     })();
   }, []);
 
-  // ── Online users with locations (from recent orders) ──
+  // ── Feature 2: New order sound detection ──
+  useEffect(() => {
+    if (orders.length === 0) return;
+
+    if (isInitialLoadRef.current) {
+      // First load — just populate the set, don't play sound
+      isInitialLoadRef.current = false;
+      prevOrderIdsRef.current = new Set(orders.map((o) => o.id));
+      return;
+    }
+
+    const currentIds = new Set(orders.map((o) => o.id));
+    const newPendingOrders = orders.filter(
+      (o) => !prevOrderIdsRef.current.has(o.id) && (o.status === "Pending" || !o.status)
+    );
+
+    if (newPendingOrders.length > 0 && !isMuted) {
+      playNewOrderChime(audioCtxRef);
+    }
+
+    prevOrderIdsRef.current = currentIds;
+  }, [orders, isMuted]);
+
+  // ── Online users with locations ──
   const onlineUsersWithLocation = useMemo<OnlineUserMarker[]>(() => {
+    const sorted = [...orders].sort((a, b) => {
+      const ta = a.createdAt?.toMillis?.() ?? 0;
+      const tb = b.createdAt?.toMillis?.() ?? 0;
+      return tb - ta;
+    });
+
     return onlineUsers.map((u) => {
-      // Find most recent order by this user (match by uid, email, or phone)
-      const userOrder = orders.find(
-        (o) =>
-          (o.userId && o.userId === u.uid) ||
-          (o.userEmail && u.email && o.userEmail === u.email) ||
-          (o.phone && u.phone && o.phone === u.phone)
-      );
+      const uPhone = normalizeIndianPhone(u.phone || "");
+      const userOrder = sorted.find((o) => {
+        if (!o.lat && !o.lng && !o.location) return false;
+        if (o.userId && o.userId === u.uid) return true;
+        if (o.userEmail && u.email && o.userEmail.toLowerCase() === u.email.toLowerCase()) return true;
+        if (uPhone && uPhone.length === 10) {
+          const oPhone = normalizeIndianPhone(o.phone || "");
+          if (oPhone === uPhone) return true;
+        }
+        return false;
+      });
+
       return {
         uid: u.uid,
         displayName: u.displayName,
@@ -239,32 +396,68 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     });
   }, [onlineUsers, orders]);
 
-  // ── Derived data ──
+  // ── Feature 1: Filtered orders by date range ──
   const todayOrders = useMemo(() => orders.filter(isToday), [orders]);
   const yesterdayOrders = useMemo(() => orders.filter(isYesterday), [orders]);
 
-  const todayRevenue = useMemo(
-    () => todayOrders.filter((o) => o.status === "Fulfilled").reduce((s, o) => s + parseTotal(o.totalValue), 0),
-    [todayOrders]
+  const filteredOrders = useMemo(() => {
+    switch (dateRange) {
+      case "today":
+        return todayOrders;
+      case "yesterday":
+        return yesterdayOrders;
+      case "7days":
+        return orders.filter(isWithin7Days);
+      case "all":
+        return orders;
+      default:
+        return todayOrders;
+    }
+  }, [dateRange, orders, todayOrders, yesterdayOrders]);
+
+  // ── KPIs (from filteredOrders) ──
+  const displayRevenue = useMemo(
+    () => filteredOrders.filter((o) => o.status === "Fulfilled").reduce((s, o) => s + parseTotal(o.totalValue), 0),
+    [filteredOrders]
   );
   const yesterdayRevenue = useMemo(
     () => yesterdayOrders.filter((o) => o.status === "Fulfilled").reduce((s, o) => s + parseTotal(o.totalValue), 0),
     [yesterdayOrders]
   );
   const activeOrders = useMemo(
-    () => todayOrders.filter((o) => o.status !== "Fulfilled" && o.status !== "Rejected").length,
-    [todayOrders]
+    () => filteredOrders.filter((o) => o.status !== "Fulfilled" && o.status !== "Rejected").length,
+    [filteredOrders]
   );
   const fulfillmentRate = useMemo(() => {
-    const total = todayOrders.length;
+    const total = filteredOrders.length;
     if (total === 0) return 0;
-    return Math.round((todayOrders.filter((o) => o.status === "Fulfilled").length / total) * 100);
-  }, [todayOrders]);
+    return Math.round((filteredOrders.filter((o) => o.status === "Fulfilled").length / total) * 100);
+  }, [filteredOrders]);
   const avgOrderValue = useMemo(() => {
-    const f = todayOrders.filter((o) => o.status === "Fulfilled");
+    const f = filteredOrders.filter((o) => o.status === "Fulfilled");
     if (f.length === 0) return 0;
     return Math.round(f.reduce((s, o) => s + parseTotal(o.totalValue), 0) / f.length);
-  }, [todayOrders]);
+  }, [filteredOrders]);
+
+  // ── Feature 3: Pending revenue (from filteredOrders) ──
+  const pendingRevenue = useMemo(
+    () =>
+      filteredOrders
+        .filter((o) => o.status !== "Fulfilled" && o.status !== "Rejected")
+        .reduce((s, o) => s + parseTotal(o.totalValue), 0),
+    [filteredOrders]
+  );
+
+  // ── Revenue label (dynamic based on date range) ──
+  const revenueLabel = useMemo(() => {
+    switch (dateRange) {
+      case "today": return "Today's Revenue";
+      case "yesterday": return "Yesterday's Revenue";
+      case "7days": return "7-Day Revenue";
+      case "all": return "Total Revenue";
+      default: return "Revenue";
+    }
+  }, [dateRange]);
 
   // ── Status change handler ──
   const handleStatusChange = useCallback(
@@ -291,6 +484,106 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     },
     [col]
   );
+
+  // ── Feature 7: Bulk status change ──
+  const handleBulkStatusChange = useCallback(
+    async (orderIds: string[], newStatus: OrderStatus) => {
+      try {
+        await Promise.all(
+          orderIds.map(async (orderId) => {
+            const updates: Record<string, unknown> = {
+              status: newStatus,
+              updatedAt: serverTimestamp(),
+            };
+            const timestampField = STATUS_TIMESTAMP_FIELDS[newStatus];
+            if (timestampField) updates[timestampField] = serverTimestamp();
+            await updateDoc(doc(db, col("orders"), orderId), updates);
+
+            try {
+              const notifyFn = httpsCallable(functions, "notifyOrderStatusChange");
+              notifyFn({ orderId, newStatus, collectionName: col("orders") }).catch(() => {});
+            } catch {}
+          })
+        );
+        toast.success(`${orderIds.length} order(s) updated to ${newStatus}.`);
+      } catch (err: any) {
+        console.error("[C2] Bulk status change failed:", err);
+        toast.error(`Failed to update orders: ${err.message}`);
+      }
+    },
+    [col]
+  );
+
+  // ── OTP Fulfill intercept ──
+  const handleFulfillClick = useCallback(
+    (order: Order) => {
+      if (otpRequired && (order.userEmail || order.phone)) {
+        setOtpDialogOrder(order);
+        setOtpCode("");
+        setOtpSent(false);
+        setOtpError("");
+      } else {
+        handleStatusChange(order.id, "Fulfilled");
+      }
+    },
+    [otpRequired, handleStatusChange]
+  );
+
+  const handleC2SendOtp = useCallback(async () => {
+    if (!otpDialogOrder) return;
+    setOtpSending(true);
+    setOtpError("");
+
+    const wantEmail = otpChannels === "email" || otpChannels === "both";
+    const hasEmail = !!otpDialogOrder.userEmail;
+    let ok = false;
+    const errors: string[] = [];
+
+    // Send Email OTP via Cloud Function
+    if (wantEmail && hasEmail) {
+      try {
+        const sendFn = httpsCallable(functions, "sendDeliveryOTP");
+        await sendFn({ orderId: otpDialogOrder.id, orderCollection: col("orders") });
+        ok = true;
+      } catch (e: unknown) {
+        errors.push(e instanceof Error ? e.message : "Email OTP failed");
+      }
+    }
+
+    // SMS OTP — use the same Cloud Function approach (email channel) for simplicity
+    // Full SMS via Firebase Phone Auth is available in Customer Orders tab
+    if (!ok && !hasEmail) {
+      errors.push("No email available for OTP delivery");
+    }
+
+    setOtpSent(ok);
+    if (ok) toast.success("OTP sent to buyer's email");
+    if (errors.length > 0 && !ok) {
+      setOtpError(errors.join("\n"));
+      toast.error("Failed to send OTP");
+    }
+    setOtpSending(false);
+  }, [otpDialogOrder, otpChannels, col]);
+
+  const handleC2VerifyOtp = useCallback(async () => {
+    if (!otpDialogOrder || !otpCode) return;
+    setOtpVerifying(true);
+    setOtpError("");
+
+    try {
+      const verifyFn = httpsCallable(functions, "verifyDeliveryOTP");
+      await verifyFn({ orderId: otpDialogOrder.id, otp: otpCode });
+
+      // OTP verified — fulfill the order
+      await handleStatusChange(otpDialogOrder.id, "Fulfilled");
+      setOtpDialogOrder(null);
+      toast.success("OTP verified — order fulfilled!");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Invalid OTP";
+      setOtpError(msg);
+    }
+    setOtpVerifying(false);
+  }, [otpDialogOrder, otpCode, handleStatusChange]);
 
   // ── Fullscreen toggle ──
   const toggleFullscreen = () => {
@@ -321,11 +614,12 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
         if (!isDraggingRef.current) return;
         const delta = dragStartY.current - ev.clientY;
         const newH = Math.max(160, Math.min(600, dragStartH.current + delta));
+        latestBottomH.current = newH;
         setBottomHeight(newH);
       };
       const handleUp = () => {
         isDraggingRef.current = false;
-        writeStorage("kkr-c2-bottom-h", bottomHeight);
+        writeStorage("kkr-c2-bottom-h", latestBottomH.current);
         window.removeEventListener("mousemove", handleMove);
         window.removeEventListener("mouseup", handleUp);
       };
@@ -347,6 +641,61 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     setLayoutKey(key);
     writeStorage("kkr-c2-layout", key);
   };
+
+  // ── Feature 2: Mute toggle ──
+  const toggleMute = () => {
+    setIsMuted((prev) => {
+      const next = !prev;
+      writeStorage("kkr-c2-muted", next);
+      return next;
+    });
+  };
+
+  // ── Feature 5: Export ──
+  const handleExport = () => {
+    if (filteredOrders.length === 0) {
+      toast.error("No orders to export.");
+      return;
+    }
+    exportOrdersToCSV(filteredOrders);
+    toast.success(`Exported ${filteredOrders.length} orders to CSV.`);
+  };
+
+  // ── Feature 8: Keyboard shortcuts ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable;
+
+      // Ctrl+K / Cmd+K — always works (even in inputs)
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((p) => !p);
+        return;
+      }
+
+      if (isInput) return;
+
+      // M — toggle mute
+      if (e.key === "m" || e.key === "M") {
+        toggleMute();
+        return;
+      }
+
+      // 1-4 — switch date range
+      const rangeIndex = parseInt(e.key) - 1;
+      if (rangeIndex >= 0 && rangeIndex < C2_DATE_RANGES.length) {
+        setDateRange(C2_DATE_RANGES[rangeIndex].key);
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // ── Loading state ──
   if (loading) {
@@ -374,13 +723,13 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     >
       {/* ─── C2 Header ───────────────────────────────────────── */}
       <div
-        className="flex items-center justify-between px-5 py-3 shrink-0"
+        className="flex items-center justify-between px-2.5 sm:px-5 py-2.5 sm:py-3 shrink-0"
         style={{ borderBottom: "1px solid var(--c2-border)" }}
       >
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-amber-500" />
-            <h2 className="text-lg font-bold tracking-wide" style={{ color: "var(--c2-text)" }}>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
+            <h2 className="text-sm sm:text-lg font-bold tracking-wide" style={{ color: "var(--c2-text)" }}>
               COMMAND CENTER
             </h2>
           </div>
@@ -401,15 +750,90 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* Feature 1: Date range selector — pills on md+, select on mobile */}
+          <div className="hidden md:flex items-center gap-1 mr-1">
+            {C2_DATE_RANGES.map((range, i) => (
+              <button
+                key={range.key}
+                onClick={() => setDateRange(range.key)}
+                className="text-[10px] font-semibold px-2 py-1 rounded-md transition-all"
+                style={{
+                  background: dateRange === range.key ? "var(--c2-accent-bg, rgba(59,130,246,0.15))" : "transparent",
+                  color: dateRange === range.key ? "#3b82f6" : "var(--c2-text-muted)",
+                  border: dateRange === range.key ? "1px solid rgba(59,130,246,0.3)" : "1px solid transparent",
+                }}
+                title={`${range.label} (${i + 1})`}
+              >
+                {range.label}
+              </button>
+            ))}
+          </div>
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value as C2DateRange)}
+            className="md:hidden text-[10px] font-medium rounded-md px-2 py-1 outline-none cursor-pointer"
+            style={{
+              background: "var(--c2-bg-secondary)",
+              color: "var(--c2-text-secondary)",
+              border: "1px solid var(--c2-border)",
+            }}
+          >
+            {C2_DATE_RANGES.map((range) => (
+              <option key={range.key} value={range.key}>
+                {range.shortLabel}
+              </option>
+            ))}
+          </select>
+
           {/* LIVE indicator */}
-          <div className="flex items-center gap-1.5 mr-2">
+          <div className="flex items-center gap-1.5 mx-1 sm:mx-2">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
             </span>
-            <span className="text-[11px] font-semibold text-green-500">LIVE</span>
+            <span className="text-[11px] font-semibold text-green-500 hidden sm:inline">LIVE</span>
           </div>
+
+          {/* Feature 6: Search button */}
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="p-1.5 rounded-lg transition-colors flex items-center gap-1"
+            style={{ color: "var(--c2-text-muted)" }}
+            title="Search orders (Ctrl+K)"
+          >
+            <Search className="w-4 h-4" />
+            <kbd
+              className="hidden sm:inline text-[9px] px-1 py-0.5 rounded font-mono"
+              style={{
+                background: "var(--c2-bg-secondary)",
+                border: "1px solid var(--c2-border)",
+                color: "var(--c2-text-muted)",
+              }}
+            >
+              {"\u2318"}K
+            </kbd>
+          </button>
+
+          {/* Feature 5: Export button */}
+          <button
+            onClick={handleExport}
+            className="p-1.5 rounded-lg transition-colors"
+            style={{ color: "var(--c2-text-muted)" }}
+            title="Export orders to CSV"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+
+          {/* Feature 2: Mute toggle */}
+          <button
+            onClick={toggleMute}
+            className="p-1.5 rounded-lg transition-colors"
+            style={{ color: isMuted ? "var(--c2-text-muted)" : "#22c55e" }}
+            title={isMuted ? "Unmute notifications (M)" : "Mute notifications (M)"}
+          >
+            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
 
           {/* Layout preset selector */}
           <div className="hidden md:flex items-center gap-1.5">
@@ -455,14 +879,16 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
       </div>
 
       {/* ─── KPI Metrics Strip ─────────────────────────────── */}
-      <div className="px-4 py-3 shrink-0" style={{ borderBottom: "1px solid var(--c2-border-subtle)" }}>
+      <div className="px-2 sm:px-4 py-2 sm:py-3 shrink-0" style={{ borderBottom: "1px solid var(--c2-border-subtle)" }}>
         <LiveMetrics
-          todayRevenue={todayRevenue}
+          todayRevenue={displayRevenue}
           activeOrders={activeOrders}
           onlineUsers={onlineUsers.length}
           fulfillmentRate={fulfillmentRate}
           avgOrderValue={avgOrderValue}
-          yesterdayRevenue={yesterdayRevenue}
+          pendingRevenue={pendingRevenue}
+          yesterdayRevenue={dateRange === "today" ? yesterdayRevenue : undefined}
+          revenueLabel={revenueLabel}
           theme={c2Theme}
         />
       </div>
@@ -484,13 +910,13 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
       ) : (
         <>
           {/* ─── Main Content Grid ─────────────────────────────── */}
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden min-h-0">
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-0 overflow-hidden min-h-0">
             {/* Left: Map */}
             <div
-              className="overflow-hidden"
+              className="overflow-hidden min-h-[300px] lg:min-h-0 lg:border-r"
               style={{
                 gridColumn: `span ${layout.mapCols}`,
-                borderRight: "1px solid var(--c2-border-subtle)",
+                borderColor: "var(--c2-border-subtle)",
               }}
             >
               <OrderMap
@@ -506,10 +932,12 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
             </div>
 
             {/* Right: Pipeline */}
-            <div className="overflow-hidden" style={{ gridColumn: `span ${layout.pipeCols}` }}>
+            <div className="overflow-hidden min-h-[300px] lg:min-h-0" style={{ gridColumn: `span ${layout.pipeCols}` }}>
               <OrderPipeline
-                orders={todayOrders}
+                orders={filteredOrders}
                 onStatusChange={handleStatusChange}
+                onBulkStatusChange={handleBulkStatusChange}
+                onFulfillClick={handleFulfillClick}
                 theme={c2Theme}
               />
             </div>
@@ -525,15 +953,15 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
 
           {/* ─── Bottom Panel ──────────────────────────────────── */}
           <div
-            className="grid grid-cols-1 lg:grid-cols-12 gap-0 shrink-0"
+            className="flex flex-col lg:grid lg:grid-cols-12 gap-0 shrink-0"
             style={{ height: `${bottomHeight}px` }}
           >
             {/* Activity Feed */}
             <div
-              className="overflow-hidden"
+              className="overflow-hidden lg:border-r"
               style={{
                 gridColumn: `span ${layout.feedCols}`,
-                borderRight: "1px solid var(--c2-border-subtle)",
+                borderColor: "var(--c2-border-subtle)",
               }}
             >
               <ActivityFeed orders={orders} onlineUsers={onlineUsersWithLocation} theme={c2Theme} />
@@ -541,10 +969,84 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
 
             {/* Mini Charts */}
             <div className="overflow-hidden" style={{ gridColumn: `span ${layout.chartCols}` }}>
-              <MiniCharts orders={todayOrders} allOrders={orders} theme={c2Theme} />
+              <MiniCharts orders={filteredOrders} allOrders={orders} theme={c2Theme} dateRange={dateRange} />
             </div>
           </div>
         </>
+      )}
+
+      {/* ─── Feature 6: Search Overlay ─────────────────────── */}
+      <OrderSearch
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        orders={orders}
+        onSelectOrder={onNavigateToOrder}
+      />
+
+      {/* ─── OTP Fulfill Dialog ─────────────────────────────── */}
+      {otpDialogOrder && (
+        <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4 animate-[scaleIn_0.25s_cubic-bezier(0.34,1.56,0.64,1)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-800">Delivery OTP Verification</h3>
+              <button
+                onClick={() => setOtpDialogOrder(null)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="text-sm text-slate-600">
+              <p><strong>{otpDialogOrder.customerName}</strong></p>
+              {otpDialogOrder.userEmail && <p className="text-xs text-slate-400">{otpDialogOrder.userEmail}</p>}
+              {otpDialogOrder.phone && <p className="text-xs text-slate-400">{otpDialogOrder.phone}</p>}
+            </div>
+
+            {!otpSent ? (
+              <button
+                onClick={handleC2SendOtp}
+                disabled={otpSending}
+                className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              >
+                {otpSending ? "Sending OTP..." : "Send OTP to Buyer"}
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-emerald-600 font-medium">✓ OTP sent! Enter the code below:</p>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Enter 6-digit OTP"
+                  className="w-full text-center text-2xl tracking-[0.5em] font-mono border-2 border-slate-200 rounded-xl py-3 focus:border-emerald-500 focus:outline-none"
+                />
+                <button
+                  onClick={handleC2VerifyOtp}
+                  disabled={otpVerifying || otpCode.length < 4}
+                  className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                >
+                  {otpVerifying ? "Verifying..." : "Verify & Fulfill"}
+                </button>
+                <button
+                  onClick={handleC2SendOtp}
+                  disabled={otpSending}
+                  className="w-full py-2 text-sm text-slate-500 hover:text-slate-700"
+                >
+                  Resend OTP
+                </button>
+              </div>
+            )}
+
+            {otpError && (
+              <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{otpError}</div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

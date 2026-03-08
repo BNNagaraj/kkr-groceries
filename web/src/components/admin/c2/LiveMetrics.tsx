@@ -9,6 +9,7 @@ import {
   Target,
   TrendingUp,
   TrendingDown,
+  Hourglass,
 } from "lucide-react";
 
 interface MetricCardProps {
@@ -83,7 +84,7 @@ function MetricCard({
 }: MetricCardProps) {
   return (
     <div
-      className={`relative overflow-hidden rounded-xl p-4 transition-all duration-300 group ${
+      className={`relative overflow-hidden rounded-xl p-2.5 sm:p-3 md:p-4 transition-all duration-300 group ${
         pulse ? "c2-pulse-border" : ""
       }`}
       style={{
@@ -106,20 +107,20 @@ function MetricCard({
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-2">
           <span
-            className="text-[11px] font-semibold tracking-wider uppercase"
+            className="text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase"
             style={{ color: "var(--c2-text-muted)" }}
           >
             {label}
           </span>
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center"
             style={{ backgroundColor: `${accentColor}15` }}
           >
             <div style={{ color: accentColor }}>{icon}</div>
           </div>
         </div>
 
-        <div className="text-2xl font-bold tracking-tight" style={{ color: "var(--c2-text)" }}>
+        <div className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight" style={{ color: "var(--c2-text)" }}>
           <AnimatedNumber value={value} format={format} prefix={prefix} suffix={suffix} />
         </div>
 
@@ -150,7 +151,9 @@ interface LiveMetricsProps {
   onlineUsers: number;
   fulfillmentRate: number;
   avgOrderValue: number;
+  pendingRevenue: number;
   yesterdayRevenue?: number;
+  revenueLabel?: string;
   theme: C2Theme;
 }
 
@@ -160,7 +163,9 @@ export default function LiveMetrics({
   onlineUsers,
   fulfillmentRate,
   avgOrderValue,
+  pendingRevenue,
   yesterdayRevenue,
+  revenueLabel,
 }: LiveMetricsProps) {
   const revenueTrend =
     yesterdayRevenue && yesterdayRevenue > 0
@@ -168,9 +173,9 @@ export default function LiveMetrics({
       : undefined;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
       <MetricCard
-        label="Today's Revenue"
+        label={revenueLabel || "Today's Revenue"}
         value={todayRevenue}
         prefix={"\u20B9"}
         icon={<DollarSign className="w-4 h-4" />}
@@ -211,6 +216,16 @@ export default function LiveMetrics({
         accentColor="#8b5cf6"
         glowColor="#8b5cf6"
         format="currency"
+      />
+      <MetricCard
+        label="Pending Revenue"
+        value={pendingRevenue}
+        prefix={"\u20B9"}
+        icon={<Hourglass className="w-4 h-4" />}
+        accentColor="#f97316"
+        glowColor="#f97316"
+        format="currency"
+        pulse={pendingRevenue > 0}
       />
     </div>
   );

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { db, functions } from "@/lib/firebase";
 import { getOtpAuth } from "@/lib/firebase-otp";
+import { normalizeIndianPhone } from "@/lib/validation";
 import { httpsCallable } from "firebase/functions";
 import {
   RecaptchaVerifier,
@@ -49,7 +50,11 @@ import {
 } from "lucide-react";
 import { Order, OrderStatus, STATUS_TIMESTAMP_FIELDS, OrderCartItem } from "@/types/order";
 import type { OtpChannel } from "@/types/settings";
-import { downloadInvoice } from "@/lib/invoice";
+// jsPDF lazy-loaded on click (~200KB kept out of initial bundle)
+const lazyDownloadInvoice = async (order: Order) => {
+  const { downloadInvoice } = await import("@/lib/invoice");
+  downloadInvoice(order);
+};
 import { useMode } from "@/contexts/ModeContext";
 import { Product } from "@/contexts/AppContext";
 import OrderEditModal from "./OrderEditModal";
@@ -93,7 +98,6 @@ type DateFilterKey = (typeof DATE_FILTERS)[number]["key"];
 const STATUS_FILTERS: Array<OrderStatus | "all"> = ["all", "Pending", "Accepted", "Shipped", "Fulfilled", "Rejected"];
 
 const DATE_MS_MAP: Record<string, number> = {
-  today: DAY,
   week: 7 * DAY,
   fortnight: 14 * DAY,
   month: 30 * DAY,
@@ -101,6 +105,13 @@ const DATE_MS_MAP: Record<string, number> = {
   half: 180 * DAY,
   year: 365 * DAY,
 };
+
+/** Get midnight of today in local timezone */
+function getMidnightToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
 
 function statusBadgeVariant(status: OrderStatus, hasPendingMod: boolean): "default" | "secondary" | "destructive" | "outline" {
   if (status === "Fulfilled") return "default";
@@ -189,20 +200,22 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
     }
 
     try {
-      // Build query constraints for server-side filtering
+      // ── Strategy ──────────────────────────────────────────────
+      // Firestore composite indexes for (status + createdAt) may not exist.
+      // So we always query by date range + orderBy("createdAt") server-side
+      // (single-field index, always works), and apply status filter client-side.
+      // We fetch extra results when status-filtering to compensate for filtered-out items.
       const constraints: QueryConstraint[] = [];
 
-      // Status filter (must come before orderBy if using composite index)
-      if (statusFilter !== "all") {
-        constraints.push(where("status", "==", statusFilter));
-      }
-
-      // Date range filter
-      if (dateFilter === "custom" && customFrom) {
-        constraints.push(where("createdAt", ">=", Timestamp.fromDate(new Date(customFrom + "T00:00:00"))));
+      // Date range filter (server-side — single field index on createdAt)
+      if (dateFilter === "today") {
+        constraints.push(where("createdAt", ">=", Timestamp.fromDate(getMidnightToday())));
+      } else if (dateFilter === "custom") {
+        if (customFrom) {
+          constraints.push(where("createdAt", ">=", Timestamp.fromDate(new Date(customFrom + "T00:00:00"))));
+        }
         if (customTo) {
-          const toDate = new Date(customTo + "T23:59:59.999");
-          constraints.push(where("createdAt", "<=", Timestamp.fromDate(toDate)));
+          constraints.push(where("createdAt", "<=", Timestamp.fromDate(new Date(customTo + "T23:59:59.999"))));
         }
       } else if (dateFilter !== "all" && DATE_MS_MAP[dateFilter]) {
         const startMs = Date.now() - DATE_MS_MAP[dateFilter];
@@ -210,7 +223,10 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
       }
 
       constraints.push(orderBy("createdAt", "desc"));
-      constraints.push(limit(ORDERS_PER_PAGE));
+
+      // Fetch more when status-filtering to ensure enough visible results
+      const fetchLimit = statusFilter !== "all" ? ORDERS_PER_PAGE * 4 : ORDERS_PER_PAGE;
+      constraints.push(limit(fetchLimit));
 
       if (!reset && lastDocRef.current) {
         constraints.push(startAfter(lastDocRef.current));
@@ -218,9 +234,14 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
 
       const q = query(collection(db, col("orders")), ...constraints);
       const snap = await getDocs(q);
-      const newOrders = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order);
+      let newOrders = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order);
 
-      setHasMore(snap.docs.length === ORDERS_PER_PAGE);
+      // Apply status filter client-side (no composite index needed)
+      if (statusFilter !== "all") {
+        newOrders = newOrders.filter((o) => (o.status || "Pending") === statusFilter);
+      }
+
+      setHasMore(snap.docs.length === fetchLimit);
       lastDocRef.current = snap.docs[snap.docs.length - 1] || null;
 
       if (reset) {
@@ -229,10 +250,14 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
         setOrders((prev) => [...prev, ...newOrders]);
       }
     } catch (e) {
-      console.warn("[Orders] Query failed, trying fallback:", e);
+      console.error("[Orders] Query failed:", e);
+      toast.error("Failed to load orders. Retrying with basic query...");
       try {
         const snap = await getDocs(query(collection(db, col("orders")), orderBy("createdAt", "desc"), limit(ORDERS_PER_PAGE)));
-        const data = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order);
+        let data = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order);
+        if (statusFilter !== "all") {
+          data = data.filter((o) => (o.status || "Pending") === statusFilter);
+        }
         setOrders(data);
         setHasMore(false);
       } catch (e2) {
@@ -436,25 +461,20 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
     // 2. Send SMS OTP via Firebase Phone Auth (second project)
     if (wantSms && hasPhone) {
       try {
-        // Normalize phone to +91XXXXXXXXXX
-        // Indian numbers are always 10 digits. If 12 digits starting with "91",
-        // treat "91" as country code. If 10 digits starting with "91", it's
-        // the actual number (e.g. 9188441334) — prepend +91.
-        let cleanPhone = otpDialogOrder.phone.replace(/[\s\-()]/g, "");
-        if (!cleanPhone.startsWith("+")) {
-          if (cleanPhone.length === 12 && cleanPhone.startsWith("91")) {
-            cleanPhone = `+${cleanPhone}`;
-          } else {
-            // 10-digit number (may or may not start with 91) — prepend +91
-            cleanPhone = `+91${cleanPhone}`;
-          }
-        }
+        // Normalize phone to E.164 format: +91 + 10-digit number
+        // Uses the same normalizeIndianPhone helper that CartDrawer uses
+        // to handle all formats: +919876543210, 919876543210, 9876543210, etc.
+        const cleanPhone = `+91${normalizeIndianPhone(otpDialogOrder.phone)}`;
 
         const otpAuthInstance = getOtpAuth();
 
-        // Create RecaptchaVerifier — on localhost with appVerificationDisabledForTesting=true,
-        // this renders a mock reCAPTCHA that auto-resolves. In production, it uses real invisible reCAPTCHA.
-        if (!window.otpRecaptchaVerifier && recaptchaContainerRef.current) {
+        // Always clear & recreate RecaptchaVerifier to avoid stale DOM refs
+        // (Dialog re-renders can invalidate previous verifier container elements)
+        if (window.otpRecaptchaVerifier) {
+          try { window.otpRecaptchaVerifier.clear(); } catch {}
+          window.otpRecaptchaVerifier = undefined;
+        }
+        if (recaptchaContainerRef.current) {
           window.otpRecaptchaVerifier = new RecaptchaVerifier(otpAuthInstance, recaptchaContainerRef.current, {
             size: "invisible",
           });
@@ -540,6 +560,11 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
     }
 
     if (verified) {
+      // Clean up RecaptchaVerifier so next send creates a fresh one
+      if (window.otpRecaptchaVerifier) {
+        window.otpRecaptchaVerifier.clear();
+        window.otpRecaptchaVerifier = undefined;
+      }
       toast.success("OTP verified! Marking as fulfilled.");
       await handleStatusChange(otpDialogOrder.id, "Fulfilled");
       setOtpDialogOrder(null);
@@ -775,7 +800,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
                       <Button variant="destructive" size="sm" onClick={() => handleCancelModification(o.id)}>
                         <XCircle className="w-3.5 h-3.5" /> Cancel Changes
                       </Button>
-                      <Button variant="secondary" size="sm" onClick={() => downloadInvoice(o)}>
+                      <Button variant="secondary" size="sm" onClick={() => lazyDownloadInvoice(o)}>
                         <FileText className="w-3.5 h-3.5" /> Invoice
                       </Button>
                     </>
@@ -787,7 +812,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
                       <Button size="sm" variant="outline" onClick={() => setEditingOrder(o)} className="text-amber-600 border-amber-300 hover:bg-amber-50">
                         <Pencil className="w-3.5 h-3.5" /> Edit
                       </Button>
-                      <Button size="sm" variant="secondary" onClick={() => downloadInvoice(o)}>
+                      <Button size="sm" variant="secondary" onClick={() => lazyDownloadInvoice(o)}>
                         <FileText className="w-3.5 h-3.5" /> Invoice
                       </Button>
                       <Button size="sm" variant="destructive" onClick={() => handleStatusChange(o.id, "Rejected")}>
@@ -799,7 +824,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
                       <Button size="sm" onClick={() => handleStatusChange(o.id, "Shipped")} className="bg-indigo-500 hover:bg-indigo-600">
                         <Truck className="w-3.5 h-3.5" /> Ship
                       </Button>
-                      <Button size="sm" variant="secondary" onClick={() => downloadInvoice(o)}>
+                      <Button size="sm" variant="secondary" onClick={() => lazyDownloadInvoice(o)}>
                         <FileText className="w-3.5 h-3.5" /> Invoice
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setEditingOrder(o)} className="text-amber-600 border-amber-300 hover:bg-amber-50">
@@ -811,7 +836,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
                       <Button size="sm" onClick={() => handleFulfillClick(o)}>
                         <CheckCircle2 className="w-3.5 h-3.5" /> Fulfill
                       </Button>
-                      <Button size="sm" variant="secondary" onClick={() => downloadInvoice(o)}>
+                      <Button size="sm" variant="secondary" onClick={() => lazyDownloadInvoice(o)}>
                         <FileText className="w-3.5 h-3.5" /> Invoice
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setEditingOrder(o)} className="text-amber-600 border-amber-300 hover:bg-amber-50">
@@ -820,7 +845,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
                     </>
                   ) : o.status === "Fulfilled" ? (
                     <>
-                      <Button size="sm" variant="secondary" onClick={() => downloadInvoice(o)}>
+                      <Button size="sm" variant="secondary" onClick={() => lazyDownloadInvoice(o)}>
                         <FileText className="w-3.5 h-3.5" /> Invoice
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setEditingOrder(o)} className="text-amber-600 border-amber-300 hover:bg-amber-50">
@@ -1013,11 +1038,12 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
               </div>
             )}
 
-            {/* Invisible reCAPTCHA container for SMS OTP */}
-            <div ref={recaptchaContainerRef} id="otp-recaptcha-container" />
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Invisible reCAPTCHA container — OUTSIDE Dialog so it persists across open/close */}
+      <div ref={recaptchaContainerRef} id="otp-recaptcha-container" />
     </div>
   );
 }

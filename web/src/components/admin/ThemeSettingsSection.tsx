@@ -129,7 +129,7 @@ export default function ThemeSettingsSection() {
                 {/* Theme Selection */}
                 <div>
                     <label className="text-sm font-semibold text-slate-700 mb-3 block">Choose Theme</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         {THEME_PRESETS.map(preset => (
                             <ThemePreviewCard
                                 key={preset.id}

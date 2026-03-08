@@ -2,17 +2,13 @@
 
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import type { C2Theme } from "../CommandCenter";
+import type { C2DateRange } from "../CommandCenter";
 import { Order } from "@/types/order";
+import { parseTotal } from "@/lib/helpers";
 
 interface ChartComponents {
   Bar: any;
   Line: any;
-}
-
-function parseTotal(v: unknown): number {
-  if (typeof v === "number") return v;
-  if (typeof v === "string") return parseInt(v.replace(/[^0-9]/g, "") || "0", 10);
-  return 0;
 }
 
 // ─── MiniCharts Component ────────────────────────────────────────────────────
@@ -20,9 +16,10 @@ interface MiniChartsProps {
   orders: Order[];
   allOrders: Order[];
   theme: C2Theme;
+  dateRange?: C2DateRange;
 }
 
-export default function MiniCharts({ orders, allOrders, theme }: MiniChartsProps) {
+export default function MiniCharts({ orders, allOrders, theme, dateRange }: MiniChartsProps) {
   const [chartComponents, setChartComponents] = useState<ChartComponents | null>(null);
 
   useEffect(() => {
@@ -50,26 +47,43 @@ export default function MiniCharts({ orders, allOrders, theme }: MiniChartsProps
 
   // ── Revenue by last 7 days ──
   const revenueTrend = useMemo(() => {
-    const byDate: Record<string, number> = {};
+    // Build YYYY-MM-DD keys for reliable date matching
+    const isoKeys: Record<string, number> = {};
+    const shortLabels: string[] = [];
+    const isoKeyList: string[] = [];
     const now = new Date();
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      const key = d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit" });
-      byDate[key] = 0;
+      const isoKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const shortLabel = d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit" });
+      isoKeys[isoKey] = 0;
+      isoKeyList.push(isoKey);
+      shortLabels.push(shortLabel);
     }
     allOrders.forEach((o) => {
       if (o.status === "Rejected") return;
-      const raw = o.timestamp || "";
-      if (!raw) return;
-      try {
-        const datePart = raw.split(",")[0];
-        if (datePart && byDate.hasOwnProperty(datePart)) {
-          byDate[datePart] += parseTotal(o.totalValue);
-        }
-      } catch {}
+      let orderKey = "";
+      // Prefer createdAt (Firestore Timestamp)
+      if (o.createdAt?.toDate) {
+        const d = o.createdAt.toDate();
+        orderKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      } else {
+        // Fallback: parse timestamp string "D/M/YYYY, ..."
+        const raw = o.timestamp || "";
+        if (!raw) return;
+        try {
+          const parts = raw.split(",")[0].trim().split("/");
+          if (parts.length === 3) {
+            orderKey = `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+          }
+        } catch {}
+      }
+      if (orderKey && isoKeys.hasOwnProperty(orderKey)) {
+        isoKeys[orderKey] += parseTotal(o.totalValue);
+      }
     });
-    return { labels: Object.keys(byDate), data: Object.values(byDate) };
+    return { labels: shortLabels, data: isoKeyList.map((k) => isoKeys[k]) };
   }, [allOrders]);
 
   // ── Orders by hour (today) ──
@@ -77,6 +91,12 @@ export default function MiniCharts({ orders, allOrders, theme }: MiniChartsProps
     const hours = Array.from({ length: 24 }, (_, i) => i);
     const counts = new Array(24).fill(0);
     orders.forEach((o) => {
+      // Prefer createdAt (Firestore Timestamp)
+      if (o.createdAt?.toDate) {
+        counts[o.createdAt.toDate().getHours()]++;
+        return;
+      }
+      // Fallback: parse timestamp string
       const raw = o.timestamp || "";
       try {
         const timePart = raw.split(",")[1]?.trim();
@@ -158,21 +178,21 @@ export default function MiniCharts({ orders, allOrders, theme }: MiniChartsProps
   return (
     <div className="h-full flex flex-col">
       <div
-        className="flex items-center justify-between px-4 py-3 shrink-0"
+        className="flex items-center justify-between px-2.5 sm:px-4 py-2.5 sm:py-3 shrink-0"
         style={{ borderBottom: "1px solid var(--c2-border)" }}
       >
-        <h3 className="text-sm font-bold tracking-wide flex items-center gap-2" style={{ color: "var(--c2-text)" }}>
+        <h3 className="text-xs sm:text-sm font-bold tracking-wide flex items-center gap-2" style={{ color: "var(--c2-text)" }}>
           <span>&#x1F4CA;</span> Performance
         </h3>
       </div>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-4">
+      <div className="flex-1 overflow-y-auto no-scrollbar p-2 sm:p-3 space-y-3 sm:space-y-4">
         {/* Revenue Trend (7 days) */}
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--c2-text-muted)" }}>
             Revenue Trend (7 Days)
           </div>
-          <div className="h-28">
+          <div className="h-24 sm:h-28">
             <Line
               data={{
                 labels: revenueTrend.labels,
@@ -209,9 +229,9 @@ export default function MiniCharts({ orders, allOrders, theme }: MiniChartsProps
         {/* Orders by Hour */}
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--c2-text-muted)" }}>
-            Orders by Hour (Today)
+            Orders by Hour{dateRange && dateRange !== "today" ? ` (${dateRange === "yesterday" ? "Yesterday" : dateRange === "7days" ? "7D" : "All"})` : ""}
           </div>
-          <div className="h-24">
+          <div className="h-20 sm:h-24">
             <Bar
               data={{
                 labels: ordersByHour.labels,
@@ -230,7 +250,7 @@ export default function MiniCharts({ orders, allOrders, theme }: MiniChartsProps
                 ...chartOptions,
                 scales: {
                   ...chartOptions.scales,
-                  x: { ...chartOptions.scales.x, ticks: { ...chartOptions.scales.x.ticks, maxTicksLimit: 8 } },
+                  x: { ...chartOptions.scales.x, ticks: { ...chartOptions.scales.x.ticks, maxTicksLimit: 6 } },
                 },
               }}
             />
@@ -240,7 +260,7 @@ export default function MiniCharts({ orders, allOrders, theme }: MiniChartsProps
         {/* Top 5 Products */}
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--c2-text-muted)" }}>
-            Top Products (Today)
+            Top Products{dateRange && dateRange !== "today" ? ` (${dateRange === "yesterday" ? "Yesterday" : dateRange === "7days" ? "7D" : "All"})` : ""}
           </div>
           {topProducts.length === 0 ? (
             <div className="text-[10px] py-4 text-center" style={{ color: "var(--c2-text-muted)" }}>
