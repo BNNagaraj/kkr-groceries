@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { db, functions } from "@/lib/firebase";
-import { getOtpAuth } from "@/lib/firebase-otp";
+import { getOtpAuth, isOtpConfigValid } from "@/lib/firebase-otp";
 import { normalizeIndianPhone } from "@/lib/validation";
 import { httpsCallable } from "firebase/functions";
 import {
@@ -169,7 +169,6 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
   const [smsConfirmation, setSmsConfirmation] = useState<ConfirmationResult | null>(null);
   const [smsSent, setSmsSent] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
-  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch requireDeliveryOTP + otpChannels setting
   useEffect(() => {
@@ -467,43 +466,64 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
     // 2. Send SMS OTP via Firebase Phone Auth (second project)
     if (wantSms && hasPhone) {
       try {
+        // Pre-check: ensure OTP Firebase config is available
+        if (!isOtpConfigValid()) {
+          throw Object.assign(new Error("OTP Firebase config missing. Rebuild with NEXT_PUBLIC_OTP_FIREBASE_* env vars."), { code: "config/missing" });
+        }
+
         // Normalize phone to E.164 format: +91 + 10-digit number
-        // Uses the same normalizeIndianPhone helper that CartDrawer uses
-        // to handle all formats: +919876543210, 919876543210, 9876543210, etc.
         const cleanPhone = `+91${normalizeIndianPhone(otpDialogOrder.phone)}`;
 
         const otpAuthInstance = getOtpAuth();
 
-        // Always clear & recreate RecaptchaVerifier to avoid stale DOM refs
-        // (Dialog re-renders can invalidate previous verifier container elements)
+        // Always clear & recreate RecaptchaVerifier
         if (window.otpRecaptchaVerifier) {
           try { window.otpRecaptchaVerifier.clear(); } catch {}
           window.otpRecaptchaVerifier = undefined;
         }
-        if (recaptchaContainerRef.current) {
-          window.otpRecaptchaVerifier = new RecaptchaVerifier(otpAuthInstance, recaptchaContainerRef.current, {
-            size: "invisible",
-          });
+
+        // Use element ID string (more reliable than DOM ref in React)
+        const containerId = "otp-recaptcha-container";
+        const containerEl = document.getElementById(containerId);
+        if (!containerEl) {
+          throw Object.assign(new Error("reCAPTCHA container not found in DOM"), { code: "recaptcha/no-container" });
         }
 
-        const appVerifier = window.otpRecaptchaVerifier!;
-        const confirmation = await signInWithPhoneNumber(otpAuthInstance, cleanPhone, appVerifier);
+        window.otpRecaptchaVerifier = new RecaptchaVerifier(otpAuthInstance, containerId, {
+          size: "invisible",
+        });
+
+        // In production, explicitly render reCAPTCHA before use.
+        // On localhost (testing mode), skip render — auto-resolved by Firebase.
+        if (window.location.hostname !== "localhost") {
+          await window.otpRecaptchaVerifier.render();
+        }
+
+        const confirmation = await signInWithPhoneNumber(otpAuthInstance, cleanPhone, window.otpRecaptchaVerifier);
         setSmsConfirmation(confirmation);
         smsOk = true;
       } catch (err: unknown) {
         const error = err as { code?: string; message?: string };
+        console.error("[OTP SMS] Firebase Phone Auth error:", error.code, error.message, err);
+
         // Cleanup recaptcha on error
         if (window.otpRecaptchaVerifier) {
-          window.otpRecaptchaVerifier.clear();
+          try { window.otpRecaptchaVerifier.clear(); } catch {}
           window.otpRecaptchaVerifier = undefined;
         }
 
         if (error.code === "auth/too-many-requests") {
           errors.push("SMS: Too many attempts. Wait a few minutes.");
         } else if (error.code === "auth/invalid-phone-number") {
-          errors.push("SMS: Invalid phone number.");
+          errors.push("SMS: Invalid phone number format.");
+        } else if (error.code === "auth/unauthorized-domain" || error.code === "auth/operation-not-allowed") {
+          errors.push(`SMS: Domain not authorized. Add "${window.location.hostname}" to OTP project's Authorized Domains in Firebase Console > Authentication > Settings.`);
+        } else if (error.code === "auth/internal-error" || error.code === "auth/captcha-check-failed") {
+          errors.push(`SMS: reCAPTCHA failed. Ensure "${window.location.hostname}" is in OTP project's Authorized Domains and Phone Auth is enabled.`);
+        } else if (error.code === "config/missing") {
+          errors.push(`SMS: ${error.message}`);
         } else {
-          errors.push(`SMS: ${error.message || "Failed to send"}`);
+          errors.push(`SMS: ${error.message || "Failed to send"} (${error.code || "unknown"})`);
         }
       }
     }
@@ -1079,7 +1099,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
       </Dialog>
 
       {/* Invisible reCAPTCHA container — OUTSIDE Dialog so it persists across open/close */}
-      <div ref={recaptchaContainerRef} id="otp-recaptcha-container" />
+      <div id="otp-recaptcha-container" />
     </div>
   );
 }

@@ -25,8 +25,23 @@ const otpFirebaseConfig = {
 let _otpApp: FirebaseApp | null = null;
 let _otpAuth: Auth | null = null;
 
+/** Check if OTP Firebase config is properly set (env vars present) */
+export function isOtpConfigValid(): boolean {
+    return !!(
+        otpFirebaseConfig.apiKey &&
+        otpFirebaseConfig.authDomain &&
+        otpFirebaseConfig.projectId &&
+        otpFirebaseConfig.appId
+    );
+}
+
 function getOtpApp(): FirebaseApp {
     if (!_otpApp) {
+        if (!isOtpConfigValid()) {
+            throw new Error(
+                "OTP Firebase config missing. Set NEXT_PUBLIC_OTP_FIREBASE_* env vars and rebuild."
+            );
+        }
         _otpApp =
             getApps().find((a) => a.name === "otp") ||
             initializeApp(otpFirebaseConfig, "otp");
