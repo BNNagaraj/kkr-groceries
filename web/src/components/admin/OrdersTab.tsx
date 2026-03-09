@@ -47,6 +47,8 @@ import {
   Phone as PhoneIcon,
   Mail,
   MessageSquare,
+  List,
+  ShoppingCart,
 } from "lucide-react";
 import { Order, OrderStatus, STATUS_TIMESTAMP_FIELDS, OrderCartItem } from "@/types/order";
 import type { OtpChannel } from "@/types/settings";
@@ -55,9 +57,12 @@ const lazyDownloadInvoice = async (order: Order) => {
   const { downloadInvoice } = await import("@/lib/invoice");
   downloadInvoice(order);
 };
+import dynamic from "next/dynamic";
 import { useMode } from "@/contexts/ModeContext";
 import { Product } from "@/contexts/AppContext";
 import OrderEditModal from "./OrderEditModal";
+
+const BuyList = dynamic(() => import("./BuyList"), { ssr: false });
 import { StatusTimeline, formatStatusTime } from "@/components/OrderTimeline";
 import { toast } from "sonner";
 
@@ -148,6 +153,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [viewMode, setViewMode] = useState<"orders" | "buylist">("orders");
   const lastDocRef = useRef<DocumentSnapshot | null>(null);
 
   // OTP on Fulfill
@@ -583,14 +589,39 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
           <LayoutDashboard className="w-6 h-6 text-slate-400" /> Order Management
           <span className="text-sm font-normal text-slate-400">({orders.length})</span>
         </h2>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => loadOrders(true)}
-          disabled={loading}
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh
-        </Button>
+        <div className="flex gap-2">
+          {/* View mode toggle */}
+          <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+            <button
+              onClick={() => setViewMode("orders")}
+              className={`px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                viewMode === "orders"
+                  ? "bg-slate-800 text-white"
+                  : "bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <List className="w-3.5 h-3.5" /> Orders
+            </button>
+            <button
+              onClick={() => { setViewMode("buylist"); setStatusFilter("all"); }}
+              className={`px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                viewMode === "buylist"
+                  ? "bg-emerald-700 text-white"
+                  : "bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <ShoppingCart className="w-3.5 h-3.5" /> Buy List
+            </button>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => loadOrders(true)}
+            disabled={loading}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Date Filter Chips */}
@@ -631,8 +662,13 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
         </div>
       )}
 
-      {/* Status Filter */}
-      <div className="flex flex-wrap gap-1.5">
+      {/* Buy List View */}
+      {viewMode === "buylist" && (
+        <BuyList orders={orders} products={products} productImageMap={productImageMap} />
+      )}
+
+      {/* Status Filter — Orders view only */}
+      {viewMode === "orders" && <div className="flex flex-wrap gap-1.5">
         <span className="text-xs font-semibold text-slate-400 self-center mr-1">Status:</span>
         {STATUS_FILTERS.map((s) => (
           <button
@@ -647,20 +683,20 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
             {s === "all" ? "All Statuses" : s}
           </button>
         ))}
-      </div>
+      </div>}
 
       {/* Loading state */}
-      {loading && (
+      {viewMode === "orders" && loading && (
         <div className="text-center py-12 text-slate-400">Loading orders...</div>
       )}
 
       {/* Empty state */}
-      {!loading && orders.length === 0 && (
+      {viewMode === "orders" && !loading && orders.length === 0 && (
         <div className="text-center py-12 text-slate-400">No orders found for this timeframe.</div>
       )}
 
       {/* Order cards */}
-      {!loading &&
+      {viewMode === "orders" && !loading &&
         orders.map((o) => {
           const hasPendingMod = o.modificationStatus === "PendingBuyerApproval";
           const statusText = hasPendingMod ? "Pending Approval" : o.status || "Pending";
@@ -866,7 +902,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
         })}
 
       {/* Load More */}
-      {!loading && hasMore && (
+      {viewMode === "orders" && !loading && hasMore && (
         <div className="text-center pt-4">
           <Button
             variant="secondary"
