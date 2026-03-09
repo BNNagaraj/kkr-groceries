@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { C2Theme } from "../CommandCenter";
 import { Order, OrderStatus } from "@/types/order";
+import { parseTotal } from "@/lib/helpers";
 
 // ─── Event Types ──────────────────────────────────────────────────────────
 interface C2Event {
@@ -48,11 +49,7 @@ function formatTime(date: Date): string {
   });
 }
 
-function parseOrderTotal(v: unknown): number {
-  if (typeof v === "number") return v;
-  if (typeof v === "string") return parseInt(v.replace(/[^0-9]/g, "") || "0", 10);
-  return 0;
-}
+const parseOrderTotal = parseTotal;
 
 // ─── Activity Feed Component ──────────────────────────────────────────────
 interface ActivityFeedProps {
@@ -153,10 +150,10 @@ export default function ActivityFeed({ orders, onlineUsers }: ActivityFeedProps)
   return (
     <div className="h-full flex flex-col">
       <div
-        className="flex items-center justify-between px-4 py-3 shrink-0"
+        className="flex items-center justify-between px-2.5 sm:px-4 py-2.5 sm:py-3 shrink-0"
         style={{ borderBottom: "1px solid var(--c2-border)" }}
       >
-        <h3 className="text-sm font-bold tracking-wide flex items-center gap-2" style={{ color: "var(--c2-text)" }}>
+        <h3 className="text-xs sm:text-sm font-bold tracking-wide flex items-center gap-2" style={{ color: "var(--c2-text)" }}>
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
@@ -187,18 +184,18 @@ export default function ActivityFeed({ orders, onlineUsers }: ActivityFeedProps)
             {events.map((event) => (
               <div
                 key={event.id}
-                className="px-4 py-2.5 transition-colors group"
+                className="px-2.5 sm:px-4 py-2 sm:py-2.5 transition-colors group"
                 style={{ borderBottom: "1px solid var(--c2-border-subtle)" }}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2 sm:gap-3">
                   <span
-                    className="text-[10px] font-mono shrink-0 pt-0.5 w-16 tabular-nums"
+                    className="text-[10px] font-mono shrink-0 pt-0.5 w-12 sm:w-16 tabular-nums"
                     style={{ color: "var(--c2-text-muted)" }}
                   >
                     {event.time}
                   </span>
                   <span className="text-sm shrink-0">{event.emoji}</span>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 break-words">
                     <span className="text-[10px] font-bold tracking-widest mr-2" style={{ color: event.color }}>
                       {event.label}
                     </span>

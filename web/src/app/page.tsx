@@ -1,13 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import { Header } from "@/components/Header";
 import { ProductCard } from "@/components/ProductCard";
-import { CartDrawer } from "@/components/CartDrawer";
 import { Footer } from "@/components/Footer";
 import { useAppStore } from "@/contexts/AppContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Search } from "lucide-react";
+
+const CartDrawer = dynamic(() => import("@/components/CartDrawer").then(m => m.CartDrawer), {
+  ssr: false,
+});
 
 const CATEGORIES = [
   { id: "all", label: "All Items" },

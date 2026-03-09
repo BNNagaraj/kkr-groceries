@@ -4,7 +4,7 @@ import React, { useState, memo } from "react";
 import Image from "next/image";
 import { Product } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn } from "lucide-react";
-import { motion } from "framer-motion";
+
 import { formatTiersForDisplay } from "@/lib/pricing";
 import { CartControls, ImageLightbox } from "./shared";
 
@@ -20,11 +20,8 @@ export const CatalogCard = memo(function CatalogCard({ product }: { product: Pro
 
     return (
         <>
-            <motion.div
-                whileHover={{ y: -3 }}
-                whileTap={{ scale: 0.98 }}
-                transition={{ duration: 0.15, ease: "easeOut" }}
-                className="bg-white shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow relative"
+            <div
+                className="bg-white shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full hover:shadow-md hover:-translate-y-[3px] active:scale-[0.98] transition-all duration-150 ease-out relative"
                 style={{ borderRadius: "var(--theme-card-radius, 1rem)" }}
             >
                 {/* Badges */}
@@ -45,7 +42,7 @@ export const CatalogCard = memo(function CatalogCard({ product }: { product: Pro
 
                 {/* Image */}
                 <div
-                    className={`relative w-full h-[200px] bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                    className={`relative w-full h-[150px] sm:h-[200px] bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                     onClick={() => hasImage && setLightboxOpen(true)}
                 >
                     {hasImage ? (
@@ -73,9 +70,9 @@ export const CatalogCard = memo(function CatalogCard({ product }: { product: Pro
                 </div>
 
                 {/* Content */}
-                <div className="p-4 flex flex-col flex-grow">
+                <div className="p-3 sm:p-4 flex flex-col flex-grow">
                     {/* Name + Languages */}
-                    <h3 className="text-lg font-bold text-slate-800 leading-tight">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-800 leading-tight">
                         {product.name}
                     </h3>
                     <div className="flex gap-2 text-[13px] text-slate-500 mt-0.5">
@@ -127,7 +124,7 @@ export const CatalogCard = memo(function CatalogCard({ product }: { product: Pro
                         <CartControls product={product} />
                     </div>
                 </div>
-            </motion.div>
+            </div>
 
             <ImageLightbox
                 src={product.image}

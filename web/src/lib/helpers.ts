@@ -17,3 +17,57 @@ export function dateToYMD(d: Date): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+
+/** Export an array of orders to a CSV file and trigger download */
+export function exportOrdersToCSV(
+  orders: {
+    orderId?: string;
+    customerName?: string;
+    phone?: string;
+    shopName?: string;
+    location?: string;
+    cart?: { name: string; qty: number; unit: string; price: number }[];
+    totalValue?: unknown;
+    status?: string;
+    timestamp?: string;
+  }[],
+  filename?: string
+) {
+  const headers = ["OrderID", "Customer", "Phone", "Shop", "Location", "Items", "Total", "Status", "Date"];
+
+  function escapeCSV(val: string): string {
+    if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+      return `"${val.replace(/"/g, '""')}"`;
+    }
+    return val;
+  }
+
+  const rows = orders.map((o) => {
+    const items = (o.cart || []).map((c) => `${c.name} x${c.qty}`).join("; ");
+    const total = parseTotal(o.totalValue);
+    return [
+      o.orderId || "",
+      o.customerName || "",
+      o.phone || "",
+      o.shopName || "",
+      o.location || "",
+      items,
+      total.toString(),
+      o.status || "",
+      o.timestamp?.split(",")[0] || "",
+    ]
+      .map(escapeCSV)
+      .join(",");
+  });
+
+  const csv = "\uFEFF" + [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename || `orders-${dateToYMD(new Date())}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

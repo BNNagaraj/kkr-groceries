@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Trash2, ZoomIn, X, Check } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { resolveSlabPrice } from "@/lib/pricing";
 
 /* ─── Inline Quantity Input ─── */
@@ -131,7 +130,7 @@ export const CartControls = memo(function CartControls({ product }: { product: P
         return (
             <button
                 onClick={() => setShowInput(true)}
-                className="w-full h-10 bg-emerald-50 text-emerald-700 font-semibold rounded-xl hover:bg-emerald-100 transition-colors flex items-center justify-center gap-2"
+                className="w-full h-9 sm:h-10 bg-emerald-50 text-emerald-700 font-semibold rounded-xl hover:bg-emerald-100 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
             >
                 Add to Cart
             </button>
@@ -142,18 +141,18 @@ export const CartControls = memo(function CartControls({ product }: { product: P
 
     return (
         <div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 sm:gap-1.5">
                 <button
                     onClick={() => removeFromCart(product.id)}
-                    className="w-9 h-10 flex items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors shrink-0"
+                    className="w-8 sm:w-9 h-9 sm:h-10 flex items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors shrink-0"
                     aria-label="Remove from cart"
                 >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                 </button>
-                <div className="flex-1 flex items-center bg-emerald-700 text-white rounded-xl h-10 overflow-hidden shadow-sm shadow-emerald-700/20">
+                <div className="flex-1 flex items-center bg-emerald-700 text-white rounded-xl h-9 sm:h-10 overflow-hidden shadow-sm shadow-emerald-700/20">
                     <button
                         onClick={() => addToCart(product, -1)}
-                        className="w-10 h-full flex items-center justify-center text-xl font-medium hover:bg-emerald-800 transition-colors"
+                        className="w-9 sm:w-10 h-full flex items-center justify-center text-xl font-medium hover:bg-emerald-800 transition-colors"
                     >
                         −
                     </button>
@@ -183,7 +182,7 @@ export const CartControls = memo(function CartControls({ product }: { product: P
                     </div>
                     <button
                         onClick={() => addToCart(product, 1)}
-                        className="w-10 h-full flex items-center justify-center text-xl font-medium hover:bg-emerald-800 transition-colors"
+                        className="w-9 sm:w-10 h-full flex items-center justify-center text-xl font-medium hover:bg-emerald-800 transition-colors"
                     >
                         +
                     </button>
@@ -229,44 +228,35 @@ export function ImageLightbox({
     if (!open || typeof document === "undefined") return null;
 
     return createPortal(
-        <AnimatePresence>
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4"
-                onClick={onClose}
+        <div
+            className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease-out]"
+            onClick={onClose}
+        >
+            <div
+                className="relative max-w-[90vw] max-h-[80vh] rounded-2xl overflow-hidden bg-white shadow-2xl animate-[scaleIn_0.25s_cubic-bezier(0.34,1.56,0.64,1)]"
+                onClick={(e) => e.stopPropagation()}
             >
-                <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                    transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                    className="relative max-w-[90vw] max-h-[80vh] rounded-2xl overflow-hidden bg-white shadow-2xl"
-                    onClick={(e) => e.stopPropagation()}
+                <Image
+                    src={src}
+                    alt={alt}
+                    width={400}
+                    height={400}
+                    className="object-contain max-h-[70vh]"
+                    unoptimized={!src.includes("googleapis.com")}
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
+                    <h3 className="text-white font-bold text-lg">{alt}</h3>
+                    {telugu && <p className="text-white/70 text-sm font-telugu">{telugu}</p>}
+                </div>
+                <button
+                    onClick={onClose}
+                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                    aria-label="Close image"
                 >
-                    <Image
-                        src={src}
-                        alt={alt}
-                        width={400}
-                        height={400}
-                        className="object-contain max-h-[70vh]"
-                        unoptimized={!src.includes("googleapis.com")}
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
-                        <h3 className="text-white font-bold text-lg">{alt}</h3>
-                        {telugu && <p className="text-white/70 text-sm font-telugu">{telugu}</p>}
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
-                        aria-label="Close image"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </motion.div>
-            </motion.div>
-        </AnimatePresence>,
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
+        </div>,
         document.body
     );
 }

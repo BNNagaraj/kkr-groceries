@@ -1,29 +1,57 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppStore, Product } from "@/contexts/AppContext";
 import { db, functions } from "@/lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, deleteDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import Link from "next/link";
 import Image from "next/image";
-import { Settings, PackageSearch, Activity, ArrowLeft, LogOut, Save, Upload, Loader2, Search, Cog, Users, ShoppingBasket, BookOpen, FlaskConical, Plus, Zap } from "lucide-react";
+import { Settings, PackageSearch, Activity, ArrowLeft, LogOut, Save, Upload, Loader2, Search, Cog, Users, ShoppingBasket, BookOpen, FlaskConical, Plus, Zap, Trash2 } from "lucide-react";
+import { formatTiersForDisplay } from "@/lib/pricing";
 import { PRODUCT_CATEGORIES } from "@/lib/constants";
 import { useMode } from "@/contexts/ModeContext";
 import { ModeToggle } from "@/components/admin/ModeToggle";
 import { useRouter } from "next/navigation";
-import OrdersTab from "@/components/admin/OrdersTab";
-import AdminAnalytics from "@/components/admin/AdminAnalytics";
-import SettingsTab from "@/components/admin/SettingsTab";
-import UsersTab from "@/components/admin/UsersTab";
-import BuyingStockTab from "@/components/admin/BuyingStockTab";
-import AccountsTab from "@/components/admin/AccountsTab";
-import CommandCenter from "@/components/admin/CommandCenter";
-import AddProductModal from "@/components/admin/AddProductModal";
-import PriceTierEditor from "@/components/admin/PriceTierEditor";
 import { markOffline } from "@/hooks/usePresence";
 import { toast } from "sonner";
+
+// ── Lazy-loaded tab components (only compiled when the tab is first opened) ──
+const TabLoader = () => (
+    <div className="flex items-center justify-center py-20 text-slate-400">
+        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading...
+    </div>
+);
+
+const CommandCenter = dynamic(() => import("@/components/admin/CommandCenter"), {
+    loading: TabLoader, ssr: false,
+});
+const OrdersTab = dynamic(() => import("@/components/admin/OrdersTab"), {
+    loading: TabLoader, ssr: false,
+});
+const AdminAnalytics = dynamic(() => import("@/components/admin/AdminAnalytics"), {
+    loading: TabLoader, ssr: false,
+});
+const SettingsTab = dynamic(() => import("@/components/admin/SettingsTab"), {
+    loading: TabLoader, ssr: false,
+});
+const UsersTab = dynamic(() => import("@/components/admin/UsersTab"), {
+    loading: TabLoader, ssr: false,
+});
+const BuyingStockTab = dynamic(() => import("@/components/admin/BuyingStockTab"), {
+    loading: TabLoader, ssr: false,
+});
+const AccountsTab = dynamic(() => import("@/components/admin/AccountsTab"), {
+    loading: TabLoader, ssr: false,
+});
+const AddProductModal = dynamic(() => import("@/components/admin/AddProductModal"), {
+    ssr: false,
+});
+const PriceTierEditor = dynamic(() => import("@/components/admin/PriceTierEditor"), {
+    ssr: false,
+});
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,6 +100,8 @@ export default function AdminDashboard() {
     const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
     const [addProductOpen, setAddProductOpen] = useState(false);
     const [tierEditProduct, setTierEditProduct] = useState<Product | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+    const [deleteConfirmText, setDeleteConfirmText] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploadTargetId = useRef<number | null>(null);
 
@@ -106,6 +136,21 @@ export default function AdminDashboard() {
             toast.error("Error saving products. Please try again.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteProduct = async () => {
+        if (!deleteTarget || deleteConfirmText.toLowerCase() !== "delete") return;
+        try {
+            await deleteDoc(doc(db, "products", deleteTarget.id.toString()));
+            setEditingProducts(prev => prev.filter(p => p.id !== deleteTarget.id));
+            toast.success(`"${deleteTarget.name}" has been permanently deleted.`);
+        } catch (e) {
+            console.error("[Admin] Failed to delete product:", e);
+            toast.error("Error deleting product. Please try again.");
+        } finally {
+            setDeleteTarget(null);
+            setDeleteConfirmText("");
         }
     };
 
@@ -192,6 +237,46 @@ export default function AdminDashboard() {
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={handleSaveAllProducts}>
                             Save to Live Catalog
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Delete Product Confirmation Dialog */}
+            <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteConfirmText(""); } }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-red-600">Delete Product Permanently?</AlertDialogTitle>
+                        <AlertDialogDescription asChild>
+                            <div className="space-y-3">
+                                <p>
+                                    You are about to permanently delete <strong className="text-slate-800">&quot;{deleteTarget?.name}&quot;</strong> (ID: {deleteTarget?.id}).
+                                    This action cannot be undone.
+                                </p>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-600 block mb-1">
+                                        Type <span className="text-red-600 font-mono bg-red-50 px-1 py-0.5 rounded">delete</span> to confirm:
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={deleteConfirmText}
+                                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                        placeholder="Type 'delete' here..."
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => { setDeleteTarget(null); setDeleteConfirmText(""); }}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteProduct}
+                            disabled={deleteConfirmText.toLowerCase() !== "delete"}
+                            className="bg-red-600 hover:bg-red-700 focus:ring-red-500 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-600"
+                        >
+                            <Trash2 className="w-4 h-4 mr-1" /> Delete Forever
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -366,6 +451,7 @@ export default function AdminDashboard() {
                                                 </th>
                                                 <th className="px-4 py-3 text-center">Tiers</th>
                                                 <th className="px-4 py-3">Badging</th>
+                                                <th className="px-4 py-3 text-center">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
@@ -405,10 +491,28 @@ export default function AdminDashboard() {
                                                     </td>
                                                     <td className="px-4 py-3 font-mono text-xs text-slate-500">{p.id}</td>
                                                     <td className="px-4 py-3">
-                                                        <div className="font-bold text-slate-800">{p.name}</div>
-                                                        <div className="text-xs text-slate-500">
-                                                            <span className="font-telugu">{p.telugu}</span>
-                                                            {p.hindi && <><span className="text-slate-300 mx-1">|</span>{p.hindi}</>}
+                                                        <input
+                                                            type="text"
+                                                            value={p.name}
+                                                            onChange={(e) => handleProductChange(p.id, "name", e.target.value)}
+                                                            className="w-full px-2 py-1 border border-slate-200 rounded text-sm font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 min-w-[120px]"
+                                                            placeholder="English name"
+                                                        />
+                                                        <div className="flex gap-1 mt-1">
+                                                            <input
+                                                                type="text"
+                                                                value={p.telugu || ""}
+                                                                onChange={(e) => handleProductChange(p.id, "telugu", e.target.value)}
+                                                                className="w-1/2 px-1.5 py-0.5 border border-slate-200 rounded text-[11px] text-slate-500 focus:ring-1 focus:ring-emerald-500 font-telugu"
+                                                                placeholder="తెలుగు"
+                                                            />
+                                                            <input
+                                                                type="text"
+                                                                value={p.hindi || ""}
+                                                                onChange={(e) => handleProductChange(p.id, "hindi", e.target.value)}
+                                                                className="w-1/2 px-1.5 py-0.5 border border-slate-200 rounded text-[11px] text-slate-500 focus:ring-1 focus:ring-emerald-500"
+                                                                placeholder="Hindi"
+                                                            />
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-3">
@@ -439,6 +543,19 @@ export default function AdminDashboard() {
                                                             className="w-20 px-2 py-1 border border-slate-200 rounded text-right focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100"
                                                         />
                                                         <span className="text-slate-400 ml-1">/{p.unit}</span>
+                                                        {p.priceTiers && p.priceTiers.length > 0 && (() => {
+                                                            const tiers = formatTiersForDisplay(p.priceTiers);
+                                                            return (
+                                                                <div className="text-[10px] text-emerald-600 mt-0.5 leading-relaxed">
+                                                                    {tiers.map((t, i) => (
+                                                                        <span key={i}>
+                                                                            {t.range}: ₹{t.price}
+                                                                            {i < tiers.length - 1 && <span className="text-slate-300"> · </span>}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            );
+                                                        })()}
                                                     </td>
                                                     <td className="px-4 py-3 text-center">
                                                         <input
@@ -489,6 +606,15 @@ export default function AdminDashboard() {
                                                                 /> Fresh
                                                             </label>
                                                         </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <button
+                                                            onClick={() => { setDeleteTarget(p); setDeleteConfirmText(""); }}
+                                                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                            title={`Delete ${p.name}`}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))}

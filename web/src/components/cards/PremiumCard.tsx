@@ -156,16 +156,12 @@ export const PremiumCard = memo(function PremiumCard({ product }: { product: Pro
                 style={{ borderRadius: "var(--theme-card-radius, 0.75rem)" }}
             >
                 {/* ── Dynamic layout: horizontal (left/right) or vertical (top) ── */}
-                <div className={`flex ${isHorizontal ? "flex-row" : "flex-col"} min-h-[240px]`}
-                     style={isHorizontal ? { flexDirection: imgPos === "right" ? "row-reverse" : "row" } : undefined}>
+                <div className={`flex flex-col ${isHorizontal ? (imgPos === "right" ? "sm:flex-row-reverse" : "sm:flex-row") : ""} sm:min-h-[240px]`}>
 
                     {/* ── Image Section ── */}
                     <div
-                        className={`relative shrink-0 bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
-                        style={isHorizontal
-                            ? { width: `${imgW}%` }
-                            : { width: "100%", height: "200px" }
-                        }
+                        className={`relative shrink-0 bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""} ${isHorizontal ? "h-[160px] w-full sm:h-auto sm:w-[var(--img-w)]" : "h-[140px] sm:h-[200px] w-full"}`}
+                        style={isHorizontal ? { '--img-w': `${imgW}%` } as React.CSSProperties : undefined}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
