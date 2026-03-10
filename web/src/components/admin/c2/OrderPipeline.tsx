@@ -351,7 +351,7 @@ interface OrderPipelineProps {
 export default function OrderPipeline({ orders, onStatusChange, onBulkStatusChange, onFulfillClick, onOrderSelect, theme }: OrderPipelineProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rejectedCollapsed, setRejectedCollapsed] = useState(true);
-  const [viewMode, setViewMode] = useState<PipelineView>("card");
+  const [viewMode, setViewMode] = useState<PipelineView>("list");
 
   const grouped = useMemo(() => {
     const map: Record<OrderStatus, Order[]> = {
