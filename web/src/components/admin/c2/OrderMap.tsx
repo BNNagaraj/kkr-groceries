@@ -159,7 +159,7 @@ function buildInfoWindowHTML(order: Order, theme: C2Theme): string {
     <div style="font-family:system-ui,sans-serif;max-width:300px;padding:4px 0;background:transparent;">
       <div style="margin-bottom:8px;">
         <div style="font-weight:700;font-size:13px;color:${textPrimary};">${escapeHTML(order.customerName || "Customer")}</div>
-        ${order.shopName ? `<div style="font-size:10px;color:${textSecondary};margin-top:1px;">${escapeHTML(order.shopName)}</div>` : ""}
+        ${order.shopName && order.shopName.toLowerCase() !== "not specified" ? `<div style="font-size:10px;color:${textSecondary};margin-top:1px;">${escapeHTML(order.shopName)}</div>` : ""}
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:${cardBg};border-radius:8px;border:1px solid ${borderColor};">
         <span style="font-weight:800;color:#059669;font-size:14px;">\u20B9${totalVal.toLocaleString("en-IN")}</span>
@@ -209,6 +209,7 @@ interface OrderMapProps {
   onlineUsers?: OnlineUserMarker[];
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  highlightOrderId?: string | null;
 }
 
 export default function OrderMap({
@@ -220,6 +221,7 @@ export default function OrderMap({
   onlineUsers,
   isExpanded,
   onToggleExpand,
+  highlightOrderId,
 }: OrderMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -247,6 +249,7 @@ export default function OrderMap({
   const zoneCircleRef = useRef<any>(null);
   const userMarkersRef = useRef<any[]>([]);
   const resolvedCoordsRef = useRef<Map<string, GeoCoord>>(new Map());
+  const markerMapRef = useRef<Map<string, any>>(new Map());
 
   // Expose global callbacks for info window button events
   useEffect(() => {
@@ -386,6 +389,7 @@ export default function OrderMap({
     // Clear existing order markers
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
+    markerMapRef.current.clear();
 
     // Clear existing heatmap
     if (heatmapLayerRef.current) {
@@ -443,6 +447,7 @@ export default function OrderMap({
       });
 
       markersRef.current.push(marker);
+      markerMapRef.current.set(order.id, marker);
     });
 
     // Create heatmap layer (visible only in "heat" mode)
@@ -590,6 +595,53 @@ export default function OrderMap({
       initMapAndMarkers();
     }
   }, [initMapAndMarkers]);
+
+  // ─── Highlight order pin when selected from pipeline ─────────────────────
+  useEffect(() => {
+    if (!highlightOrderId || !mapInstance.current || !window.google) return;
+    const marker = markerMapRef.current.get(highlightOrderId);
+    if (!marker) return;
+
+    const map = mapInstance.current;
+    const infoWindow = infoWindowRef.current;
+
+    // Smooth pan to the marker
+    map.panTo(marker.getPosition());
+    if (map.getZoom() < 14) map.setZoom(14);
+
+    // Bounce animation (3 bounces ≈ 2.1s)
+    marker.setAnimation(window.google.maps.Animation.BOUNCE);
+    const bounceTimer = setTimeout(() => marker.setAnimation(null), 2100);
+
+    // Open info window
+    const order = orders.find((o) => o.id === highlightOrderId);
+    if (order && infoWindow) {
+      infoWindow.setContent(buildInfoWindowHTML(order, theme));
+      infoWindow.open(map, marker);
+
+      window.google.maps.event.addListenerOnce(infoWindow, "domready", () => {
+        document.querySelectorAll("[data-c2-action]").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            const action = (btn as HTMLElement).getAttribute("data-c2-action")!;
+            const oid = (btn as HTMLElement).getAttribute("data-order-id")!;
+            window.__c2MapStatusChange?.(oid, action);
+            infoWindow.close();
+          });
+        });
+        document.querySelectorAll("[data-c2-view-order]").forEach((link) => {
+          link.addEventListener("click", (e) => {
+            e.preventDefault();
+            const oid = (link as HTMLElement).getAttribute("data-c2-view-order")!;
+            window.__c2MapViewOrder?.(oid);
+            infoWindow.close();
+          });
+        });
+      });
+    }
+
+    return () => clearTimeout(bounceTimer);
+  }, [highlightOrderId, orders, theme]);
 
   const handlePinSizeChange = (size: PinSize) => {
     setPinSize(size);

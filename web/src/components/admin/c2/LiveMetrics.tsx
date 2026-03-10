@@ -81,10 +81,11 @@ function MetricCard({
   trend,
   pulse,
   format = "number",
-}: MetricCardProps) {
+  onClick,
+}: MetricCardProps & { onClick?: () => void }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-xl p-2.5 sm:p-3 md:p-4 transition-all duration-300 group ${
+      className={`relative overflow-hidden rounded-xl p-2.5 sm:p-3 md:p-4 transition-all duration-300 group cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
         pulse ? "c2-pulse-border" : ""
       }`}
       style={{
@@ -94,6 +95,7 @@ function MetricCard({
         borderTopWidth: "2px",
         boxShadow: "var(--c2-card-shadow)",
       }}
+      onClick={onClick}
     >
       {/* Glow effect */}
       <div
@@ -155,6 +157,7 @@ interface LiveMetricsProps {
   yesterdayRevenue?: number;
   revenueLabel?: string;
   theme: C2Theme;
+  onCardClick?: (metric: string) => void;
 }
 
 export default function LiveMetrics({
@@ -166,6 +169,7 @@ export default function LiveMetrics({
   pendingRevenue,
   yesterdayRevenue,
   revenueLabel,
+  onCardClick,
 }: LiveMetricsProps) {
   const revenueTrend =
     yesterdayRevenue && yesterdayRevenue > 0
@@ -183,6 +187,7 @@ export default function LiveMetrics({
         glowColor="#10b981"
         format="currency"
         trend={revenueTrend}
+        onClick={() => onCardClick?.("revenue")}
       />
       <MetricCard
         label="Active Orders"
@@ -191,6 +196,7 @@ export default function LiveMetrics({
         accentColor="#f59e0b"
         glowColor="#f59e0b"
         pulse={activeOrders > 0}
+        onClick={() => onCardClick?.("active")}
       />
       <MetricCard
         label="Online Users"
@@ -198,6 +204,7 @@ export default function LiveMetrics({
         icon={<Users className="w-4 h-4" />}
         accentColor="#22c55e"
         glowColor="#22c55e"
+        onClick={() => onCardClick?.("users")}
       />
       <MetricCard
         label="Fulfillment Rate"
@@ -207,6 +214,7 @@ export default function LiveMetrics({
         accentColor="#3b82f6"
         glowColor="#3b82f6"
         format="percent"
+        onClick={() => onCardClick?.("fulfillment")}
       />
       <MetricCard
         label="Avg Order Value"
@@ -216,6 +224,7 @@ export default function LiveMetrics({
         accentColor="#8b5cf6"
         glowColor="#8b5cf6"
         format="currency"
+        onClick={() => onCardClick?.("aov")}
       />
       <MetricCard
         label="Pending Revenue"
@@ -226,6 +235,7 @@ export default function LiveMetrics({
         glowColor="#f97316"
         format="currency"
         pulse={pendingRevenue > 0}
+        onClick={() => onCardClick?.("pending")}
       />
     </div>
   );

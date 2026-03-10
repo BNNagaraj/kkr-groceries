@@ -19,7 +19,19 @@ import {
   Square,
   CheckSquare,
   X,
+  LayoutList,
+  Grid2X2,
+  List,
 } from "lucide-react";
+
+// ─── View Mode Type ──────────────────────────────────────────────────────
+type PipelineView = "card" | "compact" | "list";
+
+const VIEW_OPTIONS: { key: PipelineView; icon: React.ReactNode; label: string }[] = [
+  { key: "card", icon: <LayoutList className="w-3 h-3" />, label: "Cards" },
+  { key: "compact", icon: <Grid2X2 className="w-3 h-3" />, label: "Compact" },
+  { key: "list", icon: <List className="w-3 h-3" />, label: "List" },
+];
 
 // ─── Pipeline Columns ─────────────────────────────────────────────────────
 const PIPELINE_STAGES: {
@@ -105,6 +117,7 @@ function OrderCard({
   order,
   onStatusChange,
   onFulfillClick,
+  onOrderSelect,
   isSelected,
   onToggleSelect,
   showCheckbox,
@@ -113,6 +126,7 @@ function OrderCard({
   stageColor: string;
   onStatusChange?: (orderId: string, newStatus: OrderStatus) => void;
   onFulfillClick?: (order: Order) => void;
+  onOrderSelect?: (orderId: string) => void;
   isSelected?: boolean;
   onToggleSelect?: (orderId: string) => void;
   showCheckbox?: boolean;
@@ -139,7 +153,7 @@ function OrderCard({
         border: isSelected ? "2px solid #3b82f6" : "1px solid var(--c2-border-subtle)",
         boxShadow: "var(--c2-card-shadow)",
       }}
-      onClick={() => setExpanded(!expanded)}
+      onClick={() => { setExpanded(!expanded); onOrderSelect?.(order.id); }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1 flex items-start gap-2">
@@ -167,9 +181,9 @@ function OrderCard({
                 <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 animate-pulse" />
               )}
             </div>
-            {order.shopName && (
+            {(order.shopName && order.shopName.toLowerCase() !== "not specified" ? order.shopName : order.customerName) && (
               <div className="text-[10px] truncate mt-0.5" style={{ color: "var(--c2-text-muted)" }}>
-                {order.shopName}
+                {order.shopName && order.shopName.toLowerCase() !== "not specified" ? order.shopName : order.customerName}
               </div>
             )}
           </div>
@@ -267,6 +281,55 @@ function OrderCard({
   );
 }
 
+// ─── Compact Tile View ──────────────────────────────────────────────────────
+function CompactTile({ order, stageColor, onOrderSelect }: { order: Order; stageColor: string; onOrderSelect?: (id: string) => void }) {
+  const agingClass = getAgingClass(order);
+  return (
+    <div
+      className={`rounded-md p-2 cursor-pointer transition-all hover:brightness-105 ${agingClass}`}
+      style={{ background: "var(--c2-bg-card)", border: "1px solid var(--c2-border-subtle)" }}
+      onClick={() => onOrderSelect?.(order.id)}
+    >
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-[11px] font-semibold truncate" style={{ color: "var(--c2-text)" }}>{order.customerName || "Customer"}</span>
+        {agingClass === "c2-aging-critical" && <AlertTriangle className="w-3 h-3 text-red-500 shrink-0 animate-pulse" />}
+      </div>
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-[9px]" style={{ color: "var(--c2-text-muted)" }}>{order.cart?.length || 0} items</span>
+        <span className="text-[11px] font-bold" style={{ color: stageColor }}>{formatCurrency(parseTotal(order.totalValue))}</span>
+      </div>
+      <div className="text-[8px] mt-0.5" style={{ color: "var(--c2-text-muted)", opacity: 0.7 }}>{getElapsedText(order)}</div>
+    </div>
+  );
+}
+
+// ─── List Row View ──────────────────────────────────────────────────────────
+function ListRow({ order, stageColor, onStatusChange, onOrderSelect }: { order: Order; stageColor: string; onStatusChange?: (id: string, s: OrderStatus) => void; onOrderSelect?: (id: string) => void }) {
+  const agingClass = getAgingClass(order);
+  const nextAction =
+    order.status === "Pending" ? { label: "Accept", status: "Accepted" as OrderStatus, color: "#3b82f6" }
+    : order.status === "Accepted" ? { label: "Ship", status: "Shipped" as OrderStatus, color: "#8b5cf6" }
+    : order.status === "Shipped" ? { label: "Fulfill", status: "Fulfilled" as OrderStatus, color: "#10b981" }
+    : null;
+  return (
+    <div className={`flex items-center gap-2 px-2 py-1.5 cursor-pointer transition-all hover:brightness-105 ${agingClass}`}
+      style={{ borderBottom: "1px solid var(--c2-border-subtle)", background: "var(--c2-bg-card)" }}
+      onClick={() => onOrderSelect?.(order.id)}
+    >
+      <span className="text-[10px] font-semibold truncate flex-1 min-w-0" style={{ color: "var(--c2-text)" }}>{order.customerName || "Customer"}</span>
+      <span className="text-[9px] shrink-0 tabular-nums" style={{ color: "var(--c2-text-muted)" }}>{order.cart?.length || 0}</span>
+      <span className="text-[10px] font-bold shrink-0 w-16 text-right tabular-nums" style={{ color: "var(--c2-text)" }}>{formatCurrency(parseTotal(order.totalValue))}</span>
+      <span className="text-[9px] shrink-0 w-12 text-right" style={{ color: "var(--c2-text-muted)" }}>{getElapsedText(order)}</span>
+      {nextAction && onStatusChange && (
+        <button onClick={(e) => { e.stopPropagation(); onStatusChange(order.id, nextAction.status); }}
+          className="text-[8px] font-bold px-1.5 py-0.5 rounded shrink-0 transition-all hover:brightness-110"
+          style={{ background: `${nextAction.color}20`, color: nextAction.color, border: `1px solid ${nextAction.color}30` }}
+        >{nextAction.label}</button>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Pipeline ────────────────────────────────────────────────────────
 interface OrderPipelineProps {
   orders: Order[];
@@ -274,12 +337,14 @@ interface OrderPipelineProps {
   onBulkStatusChange?: (orderIds: string[], newStatus: OrderStatus) => void;
   /** Called instead of onStatusChange when "Fulfill" is clicked (to intercept for OTP) */
   onFulfillClick?: (order: Order) => void;
+  onOrderSelect?: (orderId: string) => void;
   theme: C2Theme;
 }
 
-export default function OrderPipeline({ orders, onStatusChange, onBulkStatusChange, onFulfillClick, theme }: OrderPipelineProps) {
+export default function OrderPipeline({ orders, onStatusChange, onBulkStatusChange, onFulfillClick, onOrderSelect, theme }: OrderPipelineProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rejectedCollapsed, setRejectedCollapsed] = useState(true);
+  const [viewMode, setViewMode] = useState<PipelineView>("card");
 
   const grouped = useMemo(() => {
     const map: Record<OrderStatus, Order[]> = {
@@ -378,6 +443,23 @@ export default function OrderPipeline({ orders, onStatusChange, onBulkStatusChan
           <span className="text-base sm:text-lg">&#x1F4E6;</span> Order Pipeline
         </h3>
         <div className="flex items-center gap-2">
+          {/* View mode selector */}
+          <div className="flex items-center gap-0.5 rounded-md overflow-hidden" style={{ border: "1px solid var(--c2-border)" }}>
+            {VIEW_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setViewMode(opt.key)}
+                className="px-1.5 py-1 text-[9px] font-bold transition-colors flex items-center gap-0.5"
+                style={{
+                  background: viewMode === opt.key ? "var(--c2-text)" : "transparent",
+                  color: viewMode === opt.key ? "var(--c2-bg)" : "var(--c2-text-muted)",
+                }}
+                title={opt.label}
+              >
+                {opt.icon}
+              </button>
+            ))}
+          </div>
           {rejectedOrders.length > 0 && (
             <button
               onClick={() => setRejectedCollapsed(!rejectedCollapsed)}
@@ -449,23 +531,34 @@ export default function OrderPipeline({ orders, onStatusChange, onBulkStatusChan
                   </span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-2 space-y-2 no-scrollbar">
+                <div className={`flex-1 overflow-y-auto no-scrollbar ${viewMode === "list" ? "" : "p-2 space-y-2"}`}>
                   {stageOrders.length === 0 && (
                     <div className="flex items-center justify-center h-20 text-[10px]" style={{ color: "var(--c2-text-muted)" }}>
                       No orders
                     </div>
                   )}
-                  {stageOrders.map((order) => (
+                  {viewMode === "card" && stageOrders.map((order) => (
                     <OrderCard
                       key={order.id}
                       order={order}
                       stageColor={stage.color}
                       onStatusChange={onStatusChange}
                       onFulfillClick={onFulfillClick}
+                      onOrderSelect={onOrderSelect}
                       isSelected={selectedIds.has(order.id)}
                       onToggleSelect={onBulkStatusChange ? toggleSelect : undefined}
                       showCheckbox={!!onBulkStatusChange}
                     />
+                  ))}
+                  {viewMode === "compact" && (
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {stageOrders.map((order) => (
+                        <CompactTile key={order.id} order={order} stageColor={stage.color} onOrderSelect={onOrderSelect} />
+                      ))}
+                    </div>
+                  )}
+                  {viewMode === "list" && stageOrders.map((order) => (
+                    <ListRow key={order.id} order={order} stageColor={stage.color} onStatusChange={onStatusChange} onOrderSelect={onOrderSelect} />
                   ))}
                 </div>
               </div>

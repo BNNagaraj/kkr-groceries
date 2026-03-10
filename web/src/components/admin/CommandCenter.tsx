@@ -52,6 +52,7 @@ import {
   VolumeX,
   Search,
   Download,
+  X,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -244,6 +245,8 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
 
   // ── Feature 6: Search ──
   const [searchOpen, setSearchOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [metricDetail, setMetricDetail] = useState<string | null>(null);
 
   // ── OTP on Fulfill ──
   const [otpRequired, setOtpRequired] = useState(false);
@@ -890,14 +893,128 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
           yesterdayRevenue={dateRange === "today" ? yesterdayRevenue : undefined}
           revenueLabel={revenueLabel}
           theme={c2Theme}
+          onCardClick={(metric) => setMetricDetail(metricDetail === metric ? null : metric)}
         />
       </div>
+
+      {/* ─── Metric Detail Panel ─────────────────────────────── */}
+      {metricDetail && (
+        <div className="px-4 py-2 shrink-0 overflow-hidden" style={{ borderBottom: "1px solid var(--c2-border-subtle)", maxHeight: 200 }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--c2-text-muted)" }}>
+              {metricDetail === "revenue" && "Fulfilled Orders (Revenue)"}
+              {metricDetail === "active" && "Active Orders"}
+              {metricDetail === "users" && "Online Users"}
+              {metricDetail === "fulfillment" && "Fulfillment Breakdown"}
+              {metricDetail === "aov" && "Fulfilled Order Values"}
+              {metricDetail === "pending" && "Pending Revenue Orders"}
+            </span>
+            <button onClick={() => setMetricDetail(null)} className="p-0.5 rounded hover:opacity-70">
+              <X className="w-3.5 h-3.5" style={{ color: "var(--c2-text-muted)" }} />
+            </button>
+          </div>
+          <div className="overflow-y-auto max-h-[140px] no-scrollbar">
+            {(metricDetail === "revenue" || metricDetail === "aov") && (() => {
+              const fulfilled = filteredOrders.filter((o) => o.status === "Fulfilled");
+              return fulfilled.length === 0 ? (
+                <div className="text-[10px] py-2" style={{ color: "var(--c2-text-muted)" }}>No fulfilled orders</div>
+              ) : (
+                <table className="w-full text-[10px]">
+                  <thead><tr style={{ color: "var(--c2-text-muted)" }}><th className="text-left py-1 font-semibold">Customer</th><th className="text-left py-1 font-semibold">Items</th><th className="text-right py-1 font-semibold">Value</th></tr></thead>
+                  <tbody>{fulfilled.sort((a, b) => parseTotal(b.totalValue) - parseTotal(a.totalValue)).map((o) => (
+                    <tr key={o.id} className="cursor-pointer hover:brightness-110" style={{ borderTop: "1px solid var(--c2-border-subtle)" }}
+                      onClick={() => { setSelectedOrderId(o.id); onNavigateToOrder?.(o.id); }}>
+                      <td className="py-1" style={{ color: "var(--c2-text)" }}>{o.customerName || "Customer"}</td>
+                      <td className="py-1" style={{ color: "var(--c2-text-muted)" }}>{o.cart?.length || 0}</td>
+                      <td className="py-1 text-right font-semibold" style={{ color: "#10b981" }}>₹{parseTotal(o.totalValue).toLocaleString("en-IN")}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              );
+            })()}
+            {metricDetail === "active" && (() => {
+              const active = filteredOrders.filter((o) => o.status !== "Fulfilled" && o.status !== "Rejected");
+              return active.length === 0 ? (
+                <div className="text-[10px] py-2" style={{ color: "var(--c2-text-muted)" }}>No active orders</div>
+              ) : (
+                <table className="w-full text-[10px]">
+                  <thead><tr style={{ color: "var(--c2-text-muted)" }}><th className="text-left py-1 font-semibold">Customer</th><th className="text-left py-1 font-semibold">Status</th><th className="text-right py-1 font-semibold">Value</th></tr></thead>
+                  <tbody>{active.map((o) => (
+                    <tr key={o.id} className="cursor-pointer hover:brightness-110" style={{ borderTop: "1px solid var(--c2-border-subtle)" }}
+                      onClick={() => setSelectedOrderId(o.id)}>
+                      <td className="py-1" style={{ color: "var(--c2-text)" }}>{o.customerName || "Customer"}</td>
+                      <td className="py-1"><span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ background: `${o.status === "Pending" ? "#f59e0b" : o.status === "Accepted" ? "#3b82f6" : "#8b5cf6"}20`, color: o.status === "Pending" ? "#f59e0b" : o.status === "Accepted" ? "#3b82f6" : "#8b5cf6" }}>{o.status}</span></td>
+                      <td className="py-1 text-right font-semibold" style={{ color: "var(--c2-text)" }}>₹{parseTotal(o.totalValue).toLocaleString("en-IN")}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              );
+            })()}
+            {metricDetail === "users" && (
+              onlineUsers.length === 0 ? (
+                <div className="text-[10px] py-2" style={{ color: "var(--c2-text-muted)" }}>No users online</div>
+              ) : (
+                <div className="space-y-1">
+                  {onlineUsers.map((u) => (
+                    <div key={u.uid} className="flex items-center gap-2 py-1" style={{ borderTop: "1px solid var(--c2-border-subtle)" }}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                      <span className="text-[10px] font-medium truncate" style={{ color: "var(--c2-text)" }}>{u.displayName || u.email || "User"}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+            {metricDetail === "fulfillment" && (() => {
+              const total = filteredOrders.length;
+              const statuses = [
+                { label: "Fulfilled", count: filteredOrders.filter((o) => o.status === "Fulfilled").length, color: "#10b981" },
+                { label: "Shipped", count: filteredOrders.filter((o) => o.status === "Shipped").length, color: "#8b5cf6" },
+                { label: "Accepted", count: filteredOrders.filter((o) => o.status === "Accepted").length, color: "#3b82f6" },
+                { label: "Pending", count: filteredOrders.filter((o) => o.status === "Pending").length, color: "#f59e0b" },
+                { label: "Rejected", count: filteredOrders.filter((o) => o.status === "Rejected").length, color: "#ef4444" },
+              ];
+              return (
+                <div className="space-y-1.5">
+                  {statuses.map((s) => (
+                    <div key={s.label} className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
+                      <span className="text-[10px] flex-1" style={{ color: "var(--c2-text-secondary)" }}>{s.label}</span>
+                      <span className="text-[10px] font-bold" style={{ color: "var(--c2-text)" }}>{s.count}</span>
+                      <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--c2-bg-secondary)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${total > 0 ? (s.count / total) * 100 : 0}%`, background: s.color }} />
+                      </div>
+                      <span className="text-[9px] w-8 text-right" style={{ color: "var(--c2-text-muted)" }}>{total > 0 ? Math.round((s.count / total) * 100) : 0}%</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            {metricDetail === "pending" && (() => {
+              const pending = filteredOrders.filter((o) => o.status !== "Fulfilled" && o.status !== "Rejected");
+              return pending.length === 0 ? (
+                <div className="text-[10px] py-2" style={{ color: "var(--c2-text-muted)" }}>No pending revenue</div>
+              ) : (
+                <table className="w-full text-[10px]">
+                  <thead><tr style={{ color: "var(--c2-text-muted)" }}><th className="text-left py-1 font-semibold">Customer</th><th className="text-left py-1 font-semibold">Status</th><th className="text-right py-1 font-semibold">Value</th></tr></thead>
+                  <tbody>{pending.map((o) => (
+                    <tr key={o.id} style={{ borderTop: "1px solid var(--c2-border-subtle)" }}>
+                      <td className="py-1" style={{ color: "var(--c2-text)" }}>{o.customerName || "Customer"}</td>
+                      <td className="py-1"><span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ background: `${o.status === "Pending" ? "#f59e0b" : o.status === "Accepted" ? "#3b82f6" : "#8b5cf6"}20`, color: o.status === "Pending" ? "#f59e0b" : o.status === "Accepted" ? "#3b82f6" : "#8b5cf6" }}>{o.status}</span></td>
+                      <td className="py-1 text-right font-semibold" style={{ color: "#f97316" }}>₹{parseTotal(o.totalValue).toLocaleString("en-IN")}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* ─── Map Expanded Mode ─────────────────────────────── */}
       {isMapExpanded ? (
         <div className="flex-1 overflow-hidden min-h-0">
           <OrderMap
-            orders={orders}
+            orders={filteredOrders}
             theme={c2Theme}
             onStatusChange={handleStatusChange}
             onViewFullOrder={onNavigateToOrder}
@@ -905,6 +1022,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
             onlineUsers={onlineUsersWithLocation}
             isExpanded={true}
             onToggleExpand={() => setIsMapExpanded(false)}
+            highlightOrderId={selectedOrderId}
           />
         </div>
       ) : (
@@ -920,7 +1038,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
               }}
             >
               <OrderMap
-                orders={orders}
+                orders={filteredOrders}
                 theme={c2Theme}
                 onStatusChange={handleStatusChange}
                 onViewFullOrder={onNavigateToOrder}
@@ -928,6 +1046,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
                 onlineUsers={onlineUsersWithLocation}
                 isExpanded={false}
                 onToggleExpand={() => setIsMapExpanded(true)}
+                highlightOrderId={selectedOrderId}
               />
             </div>
 
@@ -939,6 +1058,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
                 onBulkStatusChange={handleBulkStatusChange}
                 onFulfillClick={handleFulfillClick}
                 theme={c2Theme}
+                onOrderSelect={(id) => setSelectedOrderId(id)}
               />
             </div>
           </div>

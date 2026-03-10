@@ -10,6 +10,15 @@ export function formatCurrency(n: number): string {
   return `₹${n.toLocaleString("en-IN")}`;
 }
 
+/** Get display name for a customer: shopName (if real) → customerName → fallback */
+export function getDisplayName(order: { shopName?: string; customerName?: string }, fallback = "Unknown"): string {
+  const shop = order.shopName?.trim();
+  if (shop && shop.toLowerCase() !== "not specified") return shop;
+  const name = order.customerName?.trim();
+  if (name) return name;
+  return fallback;
+}
+
 /** Convert a Date to "YYYY-MM-DD" string */
 export function dateToYMD(d: Date): string {
   const y = d.getFullYear();

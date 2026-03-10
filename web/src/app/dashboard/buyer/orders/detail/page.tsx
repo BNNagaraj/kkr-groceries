@@ -369,7 +369,7 @@ export default function OrderDetailPage() {
               <Phone className="w-4 h-4 text-slate-400 shrink-0" />
               <span>{order.phone}</span>
             </div>
-            {order.shopName && (
+            {order.shopName && order.shopName.toLowerCase() !== "not specified" && (
               <div className="flex items-center gap-2 text-slate-600">
                 <Store className="w-4 h-4 text-slate-400 shrink-0" />
                 <span>{order.shopName}</span>

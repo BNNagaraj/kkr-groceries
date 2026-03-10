@@ -752,7 +752,7 @@ export default function BuyList({ orders, products, productImageMap }: BuyListPr
                                       {item.customers.map((c, ci) => (
                                         <tr key={ci} className="border-b border-slate-100 last:border-0">
                                           <td className="px-4 py-1.5 text-slate-700 font-medium">{c.customerName}</td>
-                                          <td className="px-3 py-1.5 text-slate-500">{c.shopName || "—"}</td>
+                                          <td className="px-3 py-1.5 text-slate-500">{c.shopName && c.shopName.toLowerCase() !== "not specified" ? c.shopName : "—"}</td>
                                           <td className="px-3 py-1.5 text-slate-400 font-mono">
                                             {(c.orderId || "").slice(-8)}
                                           </td>

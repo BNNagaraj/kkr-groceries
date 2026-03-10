@@ -6,7 +6,7 @@ import { collection, getDocs, onSnapshot, Timestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { Order } from "@/types/order";
 import { StockPurchase, StockAnalyticsData } from "@/types/stock";
-import { parseTotal, formatCurrency } from "@/lib/helpers";
+import { parseTotal, formatCurrency, getDisplayName } from "@/lib/helpers";
 import { useMode } from "@/contexts/ModeContext";
 import {
   BarChart3,
@@ -258,7 +258,7 @@ export default function AdminAnalytics() {
     orders.forEach((o) => {
       const key = o.userId || "anonymous";
       if (!customerRevenue[key]) {
-        customerRevenue[key] = { name: o.shopName || o.customerName || "Unknown", total: 0 };
+        customerRevenue[key] = { name: getDisplayName(o), total: 0 };
       }
       customerRevenue[key].total += parseTotal(o.totalValue);
     });

@@ -52,6 +52,7 @@ import {
 } from "lucide-react";
 import { Order, OrderStatus, STATUS_TIMESTAMP_FIELDS, OrderCartItem } from "@/types/order";
 import type { OtpChannel } from "@/types/settings";
+import { getDisplayName } from "@/lib/helpers";
 // jsPDF lazy-loaded on click (~200KB kept out of initial bundle)
 const lazyDownloadInvoice = async (order: Order) => {
   const { downloadInvoice } = await import("@/lib/invoice");
@@ -474,7 +475,9 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
         // Normalize phone to E.164 format: +91 + 10-digit number
         const cleanPhone = `+91${normalizeIndianPhone(otpDialogOrder.phone)}`;
 
+        console.log("[OTP SMS] Step 1: Getting OTP Auth instance...");
         const otpAuthInstance = getOtpAuth();
+        console.log("[OTP SMS] Step 1 OK. Project:", otpAuthInstance.app.options.projectId, "Key:", otpAuthInstance.app.options.apiKey?.slice(0, 10) + "...");
 
         // Always clear & recreate RecaptchaVerifier
         if (window.otpRecaptchaVerifier) {
@@ -489,17 +492,23 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
           throw Object.assign(new Error("reCAPTCHA container not found in DOM"), { code: "recaptcha/no-container" });
         }
 
+        console.log("[OTP SMS] Step 2: Creating RecaptchaVerifier...");
         window.otpRecaptchaVerifier = new RecaptchaVerifier(otpAuthInstance, containerId, {
           size: "invisible",
         });
+        console.log("[OTP SMS] Step 2 OK.");
 
         // In production, explicitly render reCAPTCHA before use.
         // On localhost (testing mode), skip render — auto-resolved by Firebase.
         if (window.location.hostname !== "localhost") {
+          console.log("[OTP SMS] Step 2b: Rendering reCAPTCHA (production)...");
           await window.otpRecaptchaVerifier.render();
+          console.log("[OTP SMS] Step 2b OK.");
         }
 
+        console.log("[OTP SMS] Step 3: Calling signInWithPhoneNumber for", cleanPhone);
         const confirmation = await signInWithPhoneNumber(otpAuthInstance, cleanPhone, window.otpRecaptchaVerifier);
+        console.log("[OTP SMS] Step 3 OK. SMS sent successfully.");
         setSmsConfirmation(confirmation);
         smsOk = true;
       } catch (err: unknown) {
@@ -516,6 +525,8 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
           errors.push("SMS: Too many attempts. Wait a few minutes.");
         } else if (error.code === "auth/invalid-phone-number") {
           errors.push("SMS: Invalid phone number format.");
+        } else if (error.code === "auth/invalid-api-key") {
+          errors.push("SMS: API key issue. Check OTP project API key restrictions in GCP Console > APIs & Services > Credentials. Ensure the key has no application restrictions, or add this domain.");
         } else if (error.code === "auth/unauthorized-domain" || error.code === "auth/operation-not-allowed") {
           errors.push(`SMS: Domain not authorized. Add "${window.location.hostname}" to OTP project's Authorized Domains in Firebase Console > Authentication > Settings.`);
         } else if (error.code === "auth/internal-error" || error.code === "auth/captcha-check-failed") {
@@ -752,7 +763,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
                       {o.timestamp || formatStatusTime(o.createdAt)}
                     </div>
                     <div className="text-sm text-slate-700">
-                      <span className="font-semibold">{o.shopName || o.customerName}</span>
+                      <span className="font-semibold">{getDisplayName(o)}</span>
                       {" \u2022 "}
                       {o.customerName} {" \u2022 "} {o.phone}
                     </div>

@@ -38,7 +38,7 @@ import {
 import { AccountEntry, LedgerRow, PnLData, EntryCategory } from "@/types/accounts";
 import { StockPurchase } from "@/types/stock";
 import { Order } from "@/types/order";
-import { formatCurrency, parseTotal, dateToYMD } from "@/lib/helpers";
+import { formatCurrency, parseTotal, dateToYMD, getDisplayName } from "@/lib/helpers";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -189,7 +189,7 @@ export default function AccountsTab() {
         rows.push({
           id: `sale-${o.id}`,
           date: orderDate,
-          description: `Sale to ${o.shopName || o.customerName || "Customer"} (${o.orderId})`,
+          description: `Sale to ${getDisplayName(o, "Customer")} (${o.orderId})`,
           category: "Sale",
           credit: amount,
           debit: 0,

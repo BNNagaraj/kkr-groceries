@@ -198,7 +198,7 @@ export default function OrderLocationMap({ orders }: Props) {
               <span style="font-size:22px;">🥬</span>
               <div>
                 <div style="font-weight:700;font-size:14px;color:#1e293b;line-height:1.2;">${order.customerName || "Customer"}</div>
-                ${order.shopName ? `<div style="font-size:11px;color:#64748b;margin-top:1px;">🏪 ${order.shopName}</div>` : ""}
+                ${order.shopName && order.shopName.toLowerCase() !== "not specified" ? `<div style="font-size:11px;color:#64748b;margin-top:1px;">🏪 ${order.shopName}</div>` : ""}
               </div>
             </div>
             <div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);padding:10px 12px;border-radius:10px;margin-bottom:8px;border:1px solid #d1fae5;">
