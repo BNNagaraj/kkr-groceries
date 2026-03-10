@@ -304,7 +304,7 @@ function CompactTile({ order, stageColor, onOrderSelect }: { order: Order; stage
 }
 
 // ─── List Row View ──────────────────────────────────────────────────────────
-function ListRow({ order, stageColor, onStatusChange, onOrderSelect }: { order: Order; stageColor: string; onStatusChange?: (id: string, s: OrderStatus) => void; onOrderSelect?: (id: string) => void }) {
+function ListRow({ order, stageColor, onStatusChange, onFulfillClick, onOrderSelect }: { order: Order; stageColor: string; onStatusChange?: (id: string, s: OrderStatus) => void; onFulfillClick?: (order: Order) => void; onOrderSelect?: (id: string) => void }) {
   const agingClass = getAgingClass(order);
   const nextAction =
     order.status === "Pending" ? { label: "Accept", status: "Accepted" as OrderStatus, color: "#3b82f6" }
@@ -321,7 +321,14 @@ function ListRow({ order, stageColor, onStatusChange, onOrderSelect }: { order: 
       <span className="text-[10px] font-bold shrink-0 w-16 text-right tabular-nums" style={{ color: "var(--c2-text)" }}>{formatCurrency(parseTotal(order.totalValue))}</span>
       <span className="text-[9px] shrink-0 w-12 text-right" style={{ color: "var(--c2-text-muted)" }}>{getElapsedText(order)}</span>
       {nextAction && onStatusChange && (
-        <button onClick={(e) => { e.stopPropagation(); onStatusChange(order.id, nextAction.status); }}
+        <button onClick={(e) => {
+            e.stopPropagation();
+            if (nextAction.status === "Fulfilled" && onFulfillClick) {
+              onFulfillClick(order);
+            } else {
+              onStatusChange(order.id, nextAction.status);
+            }
+          }}
           className="text-[8px] font-bold px-1.5 py-0.5 rounded shrink-0 transition-all hover:brightness-110"
           style={{ background: `${nextAction.color}20`, color: nextAction.color, border: `1px solid ${nextAction.color}30` }}
         >{nextAction.label}</button>
@@ -418,10 +425,21 @@ export default function OrderPipeline({ orders, onStatusChange, onBulkStatusChan
     else if (targetStatus === "Shipped") validSourceStatuses.push("Accepted");
     else if (targetStatus === "Fulfilled") validSourceStatuses.push("Shipped");
 
-    const ids = orders
-      .filter((o) => selectedIds.has(o.id) && validSourceStatuses.includes(o.status || "Pending"))
-      .map((o) => o.id);
+    const eligible = orders.filter(
+      (o) => selectedIds.has(o.id) && validSourceStatuses.includes(o.status || "Pending")
+    );
 
+    if (eligible.length === 0) return;
+
+    // For Fulfill, use onFulfillClick (OTP intercept) if available — one at a time
+    if (targetStatus === "Fulfilled" && onFulfillClick) {
+      // Fulfill via OTP for first selected; rest will need individual handling
+      onFulfillClick(eligible[0]);
+      setSelectedIds(new Set());
+      return;
+    }
+
+    const ids = eligible.map((o) => o.id);
     if (ids.length > 0 && onBulkStatusChange) {
       onBulkStatusChange(ids, targetStatus);
       setSelectedIds(new Set());
@@ -558,7 +576,7 @@ export default function OrderPipeline({ orders, onStatusChange, onBulkStatusChan
                     </div>
                   )}
                   {viewMode === "list" && stageOrders.map((order) => (
-                    <ListRow key={order.id} order={order} stageColor={stage.color} onStatusChange={onStatusChange} onOrderSelect={onOrderSelect} />
+                    <ListRow key={order.id} order={order} stageColor={stage.color} onStatusChange={onStatusChange} onFulfillClick={onFulfillClick} onOrderSelect={onOrderSelect} />
                   ))}
                 </div>
               </div>

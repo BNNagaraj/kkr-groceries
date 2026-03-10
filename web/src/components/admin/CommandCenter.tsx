@@ -262,7 +262,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
   useEffect(() => {
     (async () => {
       try {
-        const snap = await getDoc(doc(db, col("settings"), "checkout"));
+        const snap = await getDoc(doc(db, "settings", "checkout"));
         if (snap.exists()) {
           const data = snap.data();
           setOtpRequired(data.requireDeliveryOTP === true);
@@ -272,7 +272,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
         console.warn("[C2] Failed to fetch OTP settings:", e);
       }
     })();
-  }, [col]);
+  }, []);
 
   // Sync bottom height when layout preset changes
   useEffect(() => {
