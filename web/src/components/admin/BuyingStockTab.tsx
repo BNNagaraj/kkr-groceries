@@ -251,6 +251,8 @@ export default function BuyingStockTab() {
   // Inline editing
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<StockPurchase>>({});
+  const [editProductId, setEditProductId] = useState<number | undefined>();
+  const [editSuggestions, setEditSuggestions] = useState<typeof products>([]);
 
   // Display settings (persisted to localStorage)
   const [showImages, setShowImages] = useState(() => readStorage("kkr-bs-showImages", true));
@@ -456,15 +458,49 @@ export default function BuyingStockTab() {
       supplier: p.supplier || "",
       notes: p.notes || "",
     });
+    setEditProductId(p.productId);
+    setEditSuggestions([]);
+  };
+
+  // Edit autocomplete — same logic as add form
+  const handleEditProductNameChange = (val: string) => {
+    setEditData((prev) => ({ ...prev, productName: val }));
+    if (val.length >= 2) {
+      const q = val.toLowerCase();
+      const matches = products.filter(
+        (p) =>
+          !p.isHidden &&
+          (p.name.toLowerCase().includes(q) ||
+           p.telugu?.toLowerCase().includes(q) ||
+           p.hindi?.toLowerCase().includes(q))
+      );
+      setEditSuggestions(matches.slice(0, 8));
+    } else {
+      setEditSuggestions([]);
+    }
+    // Clear productId when user types manually
+    setEditProductId(undefined);
+  };
+
+  const selectEditProduct = (p: (typeof products)[0]) => {
+    setEditData((prev) => ({ ...prev, productName: p.name, unit: p.unit || prev.unit }));
+    setEditProductId(p.id);
+    setEditSuggestions([]);
   };
 
   const saveEdit = async () => {
     if (!editingId) return;
+    // ✅ Enforce catalog-only for edits too
+    if (editProductId === undefined) {
+      toast.error("Please select a product from the catalog list. Only listed products are accepted.");
+      return;
+    }
     try {
       const qty = Number(editData.qty) || 0;
       const price = Number(editData.pricePerUnit) || 0;
       await updateDoc(doc(db, col("stockPurchases"), editingId), {
         productName: editData.productName,
+        productId: editProductId,
         qty,
         unit: editData.unit,
         pricePerUnit: price,
@@ -474,6 +510,7 @@ export default function BuyingStockTab() {
       });
       toast.success("Purchase updated!");
       setEditingId(null);
+      setEditSuggestions([]);
       loadPurchases(false);
     } catch (e) {
       console.error("[BuyingStock] Edit failed:", e);
@@ -943,19 +980,70 @@ export default function BuyingStockTab() {
                       : new Date();
 
                   if (isEditing) {
+                    const editCat = editProductId ? productMap.get(editProductId) : undefined;
                     return (
                       <tr key={p.id} className="bg-amber-50/50 print:hidden">
                         <td className="px-4 py-3 text-xs text-slate-500">
                           {purchaseDate.toLocaleDateString("en-IN")}
                         </td>
                         <td className="px-4 py-3">
-                          <Input
-                            value={editData.productName || ""}
-                            onChange={(e) =>
-                              setEditData({ ...editData, productName: e.target.value })
-                            }
-                            className="text-sm h-8"
-                          />
+                          <div className="relative">
+                            <div className="flex items-center gap-2">
+                              {/* Show image of selected edit product */}
+                              {showImages && editCat?.image && (
+                                <div className="w-8 h-8 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-200">
+                                  <Image src={editCat.image} alt={editCat.name} width={32} height={32} className="w-full h-full object-cover" unoptimized />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <Input
+                                  value={editData.productName || ""}
+                                  onChange={(e) => handleEditProductNameChange(e.target.value)}
+                                  className={`text-sm h-8 ${editProductId !== undefined ? "border-emerald-400 bg-emerald-50/30" : ""}`}
+                                  placeholder="Type to search catalog..."
+                                />
+                              </div>
+                            </div>
+                            {/* Edit autocomplete dropdown */}
+                            {editSuggestions.length > 0 && (
+                              <div className="absolute z-30 top-full left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-52 overflow-y-auto">
+                                {editSuggestions.map((s) => (
+                                  <button
+                                    key={s.id}
+                                    onClick={() => selectEditProduct(s)}
+                                    className="w-full text-left px-2.5 py-2 hover:bg-emerald-50 text-sm flex items-center gap-2.5 border-b border-slate-50 last:border-0"
+                                  >
+                                    <div className="w-8 h-8 rounded-md bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-200">
+                                      {s.image ? (
+                                        <Image src={s.image} alt={s.name} width={32} height={32} className="w-full h-full object-cover" unoptimized />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs font-bold">{s.name.charAt(0)}</div>
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-slate-700 text-xs">{s.name}</div>
+                                      <div className="text-[10px] text-slate-400 flex gap-1.5 truncate">
+                                        {s.telugu && <span className="font-telugu">{s.telugu}</span>}
+                                        {s.hindi && <span className="italic">{s.hindi}</span>}
+                                      </div>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 flex-shrink-0">{s.unit}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            {/* Translated names below input */}
+                            {editCat && (showTelugu || showHindi) && (
+                              <div className="flex gap-2 mt-0.5 text-[10px] text-slate-400 truncate">
+                                {showTelugu && editCat.telugu && <span className="font-telugu">{editCat.telugu}</span>}
+                                {showHindi && editCat.hindi && <span className="italic">{editCat.hindi}</span>}
+                              </div>
+                            )}
+                            {/* Warning if product not matched */}
+                            {(editData.productName?.length || 0) >= 2 && editProductId === undefined && editSuggestions.length === 0 && (
+                              <p className="text-[10px] text-amber-600 mt-0.5">No match — select from catalog</p>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <Input
@@ -1017,13 +1105,14 @@ export default function BuyingStockTab() {
                           <div className="flex justify-center gap-1">
                             <button
                               onClick={saveEdit}
-                              className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
-                              title="Save"
+                              disabled={editProductId === undefined}
+                              className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              title={editProductId === undefined ? "Select a product from catalog first" : "Save"}
                             >
                               <Save className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => setEditingId(null)}
+                              onClick={() => { setEditingId(null); setEditSuggestions([]); }}
                               className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
                               title="Cancel"
                             >
