@@ -85,21 +85,25 @@ function MetricCard({
 }: MetricCardProps & { onClick?: () => void }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-xl p-2.5 sm:p-3 md:p-4 transition-all duration-300 group cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
+      className={`relative overflow-hidden rounded-xl p-2.5 sm:p-3 md:p-3.5 transition-all duration-200 group cursor-pointer hover:translate-y-[-1px] active:translate-y-0 ${
         pulse ? "c2-pulse-border" : ""
       }`}
       style={{
-        background: "var(--c2-bg-card)",
+        background: "var(--c2-kpi-bg)",
         border: "1px solid var(--c2-border)",
-        borderTopColor: accentColor,
-        borderTopWidth: "2px",
         boxShadow: "var(--c2-card-shadow)",
       }}
       onClick={onClick}
     >
-      {/* Glow effect */}
+      {/* Accent line at top */}
       <div
-        className="absolute -top-8 -right-8 w-24 h-24 rounded-full transition-opacity duration-500"
+        className="absolute top-0 left-0 right-0 h-[2px]"
+        style={{ background: `linear-gradient(90deg, ${accentColor}, ${accentColor}80)` }}
+      />
+
+      {/* Subtle corner glow */}
+      <div
+        className="absolute -top-6 -right-6 w-20 h-20 rounded-full transition-opacity duration-500 group-hover:opacity-[0.12]"
         style={{
           background: `radial-gradient(circle, ${glowColor}, transparent)`,
           opacity: "var(--c2-glow-opacity)",
@@ -107,38 +111,38 @@ function MetricCard({
       />
 
       <div className="relative z-10">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-1.5 sm:mb-2">
           <span
-            className="text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase"
+            className="text-[9px] sm:text-[10px] font-bold tracking-[0.08em] uppercase"
             style={{ color: "var(--c2-text-muted)" }}
           >
             {label}
           </span>
           <div
-            className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${accentColor}15` }}
+            className="w-5 h-5 sm:w-6 sm:h-6 rounded-md flex items-center justify-center"
+            style={{ backgroundColor: `${accentColor}10`, border: `1px solid ${accentColor}15` }}
           >
             <div style={{ color: accentColor }}>{icon}</div>
           </div>
         </div>
 
-        <div className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight" style={{ color: "var(--c2-text)" }}>
+        <div className="text-base sm:text-lg md:text-xl font-extrabold tracking-tight tabular-nums" style={{ color: "var(--c2-text)" }}>
           <AnimatedNumber value={value} format={format} prefix={prefix} suffix={suffix} />
         </div>
 
         {trend !== undefined && (
-          <div className="flex items-center gap-1 mt-1.5">
+          <div className="flex items-center gap-1 mt-1">
             {trend >= 0 ? (
-              <TrendingUp className="w-3 h-3 text-emerald-500" />
+              <TrendingUp className="w-2.5 h-2.5 text-emerald-500" />
             ) : (
-              <TrendingDown className="w-3 h-3 text-red-500" />
+              <TrendingDown className="w-2.5 h-2.5 text-red-500" />
             )}
-            <span className={`text-[11px] font-semibold ${trend >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+            <span className={`text-[10px] font-bold tabular-nums ${trend >= 0 ? "text-emerald-500" : "text-red-500"}`}>
               {trend >= 0 ? "+" : ""}
               {trend}%
             </span>
-            <span className="text-[10px] ml-1" style={{ color: "var(--c2-text-muted)" }}>
-              vs yesterday
+            <span className="text-[9px] ml-0.5" style={{ color: "var(--c2-text-muted)" }}>
+              vs yest
             </span>
           </div>
         )}
@@ -177,7 +181,7 @@ export default function LiveMetrics({
       : undefined;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2">
       <MetricCard
         label={revenueLabel || "Today's Revenue"}
         value={todayRevenue}

@@ -901,14 +901,25 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     return (
       <div className={`c2-root ${c2Theme === "dark" ? "c2-dark" : ""} flex items-center justify-center min-h-[600px]`}>
         <div className="text-center">
-          <div className="relative inline-flex">
-            <div className="w-12 h-12 rounded-full border-2 border-emerald-500/20 border-t-emerald-500 animate-spin" />
+          <div className="relative inline-flex mb-5">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}>
+              <Zap className="w-5 h-5 text-white" />
+            </div>
           </div>
-          <div className="text-sm mt-4 font-medium" style={{ color: "var(--c2-text-secondary)" }}>
-            Initializing Command Center...
+          <div className="text-sm font-bold tracking-wide" style={{ color: "var(--c2-text)" }}>
+            Command Center
           </div>
-          <div className="text-[10px] mt-1" style={{ color: "var(--c2-text-muted)" }}>
-            Establishing real-time data links
+          <div className="text-[10px] mt-1 font-medium" style={{ color: "var(--c2-text-muted)" }}>
+            Establishing real-time data links...
+          </div>
+          <div className="flex justify-center gap-1 mt-4">
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
+                className="w-1.5 h-1.5 rounded-full animate-pulse"
+                style={{ background: "var(--c2-text-muted)", animationDelay: `${i * 200}ms` }}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -922,35 +933,54 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     >
       {/* ─── C2 Header ───────────────────────────────────────── */}
       <div
-        className="flex items-center justify-between px-2.5 sm:px-5 py-2.5 sm:py-3 shrink-0"
+        className="c2-header flex items-center justify-between px-3 sm:px-5 py-2 sm:py-2.5 shrink-0"
         style={{ borderBottom: "1px solid var(--c2-border)" }}
       >
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
-            <h2 className="text-sm sm:text-lg font-bold tracking-wide" style={{ color: "var(--c2-text)" }}>
-              COMMAND CENTER
+        {/* ── Left: Identity + Status ── */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}>
+              <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+            </div>
+            <div className="hidden sm:block">
+              <h2 className="text-xs sm:text-sm font-bold tracking-wider leading-none" style={{ color: "var(--c2-text)", letterSpacing: "0.08em" }}>
+                COMMAND CENTER
+              </h2>
+              <span className="text-[9px] font-medium leading-none" style={{ color: "var(--c2-text-muted)" }}>
+                KKR Groceries
+              </span>
+            </div>
+            <h2 className="sm:hidden text-xs font-bold tracking-wider" style={{ color: "var(--c2-text)", letterSpacing: "0.06em" }}>
+              C2
             </h2>
           </div>
-          <span className="text-[10px] font-mono hidden sm:inline" style={{ color: "var(--c2-text-muted)" }}>
-            KKR Groceries
-          </span>
-          {/* Database mode indicator */}
+
+          {/* Database mode badge */}
           <span
-            className="text-[9px] font-bold px-2 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1"
+            className="text-[9px] font-bold px-2 py-0.5 rounded-md hidden sm:inline-flex items-center gap-1"
             style={{
-              background: mode === "test" ? "rgba(245,158,11,0.15)" : "rgba(16,185,129,0.15)",
-              color: mode === "test" ? "#f59e0b" : "#10b981",
-              border: `1px solid ${mode === "test" ? "rgba(245,158,11,0.3)" : "rgba(16,185,129,0.3)"}`,
+              background: mode === "test" ? "rgba(245,158,11,0.1)" : "rgba(16,185,129,0.08)",
+              color: mode === "test" ? "#d97706" : "#059669",
+              border: `1px solid ${mode === "test" ? "rgba(245,158,11,0.2)" : "rgba(16,185,129,0.2)"}`,
             }}
           >
             {mode === "test" ? <FlaskConical className="w-3 h-3" /> : <Database className="w-3 h-3" />}
-            {mode === "test" ? "TEST DB" : "LIVE DB"}
+            {mode === "test" ? "TEST" : "LIVE"}
           </span>
+
+          {/* LIVE pulse indicator */}
+          <div className="flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="text-[10px] font-bold text-emerald-500 hidden sm:inline tracking-wider">LIVE</span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-2">
-          {/* Store filter */}
+        {/* ── Right: Controls ── */}
+        <div className="flex items-center gap-0.5 sm:gap-1">
+          {/* ── Control Group 1: Data Filters ── */}
           {stores.length > 0 && (
             <StoreFilter
               stores={stores}
@@ -959,17 +989,17 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
             />
           )}
 
-          {/* Feature 1: Date range selector — pills on md+, select on mobile */}
-          <div className="hidden md:flex items-center gap-1 mr-1">
+          {/* Date range — segmented control on md+ */}
+          <div className="hidden md:flex items-center rounded-lg p-0.5" style={{ background: "var(--c2-bg-secondary)", border: "1px solid var(--c2-border-subtle)" }}>
             {C2_DATE_RANGES.map((range, i) => (
               <button
                 key={range.key}
                 onClick={() => setDateRange(range.key)}
-                className="text-[10px] font-semibold px-2 py-1 rounded-md transition-all"
+                className="text-[10px] font-semibold px-2.5 py-1 rounded-md transition-all"
                 style={{
-                  background: dateRange === range.key ? "var(--c2-accent-bg, rgba(59,130,246,0.15))" : "transparent",
-                  color: dateRange === range.key ? "#3b82f6" : "var(--c2-text-muted)",
-                  border: dateRange === range.key ? "1px solid rgba(59,130,246,0.3)" : "1px solid transparent",
+                  background: dateRange === range.key ? "var(--c2-bg-card)" : "transparent",
+                  color: dateRange === range.key ? "var(--c2-text)" : "var(--c2-text-muted)",
+                  boxShadow: dateRange === range.key ? "var(--c2-card-shadow)" : "none",
                 }}
                 title={`${range.label} (${i + 1})`}
               >
@@ -994,28 +1024,20 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
             ))}
           </select>
 
-          {/* LIVE indicator */}
-          <div className="flex items-center gap-1.5 mx-1 sm:mx-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-            </span>
-            <span className="text-[11px] font-semibold text-green-500 hidden sm:inline">LIVE</span>
-          </div>
+          <div className="c2-divider-v hidden sm:block" />
 
-          {/* Feature 6: Search button */}
+          {/* ── Control Group 2: Actions ── */}
           <button
             onClick={() => setSearchOpen(true)}
-            className="p-1.5 rounded-lg transition-colors flex items-center gap-1"
-            style={{ color: "var(--c2-text-muted)" }}
+            className="c2-ctrl-btn flex items-center gap-1"
             title="Search orders (Ctrl+K)"
           >
             <Search className="w-4 h-4" />
             <kbd
-              className="hidden sm:inline text-[9px] px-1 py-0.5 rounded font-mono"
+              className="hidden lg:inline text-[9px] px-1 py-0.5 rounded font-mono"
               style={{
                 background: "var(--c2-bg-secondary)",
-                border: "1px solid var(--c2-border)",
+                border: "1px solid var(--c2-border-subtle)",
                 color: "var(--c2-text-muted)",
               }}
             >
@@ -1023,37 +1045,32 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
             </kbd>
           </button>
 
-          {/* Feature 5: Export button */}
-          <button
-            onClick={handleExport}
-            className="p-1.5 rounded-lg transition-colors"
-            style={{ color: "var(--c2-text-muted)" }}
-            title="Export orders to CSV"
-          >
+          <button onClick={handleExport} className="c2-ctrl-btn" title="Export orders to CSV">
             <Download className="w-4 h-4" />
           </button>
 
-          {/* Feature 2: Mute toggle */}
           <button
             onClick={toggleMute}
-            className="p-1.5 rounded-lg transition-colors"
-            style={{ color: isMuted ? "var(--c2-text-muted)" : "#22c55e" }}
+            className="c2-ctrl-btn"
+            style={{ color: isMuted ? "var(--c2-text-muted)" : "#059669" }}
             title={isMuted ? "Unmute notifications (M)" : "Mute notifications (M)"}
           >
             {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
 
-          {/* Layout preset selector */}
-          <div className="hidden md:flex items-center gap-1.5">
-            <LayoutGrid className="w-3.5 h-3.5" style={{ color: "var(--c2-text-muted)" }} />
+          <div className="c2-divider-v hidden md:block" />
+
+          {/* ── Control Group 3: View Settings ── */}
+          <div className="hidden md:flex items-center gap-0.5">
+            <LayoutGrid className="w-3.5 h-3.5 ml-0.5" style={{ color: "var(--c2-text-muted)" }} />
             <select
               value={layoutKey}
               onChange={(e) => changeLayout(e.target.value as C2LayoutKey)}
-              className="text-[10px] font-medium rounded-md px-2 py-1 outline-none cursor-pointer"
+              className="text-[10px] font-medium rounded-md px-1.5 py-1 outline-none cursor-pointer"
               style={{
-                background: "var(--c2-bg-secondary)",
+                background: "transparent",
                 color: "var(--c2-text-secondary)",
-                border: "1px solid var(--c2-border)",
+                border: "none",
               }}
             >
               {Object.entries(C2_LAYOUTS).map(([key, cfg]) => (
@@ -1064,30 +1081,18 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
             </select>
           </div>
 
-          {/* Theme toggle */}
-          <button
-            onClick={toggleTheme}
-            className="p-1.5 rounded-lg transition-colors"
-            style={{ color: "var(--c2-text-muted)" }}
-            title={c2Theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          >
+          <button onClick={toggleTheme} className="c2-ctrl-btn" title={c2Theme === "dark" ? "Light mode" : "Dark mode"}>
             {c2Theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
-          {/* Fullscreen toggle */}
-          <button
-            onClick={toggleFullscreen}
-            className="p-1.5 rounded-lg transition-colors"
-            style={{ color: "var(--c2-text-muted)" }}
-            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-          >
+          <button onClick={toggleFullscreen} className="c2-ctrl-btn" title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
       {/* ─── KPI Metrics Strip ─────────────────────────────── */}
-      <div className="px-2 sm:px-4 py-2 sm:py-3 shrink-0" style={{ borderBottom: "1px solid var(--c2-border-subtle)" }}>
+      <div className="px-2.5 sm:px-4 py-2 sm:py-2.5 shrink-0" style={{ borderBottom: "1px solid var(--c2-border-subtle)", background: "var(--c2-bg)" }}>
         <LiveMetrics
           todayRevenue={displayRevenue}
           activeOrders={activeOrders}
@@ -1104,9 +1109,9 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
 
       {/* ─── Metric Detail Panel ─────────────────────────────── */}
       {metricDetail && (
-        <div className="px-4 py-2 shrink-0 overflow-hidden" style={{ borderBottom: "1px solid var(--c2-border-subtle)", maxHeight: 200 }}>
+        <div className="px-4 py-2.5 shrink-0 overflow-hidden" style={{ borderBottom: "1px solid var(--c2-border)", background: "var(--c2-bg-secondary)", maxHeight: 200 }}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--c2-text-muted)" }}>
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--c2-text-muted)" }}>
               {metricDetail === "revenue" && "Fulfilled Orders (Revenue)"}
               {metricDetail === "active" && "Active Orders"}
               {metricDetail === "users" && "Online Users"}
@@ -1273,8 +1278,8 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
           {/* ─── Drag Handle ──────────────────────────────────── */}
           <div
             onMouseDown={handleDragStart}
-            className="c2-drag-handle h-1 shrink-0"
-            style={{ borderTop: "1px solid var(--c2-border-subtle)" }}
+            className="c2-drag-handle h-2 shrink-0"
+            style={{ borderTop: "1px solid var(--c2-border)", background: "var(--c2-bg)" }}
             title="Drag to resize bottom panel"
           />
 
