@@ -6,12 +6,14 @@ import { Product } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn } from "lucide-react";
 
 import { formatTiersForDisplay } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 export const ClassicCard = memo(function ClassicCard({ product }: { product: Product }) {
     const [imgError, setImgError] = useState(false);
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const hasImage = !!product.image && !imgError;
+
+    const img = useImageLayout();
 
     return (
         <>
@@ -21,7 +23,7 @@ export const ClassicCard = memo(function ClassicCard({ product }: { product: Pro
             >
                 <div className="p-2.5 sm:p-3 flex items-start gap-3 sm:gap-4 flex-grow">
                     <div
-                        className={`w-14 h-14 sm:w-[70px] sm:h-[70px] rounded-xl flex-shrink-0 bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden relative group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`rounded-xl flex-shrink-0 bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden relative group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                         role={hasImage ? "button" : undefined}
                         aria-label={hasImage ? `View ${product.name} image` : undefined}
@@ -32,7 +34,7 @@ export const ClassicCard = memo(function ClassicCard({ product }: { product: Pro
                                     src={product.image}
                                     alt={product.name}
                                     fill
-                                    sizes="70px"
+                                    sizes={img.imageSizes}
                                     className="object-cover"
                                     unoptimized={!product.image.includes("googleapis.com")}
                                     onError={() => setImgError(true)}

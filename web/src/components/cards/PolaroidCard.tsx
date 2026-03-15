@@ -6,7 +6,7 @@ import { Product } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn } from "lucide-react";
 
 import { formatTiersForDisplay } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Polaroid Snap — retro photo-print card.
@@ -21,6 +21,8 @@ export const PolaroidCard = memo(function PolaroidCard({ product }: { product: P
     const tiers = product.priceTiers?.length ? formatTiersForDisplay(product.priceTiers) : [];
     const lowestPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : product.price;
 
+    const img = useImageLayout();
+
     return (
         <>
             <div
@@ -28,9 +30,9 @@ export const PolaroidCard = memo(function PolaroidCard({ product }: { product: P
                 style={{ borderRadius: "2px" }}
             >
                 {/* Polaroid-style thick white border around image */}
-                <div className="p-2.5 sm:p-3 pb-0">
+                <div className={`flex ${img.containerClass} flex-1`}><div className={`${img.isHorizontal ? "" : "p-2.5 sm:p-3 pb-0"} shrink-0`} style={img.isHorizontal ? { width: `${img.imgW}%` } : undefined}>
                     <div
-                        className={`relative aspect-[4/3] w-full bg-slate-100 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`relative ${img.isHorizontal ? "h-full" : "aspect-[4/3] w-full"} bg-slate-100 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
@@ -39,7 +41,7 @@ export const PolaroidCard = memo(function PolaroidCard({ product }: { product: P
                                     src={product.image}
                                     alt={product.name}
                                     fill
-                                    sizes="(max-width: 640px) 100vw, 33vw"
+                                    sizes={img.imageSizes}
                                     className="object-cover"
                                     unoptimized={!product.image.includes("googleapis.com")}
                                     onError={() => setImgError(true)}
@@ -81,7 +83,7 @@ export const PolaroidCard = memo(function PolaroidCard({ product }: { product: P
                 </div>
 
                 {/* Content — extra bottom padding like a polaroid */}
-                <div className="p-2.5 sm:p-3 pt-3 sm:pt-4 pb-2 flex flex-col flex-grow">
+                </div><div className="p-2.5 sm:p-3 pt-3 sm:pt-4 pb-2 flex flex-col flex-grow min-w-0">
                     <h3 className="text-[15px] font-bold text-slate-800 leading-tight">
                         {product.name}
                     </h3>

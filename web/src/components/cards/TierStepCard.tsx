@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn, Zap } from "lucide-react";
 import { formatTiersForDisplay, getActiveTierIndex, getNextTierNudge, resolveSlabPrice } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Tier Steps — Visual stepped progression from expensive to cheap.
@@ -34,6 +34,8 @@ export const TierStepCard = memo(function TierStepCard({ product }: { product: P
         { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", activeBg: "bg-green-600", activeText: "text-white" },
     ];
 
+    const img = useImageLayout();
+
     return (
         <>
             <div
@@ -43,12 +45,12 @@ export const TierStepCard = memo(function TierStepCard({ product }: { product: P
                 {/* Product header */}
                 <div className="p-3 pb-2 flex items-start gap-3">
                     <div
-                        className={`w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-2xl shrink-0 bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`rounded-2xl shrink-0 bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
                             <>
-                                <Image src={product.image} alt={product.name} fill sizes="72px" className="object-cover" unoptimized={!product.image.includes("googleapis.com")} onError={() => setImgError(true)} />
+                                <Image src={product.image} alt={product.name} fill sizes={img.imageSizes} className="object-cover" unoptimized={!product.image.includes("googleapis.com")} onError={() => setImgError(true)} />
                                 <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/15 transition-colors flex items-center justify-center">
                                     <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover/img:opacity-100 transition-opacity drop-shadow" />
                                 </div>

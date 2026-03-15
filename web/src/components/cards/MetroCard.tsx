@@ -6,7 +6,7 @@ import { Product } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn } from "lucide-react";
 
 import { formatTiersForDisplay } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Bold Metro — material/metro-style tiles.
@@ -21,6 +21,8 @@ export const MetroCard = memo(function MetroCard({ product }: { product: Product
     const lowestPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : product.price;
     const highestPrice = tiers.length > 0 ? Math.max(...tiers.map(t => t.price)) : product.price;
     const hasTierRange = lowestPrice !== highestPrice;
+
+    const img = useImageLayout();
 
     return (
         <>
@@ -50,9 +52,11 @@ export const MetroCard = memo(function MetroCard({ product }: { product: Product
                     </div>
                 </div>
 
+              <div className={`flex ${img.containerClass} flex-1`}>
                 {/* Image */}
                 <div
-                    className={`relative w-full aspect-[4/3] bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                    className={`relative bg-slate-50 overflow-hidden group/img shrink-0 ${img.imageClass} ${hasImage ? "cursor-pointer" : ""}`}
+                    style={img.imageStyle}
                     onClick={() => hasImage && setLightboxOpen(true)}
                 >
                     {hasImage ? (
@@ -61,7 +65,7 @@ export const MetroCard = memo(function MetroCard({ product }: { product: Product
                                 src={product.image}
                                 alt={product.name}
                                 fill
-                                sizes="(max-width: 640px) 100vw, 33vw"
+                                sizes={img.imageSizes}
                                 className="object-cover"
                                 unoptimized={!product.image.includes("googleapis.com")}
                                 onError={() => setImgError(true)}
@@ -78,7 +82,7 @@ export const MetroCard = memo(function MetroCard({ product }: { product: Product
                 </div>
 
                 {/* Content body */}
-                <div className="p-3 sm:p-3.5 flex flex-col flex-grow">
+                <div className="p-3 sm:p-3.5 flex flex-col flex-grow min-w-0">
                     {/* Languages */}
                     <div className="flex gap-2 text-[11px] text-slate-400">
                         <span className="font-telugu">{product.telugu}</span>
@@ -124,6 +128,7 @@ export const MetroCard = memo(function MetroCard({ product }: { product: Product
                         <CartControls product={product} />
                     </div>
                 </div>
+              </div>
             </div>
 
             <ImageLightbox

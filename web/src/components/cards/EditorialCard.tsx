@@ -6,7 +6,7 @@ import { Product } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn } from "lucide-react";
 
 import { formatTiersForDisplay } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Editorial — vintage newspaper-style card.
@@ -21,6 +21,8 @@ export const EditorialCard = memo(function EditorialCard({ product }: { product:
     const lowestPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : product.price;
     const highestPrice = tiers.length > 0 ? Math.max(...tiers.map(t => t.price)) : product.price;
     const hasTierRange = lowestPrice !== highestPrice;
+
+    const img = useImageLayout();
 
     return (
         <>
@@ -37,7 +39,7 @@ export const EditorialCard = memo(function EditorialCard({ product }: { product:
                 {/* Image */}
                 <div className="px-3 sm:px-4 pt-2">
                     <div
-                        className={`relative aspect-[4/3] w-full bg-slate-100 overflow-hidden grayscale-[15%] group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`relative ${img.isHorizontal ? "h-full" : "aspect-[4/3] w-full"} bg-slate-100 overflow-hidden grayscale-[15%] group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
@@ -46,7 +48,7 @@ export const EditorialCard = memo(function EditorialCard({ product }: { product:
                                     src={product.image}
                                     alt={product.name}
                                     fill
-                                    sizes="(max-width: 640px) 100vw, 33vw"
+                                    sizes={img.imageSizes}
                                     className="object-cover group-hover/img:grayscale-0 transition-all duration-500"
                                     unoptimized={!product.image.includes("googleapis.com")}
                                     onError={() => setImgError(true)}

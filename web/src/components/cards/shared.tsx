@@ -6,6 +6,34 @@ import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Trash2, ZoomIn, X, Check } from "lucide-react";
 import { resolveSlabPrice } from "@/lib/pricing";
+import { useTheme } from "@/contexts/ThemeContext";
+
+/* ─── Theme-aware Image Layout Hook ─── */
+
+export function useImageLayout() {
+    const { theme } = useTheme();
+    const imgPos = theme.cardLayout?.imagePosition || "left";
+    const imgW = theme.cardLayout?.imageWidth || 30;
+    const isHorizontal = imgPos === "left" || imgPos === "right";
+    const isRight = imgPos === "right";
+
+    return {
+        imgPos,
+        imgW,
+        isHorizontal,
+        isRight,
+        /** flex direction class for the outer container */
+        containerClass: isHorizontal
+            ? (isRight ? "flex-row-reverse" : "flex-row")
+            : "flex-col",
+        /** inline style for the image wrapper (sets width% for horizontal) */
+        imageStyle: isHorizontal ? { width: `${imgW}%` } as React.CSSProperties : undefined,
+        /** className for the image wrapper */
+        imageClass: isHorizontal ? "aspect-auto" : "aspect-[16/9] w-full",
+        /** sizes hint for next/image */
+        imageSizes: isHorizontal ? `${imgW}vw` : "100vw",
+    };
+}
 
 /* ─── Inline Quantity Input ─── */
 

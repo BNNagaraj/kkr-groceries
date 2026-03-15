@@ -6,7 +6,7 @@ import { Product } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn } from "lucide-react";
 
 import { formatTiersForDisplay } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Bold Storefront — conversion-focused card.
@@ -22,6 +22,8 @@ export const StorefrontCard = memo(function StorefrontCard({ product }: { produc
     const highestPrice = tiers.length > 0 ? Math.max(...tiers.map(t => t.price)) : product.price;
     const hasTierRange = lowestPrice !== highestPrice;
 
+    const img = useImageLayout();
+
     return (
         <>
             <div
@@ -31,10 +33,10 @@ export const StorefrontCard = memo(function StorefrontCard({ product }: { produc
                     borderLeft: "4px solid var(--color-accent, #f97316)",
                 }}
             >
-                <div className="flex items-stretch flex-grow">
+                <div className={`flex ${img.containerClass} items-stretch flex-grow`}>
                     {/* Image */}
                     <div
-                        className={`w-16 sm:w-[90px] shrink-0 bg-slate-50 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`shrink-0 bg-slate-50 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
@@ -43,7 +45,7 @@ export const StorefrontCard = memo(function StorefrontCard({ product }: { produc
                                     src={product.image}
                                     alt={product.name}
                                     fill
-                                    sizes="(max-width: 640px) 70px, 90px"
+                                    sizes={img.imageSizes}
                                     className="object-cover"
                                     unoptimized={!product.image.includes("googleapis.com")}
                                     onError={() => setImgError(true)}

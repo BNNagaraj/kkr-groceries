@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn, Tag } from "lucide-react";
 import { formatTiersForDisplay, getActiveTierIndex, getNextTierNudge, resolveSlabPrice } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Harvest — Warm, earthy, organic produce aesthetic.
@@ -34,6 +34,8 @@ export const HarvestCard = memo(function HarvestCard({ product }: { product: Pro
         { bg: "bg-green-100/60", border: "border-green-300/50", text: "text-green-800", price: "text-green-900", activeBg: "bg-green-600", activeText: "text-white" },
     ];
 
+    const img = useImageLayout();
+
     return (
         <>
             <div
@@ -45,13 +47,14 @@ export const HarvestCard = memo(function HarvestCard({ product }: { product: Pro
                 }}
             >
                 {/* Hero image area */}
-                <div
-                    className={`relative aspect-[2/1] w-full bg-amber-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                <div className={`flex ${img.containerClass} flex-1`}><div
+                    className={`relative bg-amber-50 shrink-0 ${img.imageClass} overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                    style={img.imageStyle}
                     onClick={() => hasImage && setLightboxOpen(true)}
                 >
                     {hasImage ? (
                         <>
-                            <Image src={product.image} alt={product.name} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-cover" unoptimized={!product.image.includes("googleapis.com")} onError={() => setImgError(true)} />
+                            <Image src={product.image} alt={product.name} fill sizes={img.imageSizes} className="object-cover" unoptimized={!product.image.includes("googleapis.com")} onError={() => setImgError(true)} />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                             <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors flex items-center justify-center">
                                 <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover/img:opacity-70 transition-opacity drop-shadow-lg" />
@@ -173,6 +176,7 @@ export const HarvestCard = memo(function HarvestCard({ product }: { product: Pro
                 <div className="mt-auto px-3.5 pb-3.5">
                     <CartControls product={product} />
                 </div>
+              </div>
             </div>
 
             <ImageLightbox src={product.image} alt={product.name} telugu={product.telugu} open={lightboxOpen} onClose={() => setLightboxOpen(false)} />

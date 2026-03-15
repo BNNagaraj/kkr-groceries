@@ -6,7 +6,7 @@ import { Product } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn } from "lucide-react";
 
 import { formatTiersForDisplay } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Dark Luxe — premium dark-mode card.
@@ -22,15 +22,19 @@ export const DarkLuxeCard = memo(function DarkLuxeCard({ product }: { product: P
     const highestPrice = tiers.length > 0 ? Math.max(...tiers.map(t => t.price)) : product.price;
     const hasTierRange = lowestPrice !== highestPrice;
 
+    const img = useImageLayout();
+
     return (
         <>
             <div
                 className="bg-slate-900 overflow-hidden flex flex-col h-full shadow-lg shadow-black/20 hover:shadow-[0_20px_40px_-8px_rgba(0,0,0,0.5)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 ease-out"
                 style={{ borderRadius: "var(--theme-card-radius, 0.75rem)" }}
             >
+              <div className={`flex ${img.containerClass} flex-1`}>
                 {/* Image with cinematic filter */}
                 <div
-                    className={`relative aspect-[4/3] w-full bg-slate-800 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                    className={`relative bg-slate-800 overflow-hidden group/img shrink-0 ${img.imageClass} ${hasImage ? "cursor-pointer" : ""}`}
+                    style={img.imageStyle}
                     onClick={() => hasImage && setLightboxOpen(true)}
                 >
                     {hasImage ? (
@@ -39,7 +43,7 @@ export const DarkLuxeCard = memo(function DarkLuxeCard({ product }: { product: P
                                 src={product.image}
                                 alt={product.name}
                                 fill
-                                sizes="(max-width: 640px) 100vw, 33vw"
+                                sizes={img.imageSizes}
                                 className="object-cover brightness-90 group-hover/img:brightness-100 transition-all duration-500"
                                 unoptimized={!product.image.includes("googleapis.com")}
                                 onError={() => setImgError(true)}
@@ -75,7 +79,7 @@ export const DarkLuxeCard = memo(function DarkLuxeCard({ product }: { product: P
                 </div>
 
                 {/* Content */}
-                <div className="p-3 sm:p-4 flex flex-col flex-grow">
+                <div className="p-3 sm:p-4 flex flex-col flex-grow min-w-0">
                     <h3 className="text-[15px] font-bold text-white leading-tight">
                         {product.name}
                     </h3>
@@ -120,6 +124,7 @@ export const DarkLuxeCard = memo(function DarkLuxeCard({ product }: { product: P
                         <CartControls product={product} />
                     </div>
                 </div>
+              </div>
             </div>
 
             <ImageLightbox

@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn } from "lucide-react";
 import { formatTiersForDisplay, getActiveTierIndex, getNextTierNudge } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Mandi Board — Inspired by Indian wholesale mandi rate boards.
@@ -24,6 +24,8 @@ export const MandiCard = memo(function MandiCard({ product }: { product: Product
     const activeIdx = getActiveTierIndex(qty, product.priceTiers || []);
     const nudge = getNextTierNudge(qty, product.price, product.priceTiers || [], product.unit);
 
+    const img = useImageLayout();
+
     return (
         <>
             <div
@@ -38,7 +40,7 @@ export const MandiCard = memo(function MandiCard({ product }: { product: Product
                 <div className="flex items-center gap-3 p-3 border-b border-emerald-900/60">
                     {/* Image */}
                     <div
-                        className={`w-14 h-14 sm:w-16 sm:h-16 rounded-lg shrink-0 bg-black/30 border border-emerald-800/50 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`rounded-lg shrink-0 bg-black/30 border border-emerald-800/50 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
@@ -47,7 +49,7 @@ export const MandiCard = memo(function MandiCard({ product }: { product: Product
                                     src={product.image}
                                     alt={product.name}
                                     fill
-                                    sizes="64px"
+                                    sizes={img.imageSizes}
                                     className="object-cover"
                                     unoptimized={!product.image.includes("googleapis.com")}
                                     onError={() => setImgError(true)}

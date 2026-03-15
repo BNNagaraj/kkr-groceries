@@ -6,7 +6,7 @@ import { Product } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn } from "lucide-react";
 
 import { formatTiersForDisplay } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Magazine — editorial hero-image card.
@@ -21,6 +21,7 @@ export const MagazineCard = memo(function MagazineCard({ product }: { product: P
     const lowestPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : product.price;
     const highestPrice = tiers.length > 0 ? Math.max(...tiers.map(t => t.price)) : product.price;
     const hasTierRange = lowestPrice !== highestPrice;
+    const img = useImageLayout();
 
     return (
         <>
@@ -28,9 +29,11 @@ export const MagazineCard = memo(function MagazineCard({ product }: { product: P
                 className="bg-white shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 ease-out"
                 style={{ borderRadius: "var(--theme-card-radius, 0.75rem)" }}
             >
+              <div className={`flex ${img.containerClass} flex-1`}>
                 {/* Hero image with gradient overlay */}
                 <div
-                    className={`relative w-full aspect-[3/2] bg-slate-900 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                    className={`relative bg-slate-900 overflow-hidden group/img shrink-0 ${img.imageClass} ${hasImage ? "cursor-pointer" : ""}`}
+                    style={img.imageStyle}
                     onClick={() => hasImage && setLightboxOpen(true)}
                 >
                     {hasImage ? (
@@ -39,7 +42,7 @@ export const MagazineCard = memo(function MagazineCard({ product }: { product: P
                                 src={product.image}
                                 alt={product.name}
                                 fill
-                                sizes="(max-width: 640px) 100vw, 33vw"
+                                sizes={img.imageSizes}
                                 className="object-cover transition-transform duration-700 group-hover/img:scale-105"
                                 unoptimized={!product.image.includes("googleapis.com")}
                                 onError={() => setImgError(true)}
@@ -88,7 +91,7 @@ export const MagazineCard = memo(function MagazineCard({ product }: { product: P
                 </div>
 
                 {/* Content below image */}
-                <div className="p-3 sm:p-4 flex flex-col flex-grow">
+                <div className="p-3 sm:p-4 flex flex-col flex-grow min-w-0">
                     <div className="flex gap-2 text-[11px] sm:text-[12px] text-slate-500">
                         <span className="font-telugu">{product.telugu}</span>
                         <span className="text-slate-300">•</span>
@@ -119,6 +122,7 @@ export const MagazineCard = memo(function MagazineCard({ product }: { product: P
                         <CartControls product={product} />
                     </div>
                 </div>
+              </div>
             </div>
 
             <ImageLightbox

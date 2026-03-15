@@ -6,7 +6,7 @@ import { Product } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn } from "lucide-react";
 
 import { formatTiersForDisplay } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Elegant Minimal — luxury e-commerce feel.
@@ -19,6 +19,7 @@ export const ElegantCard = memo(function ElegantCard({ product }: { product: Pro
 
     const tiers = product.priceTiers?.length ? formatTiersForDisplay(product.priceTiers) : [];
     const lowestPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : product.price;
+    const img = useImageLayout();
 
     return (
         <>
@@ -26,10 +27,11 @@ export const ElegantCard = memo(function ElegantCard({ product }: { product: Pro
                 className="bg-white shadow-md overflow-hidden flex flex-col h-full hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 ease-out"
                 style={{ borderRadius: "var(--theme-card-radius, 1rem)" }}
             >
+              <div className={`flex ${img.containerClass} flex-1`}>
                 {/* Image with internal padding */}
-                <div className="p-2.5 sm:p-3 pb-0">
+                <div className={`${img.isHorizontal ? "" : "p-2.5 sm:p-3 pb-0"} shrink-0`} style={img.isHorizontal ? { width: `${img.imgW}%` } : undefined}>
                     <div
-                        className={`relative w-full aspect-[4/3] rounded-xl bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`relative ${img.isHorizontal ? "h-full" : "w-full aspect-[4/3]"} rounded-xl bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
@@ -38,7 +40,7 @@ export const ElegantCard = memo(function ElegantCard({ product }: { product: Pro
                                     src={product.image}
                                     alt={product.name}
                                     fill
-                                    sizes="(max-width: 640px) 100vw, 33vw"
+                                    sizes={img.imageSizes}
                                     className="object-cover transition-transform duration-500 group-hover/img:scale-110"
                                     unoptimized={!product.image.includes("googleapis.com")}
                                     onError={() => setImgError(true)}
@@ -80,7 +82,7 @@ export const ElegantCard = memo(function ElegantCard({ product }: { product: Pro
                 </div>
 
                 {/* Content */}
-                <div className="p-3 sm:p-4 pt-2.5 sm:pt-3 flex flex-col flex-grow">
+                <div className="p-3 sm:p-4 pt-2.5 sm:pt-3 flex flex-col flex-grow min-w-0">
                     <h3 className="text-[15px] font-bold text-slate-800 leading-tight">
                         {product.name}
                     </h3>
@@ -115,6 +117,7 @@ export const ElegantCard = memo(function ElegantCard({ product }: { product: Pro
                         <CartControls product={product} />
                     </div>
                 </div>
+              </div>
             </div>
 
             <ImageLightbox

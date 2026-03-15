@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn, TrendingDown } from "lucide-react";
 import { formatTiersForDisplay, getActiveTierIndex, getNextTierNudge, resolveSlabPrice } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Premium Compact — Same Premium Wholesale DNA but ~40% shorter.
@@ -38,6 +38,8 @@ export const PremiumCompactCard = memo(function PremiumCompactCard({ product }: 
     const lowestTierPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : basePrice;
     const maxSavingsPercent = basePrice > 0 ? Math.round(((basePrice - lowestTierPrice) / basePrice) * 100) : 0;
 
+    const img = useImageLayout();
+
     return (
         <>
             <div
@@ -45,10 +47,10 @@ export const PremiumCompactCard = memo(function PremiumCompactCard({ product }: 
                 style={{ borderRadius: "var(--theme-card-radius, 0.75rem)" }}
             >
                 {/* Always horizontal: image left, content right */}
-                <div className="flex">
+                <div className={`flex ${img.containerClass}`}>
                     {/* Small fixed image */}
                     <div
-                        className={`w-20 sm:w-24 shrink-0 bg-slate-50 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`shrink-0 bg-slate-50 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
@@ -57,7 +59,7 @@ export const PremiumCompactCard = memo(function PremiumCompactCard({ product }: 
                                     src={product.image}
                                     alt={product.name}
                                     fill
-                                    sizes="96px"
+                                    sizes={img.imageSizes}
                                     className="object-cover"
                                     unoptimized={!product.image.includes("googleapis.com")}
                                     onError={() => setImgError(true)}

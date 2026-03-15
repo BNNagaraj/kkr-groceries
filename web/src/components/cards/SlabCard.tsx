@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn, TrendingDown, ChevronRight } from "lucide-react";
 import { formatTiersForDisplay, getActiveTierIndex, getNextTierNudge, resolveSlabPrice } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Smart Slab — Clean minimal design where tiers ARE the hero.
@@ -37,6 +37,8 @@ export const SlabCard = memo(function SlabCard({ product }: { product: Product }
         return Math.min(100, Math.round(((qty - rangeStart) / rangeSize) * 100));
     })();
 
+    const img = useImageLayout();
+
     return (
         <>
             <div
@@ -46,12 +48,12 @@ export const SlabCard = memo(function SlabCard({ product }: { product: Product }
                 {/* Compact header: image + name + base price */}
                 <div className="flex items-center gap-3 p-3 pb-2">
                     <div
-                        className={`w-12 h-12 rounded-xl shrink-0 bg-slate-50 border border-slate-100 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`rounded-xl shrink-0 bg-slate-50 border border-slate-100 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
                             <>
-                                <Image src={product.image} alt={product.name} fill sizes="48px" className="object-cover" unoptimized={!product.image.includes("googleapis.com")} onError={() => setImgError(true)} />
+                                <Image src={product.image} alt={product.name} fill sizes={img.imageSizes} className="object-cover" unoptimized={!product.image.includes("googleapis.com")} onError={() => setImgError(true)} />
                                 <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors flex items-center justify-center">
                                     <ZoomIn className="w-4 h-4 text-white opacity-0 group-hover/img:opacity-100 transition-opacity" />
                                 </div>

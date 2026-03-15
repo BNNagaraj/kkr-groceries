@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, Zap } from "lucide-react";
 import { formatTiersForDisplay, getActiveTierIndex, getNextTierNudge, resolveSlabPrice } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Premium Mini — Ultra-compact variant with tier PILLS instead of rows.
@@ -32,6 +32,8 @@ export const PremiumMiniCard = memo(function PremiumMiniCard({ product }: { prod
     const lowestPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : basePrice;
     const maxSavingsPercent = basePrice > 0 ? Math.round(((basePrice - lowestPrice) / basePrice) * 100) : 0;
 
+    const img = useImageLayout();
+
     return (
         <>
             <div
@@ -42,7 +44,7 @@ export const PremiumMiniCard = memo(function PremiumMiniCard({ product }: { prod
                 <div className="flex items-center gap-2.5 p-2.5">
                     {/* Tiny image */}
                     <div
-                        className={`w-12 h-12 rounded-lg shrink-0 bg-slate-50 border border-slate-100 relative overflow-hidden ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`rounded-lg shrink-0 bg-slate-50 border border-slate-100 relative overflow-hidden ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
@@ -50,7 +52,7 @@ export const PremiumMiniCard = memo(function PremiumMiniCard({ product }: { prod
                                 src={product.image}
                                 alt={product.name}
                                 fill
-                                sizes="48px"
+                                sizes={img.imageSizes}
                                 className="object-cover"
                                 unoptimized={!product.image.includes("googleapis.com")}
                                 onError={() => setImgError(true)}

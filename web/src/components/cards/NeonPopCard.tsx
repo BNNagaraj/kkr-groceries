@@ -6,7 +6,7 @@ import { Product } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn } from "lucide-react";
 
 import { formatTiersForDisplay } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Neon Pop — vibrant gradient-bordered card.
@@ -23,6 +23,8 @@ export const NeonPopCard = memo(function NeonPopCard({ product }: { product: Pro
     const highestPrice = tiers.length > 0 ? Math.max(...tiers.map(t => t.price)) : product.price;
     const hasTierRange = lowestPrice !== highestPrice;
 
+    const img = useImageLayout();
+
     return (
         <>
             {/* Gradient border wrapper */}
@@ -35,8 +37,9 @@ export const NeonPopCard = memo(function NeonPopCard({ product }: { product: Pro
                     style={{ borderRadius: "calc(var(--theme-card-radius, 1rem) - 2px)" }}
                 >
                     {/* Image */}
-                    <div
-                        className={`relative aspect-[4/3] w-full bg-gradient-to-br from-purple-50 to-pink-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                    <div className={`flex ${img.containerClass} flex-1`}><div
+                        className={`relative bg-gradient-to-br from-purple-50 to-pink-50 shrink-0 ${img.imageClass} overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        style={img.imageStyle}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
@@ -45,7 +48,7 @@ export const NeonPopCard = memo(function NeonPopCard({ product }: { product: Pro
                                     src={product.image}
                                     alt={product.name}
                                     fill
-                                    sizes="(max-width: 640px) 100vw, 33vw"
+                                    sizes={img.imageSizes}
                                     className="object-cover"
                                     unoptimized={!product.image.includes("googleapis.com")}
                                     onError={() => setImgError(true)}
@@ -80,7 +83,7 @@ export const NeonPopCard = memo(function NeonPopCard({ product }: { product: Pro
                     </div>
 
                     {/* Content */}
-                    <div className="p-3 sm:p-4 flex flex-col flex-grow">
+                    <div className="p-3 sm:p-4 flex flex-col flex-grow min-w-0">
                         <h3 className="text-[15px] font-black text-slate-900 leading-tight">
                             {product.name}
                         </h3>
@@ -133,6 +136,7 @@ export const NeonPopCard = memo(function NeonPopCard({ product }: { product: Pro
                             <CartControls product={product} />
                         </div>
                     </div>
+                  </div>
                 </div>
             </div>
 

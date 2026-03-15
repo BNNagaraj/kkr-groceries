@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Product } from "@/contexts/AppContext";
 import { Flame, LeafyGreen } from "lucide-react";
 import { formatTiersForDisplay } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * List Pro — ultra-compact single-row card for power buyers.
@@ -19,6 +19,8 @@ export const ListProCard = memo(function ListProCard({ product }: { product: Pro
     const tiers = product.priceTiers?.length ? formatTiersForDisplay(product.priceTiers) : [];
     const lowestPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : product.price;
 
+    const img = useImageLayout();
+
     return (
         <>
             <div className="bg-white border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
@@ -27,7 +29,7 @@ export const ListProCard = memo(function ListProCard({ product }: { product: Pro
                     <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
                         {/* Image */}
                         <div
-                            className={`w-10 h-10 sm:w-[52px] sm:h-[52px] rounded-lg shrink-0 bg-slate-50 border border-slate-100 relative overflow-hidden ${hasImage ? "cursor-pointer" : ""}`}
+                            className={`rounded-lg shrink-0 bg-slate-50 border border-slate-100 relative overflow-hidden ${hasImage ? "cursor-pointer" : ""}`}
                             onClick={() => hasImage && setLightboxOpen(true)}
                         >
                             {hasImage ? (
@@ -35,7 +37,7 @@ export const ListProCard = memo(function ListProCard({ product }: { product: Pro
                                     src={product.image}
                                     alt={product.name}
                                     fill
-                                    sizes="52px"
+                                    sizes={img.imageSizes}
                                     className="object-cover"
                                     unoptimized={!product.image.includes("googleapis.com")}
                                     onError={() => setImgError(true)}

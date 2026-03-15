@@ -6,7 +6,7 @@ import { Product } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn } from "lucide-react";
 
 import { formatTiersForDisplay } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Glassmorphism — modern frosted-glass card.
@@ -23,6 +23,8 @@ export const GlassCard = memo(function GlassCard({ product }: { product: Product
     const highestPrice = tiers.length > 0 ? Math.max(...tiers.map(t => t.price)) : product.price;
     const hasTierRange = lowestPrice !== highestPrice;
 
+    const img = useImageLayout();
+
     return (
         <>
             <div
@@ -37,9 +39,9 @@ export const GlassCard = memo(function GlassCard({ product }: { product: Product
                 }}
             >
                 {/* Image */}
-                <div className="p-2.5 sm:p-3 pb-0">
+                <div className={`flex ${img.containerClass} flex-1`}><div className={`${img.isHorizontal ? "" : "p-2.5 sm:p-3 pb-0"} shrink-0`} style={img.isHorizontal ? { width: `${img.imgW}%` } : undefined}>
                     <div
-                        className={`relative aspect-[4/3] w-full rounded-xl sm:rounded-2xl bg-white/30 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`relative ${img.isHorizontal ? "h-full" : "aspect-[4/3] w-full"} rounded-xl sm:rounded-2xl bg-white/30 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
@@ -48,7 +50,7 @@ export const GlassCard = memo(function GlassCard({ product }: { product: Product
                                     src={product.image}
                                     alt={product.name}
                                     fill
-                                    sizes="(max-width: 640px) 100vw, 33vw"
+                                    sizes={img.imageSizes}
                                     className="object-cover"
                                     unoptimized={!product.image.includes("googleapis.com")}
                                     onError={() => setImgError(true)}
@@ -82,7 +84,7 @@ export const GlassCard = memo(function GlassCard({ product }: { product: Product
                 </div>
 
                 {/* Content */}
-                <div className="p-3 sm:p-4 pt-2.5 sm:pt-3 flex flex-col flex-grow">
+                </div><div className="p-3 sm:p-4 pt-2.5 sm:pt-3 flex flex-col flex-grow min-w-0">
                     <h3 className="text-[15px] font-bold text-slate-800 leading-tight">
                         {product.name}
                     </h3>

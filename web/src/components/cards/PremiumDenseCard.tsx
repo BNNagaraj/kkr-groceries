@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Flame, LeafyGreen, ZoomIn, ArrowRight } from "lucide-react";
 import { formatTiersForDisplay, getActiveTierIndex, getNextTierNudge, resolveSlabPrice } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
  * Premium Dense — Information-dense 2-column tier grid.
@@ -33,21 +33,23 @@ export const PremiumDenseCard = memo(function PremiumDenseCard({ product }: { pr
     const lowestPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : basePrice;
     const hasTierRange = basePrice !== lowestPrice;
 
+    const img = useImageLayout();
+
     return (
         <>
             <div
                 className="bg-white shadow-sm border border-slate-100 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 ease-out"
                 style={{ borderRadius: "var(--theme-card-radius, 0.75rem)" }}
             >
-                <div className="flex">
+                <div className={`flex ${img.containerClass}`}>
                     {/* Image — compact fixed width */}
                     <div
-                        className={`w-[88px] sm:w-[100px] shrink-0 bg-slate-50 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`shrink-0 bg-slate-50 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
                             <>
-                                <Image src={product.image} alt={product.name} fill sizes="100px" className="object-cover" unoptimized={!product.image.includes("googleapis.com")} onError={() => setImgError(true)} />
+                                <Image src={product.image} alt={product.name} fill sizes={img.imageSizes} className="object-cover" unoptimized={!product.image.includes("googleapis.com")} onError={() => setImgError(true)} />
                                 <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors flex items-center justify-center">
                                     <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover/img:opacity-70 transition-opacity drop-shadow-lg" />
                                 </div>
