@@ -122,6 +122,32 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         root.style.setProperty("--color-accent", theme.accentColor);
         root.style.setProperty("--color-ring", theme.primaryColor);
         root.style.setProperty("--theme-card-radius", RADIUS_MAP[theme.cardStyle.borderRadius] || "1rem");
+
+        // Page-level theme effects — subtle background tint per theme
+        const PAGE_BG: Record<string, string> = {
+            classic: "#f8faf9",
+            premium: "#f7f9f8",
+            catalog: "#f8faf9",
+            elegant: "#fafafa",
+            storefront: "#f9fafb",
+            magazine: "#f8f8f8",
+            listpro: "#fafbfc",
+            metro: "#f5f7f9",
+            polaroid: "#faf9f7",
+            glass: "#f0f4ff",
+            darkluxe: "#111318",
+            editorial: "#faf9f6",
+            neonpop: "#faf8ff",
+        };
+        const bg = PAGE_BG[theme.activeTheme] || "#f8faf9";
+        root.style.setProperty("--theme-page-bg", bg);
+
+        // Set body class for dark themes
+        if (theme.activeTheme === "darkluxe") {
+            document.body.classList.add("theme-dark-page");
+        } else {
+            document.body.classList.remove("theme-dark-page");
+        }
     }, [theme]);
 
     return (

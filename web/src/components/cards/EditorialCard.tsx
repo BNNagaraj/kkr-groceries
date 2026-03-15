@@ -37,7 +37,7 @@ export const EditorialCard = memo(function EditorialCard({ product }: { product:
                 {/* Image */}
                 <div className="px-3 sm:px-4 pt-2">
                     <div
-                        className={`relative w-full h-[130px] sm:h-[170px] bg-slate-100 overflow-hidden grayscale-[15%] group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`relative aspect-[4/3] w-full bg-slate-100 overflow-hidden grayscale-[15%] group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (

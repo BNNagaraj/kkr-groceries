@@ -25,12 +25,12 @@ export const MagazineCard = memo(function MagazineCard({ product }: { product: P
     return (
         <>
             <div
-                className="bg-white shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full hover:shadow-lg hover:-translate-y-[3px] active:scale-[0.98] transition-all duration-150 ease-out"
+                className="bg-white shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 ease-out"
                 style={{ borderRadius: "var(--theme-card-radius, 0.75rem)" }}
             >
                 {/* Hero image with gradient overlay */}
                 <div
-                    className={`relative w-full h-[160px] sm:h-[220px] bg-slate-900 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                    className={`relative w-full aspect-[3/2] bg-slate-900 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                     onClick={() => hasImage && setLightboxOpen(true)}
                 >
                     {hasImage ? (

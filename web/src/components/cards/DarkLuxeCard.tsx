@@ -25,12 +25,12 @@ export const DarkLuxeCard = memo(function DarkLuxeCard({ product }: { product: P
     return (
         <>
             <div
-                className="bg-slate-900 overflow-hidden flex flex-col h-full shadow-lg shadow-black/20 hover:shadow-[0_20px_40px_-8px_rgba(0,0,0,0.5)] hover:-translate-y-[3px] active:scale-[0.98] transition-all duration-200 ease-out"
+                className="bg-slate-900 overflow-hidden flex flex-col h-full shadow-lg shadow-black/20 hover:shadow-[0_20px_40px_-8px_rgba(0,0,0,0.5)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 ease-out"
                 style={{ borderRadius: "var(--theme-card-radius, 0.75rem)" }}
             >
                 {/* Image with cinematic filter */}
                 <div
-                    className={`relative w-full h-[140px] sm:h-[180px] bg-slate-800 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                    className={`relative aspect-[4/3] w-full bg-slate-800 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                     onClick={() => hasImage && setLightboxOpen(true)}
                 >
                     {hasImage ? (

@@ -34,7 +34,7 @@ export const StorefrontCard = memo(function StorefrontCard({ product }: { produc
                 <div className="flex items-stretch flex-grow">
                     {/* Image */}
                     <div
-                        className={`w-[70px] sm:w-[90px] shrink-0 bg-slate-50 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`w-16 sm:w-[90px] shrink-0 bg-slate-50 relative overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (

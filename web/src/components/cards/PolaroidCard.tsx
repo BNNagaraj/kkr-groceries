@@ -24,13 +24,13 @@ export const PolaroidCard = memo(function PolaroidCard({ product }: { product: P
     return (
         <>
             <div
-                className="bg-white shadow-lg hover:shadow-xl flex flex-col h-full border border-slate-100 hover:-translate-y-1 hover:rotate-[1.5deg] active:scale-[0.97] transition-all duration-200 ease-out"
+                className="bg-white shadow-lg hover:shadow-xl flex flex-col h-full border border-slate-100 hover:-translate-y-0.5 hover:rotate-[1.5deg] active:scale-[0.98] transition-all duration-200 ease-out"
                 style={{ borderRadius: "2px" }}
             >
                 {/* Polaroid-style thick white border around image */}
                 <div className="p-2.5 sm:p-3 pb-0">
                     <div
-                        className={`relative w-full h-[140px] sm:h-[180px] bg-slate-100 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`relative aspect-[4/3] w-full bg-slate-100 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (

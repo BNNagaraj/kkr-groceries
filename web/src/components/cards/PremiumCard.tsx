@@ -152,15 +152,15 @@ export const PremiumCard = memo(function PremiumCard({ product }: { product: Pro
     return (
         <>
             <div
-                className="bg-white shadow-sm border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow relative"
+                className="bg-white shadow-sm border border-slate-100 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 ease-out relative"
                 style={{ borderRadius: "var(--theme-card-radius, 0.75rem)" }}
             >
                 {/* ── Dynamic layout: horizontal (left/right) or vertical (top) ── */}
-                <div className={`flex flex-col ${isHorizontal ? (imgPos === "right" ? "sm:flex-row-reverse" : "sm:flex-row") : ""} sm:min-h-[240px]`}>
+                <div className={`flex flex-col ${isHorizontal ? (imgPos === "right" ? "sm:flex-row-reverse" : "sm:flex-row") : ""}`}>
 
                     {/* ── Image Section ── */}
                     <div
-                        className={`relative shrink-0 bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""} ${isHorizontal ? "h-[160px] w-full sm:h-auto sm:w-[var(--img-w)]" : "h-[140px] sm:h-[200px] w-full"}`}
+                        className={`relative shrink-0 bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""} ${isHorizontal ? "aspect-[16/9] w-full sm:aspect-auto sm:h-auto sm:w-[var(--img-w)]" : "aspect-[16/9] w-full"}`}
                         style={isHorizontal ? { '--img-w': `${imgW}%` } as React.CSSProperties : undefined}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >

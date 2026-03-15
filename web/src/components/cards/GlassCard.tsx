@@ -26,7 +26,7 @@ export const GlassCard = memo(function GlassCard({ product }: { product: Product
     return (
         <>
             <div
-                className="relative overflow-hidden flex flex-col h-full hover:shadow-[0_20px_40px_-8px_rgba(0,0,0,0.15),0_0_20px_rgba(99,102,241,0.1)] hover:-translate-y-[3px] active:scale-[0.98] transition-all duration-200 ease-out"
+                className="relative overflow-hidden flex flex-col h-full hover:shadow-[0_20px_40px_-8px_rgba(0,0,0,0.15),0_0_20px_rgba(99,102,241,0.1)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 ease-out"
                 style={{
                     borderRadius: "var(--theme-card-radius, 1rem)",
                     background: "rgba(255,255,255,0.45)",
@@ -39,7 +39,7 @@ export const GlassCard = memo(function GlassCard({ product }: { product: Product
                 {/* Image */}
                 <div className="p-2.5 sm:p-3 pb-0">
                     <div
-                        className={`relative w-full h-[140px] sm:h-[180px] rounded-xl sm:rounded-2xl bg-white/30 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`relative aspect-[4/3] w-full rounded-xl sm:rounded-2xl bg-white/30 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (

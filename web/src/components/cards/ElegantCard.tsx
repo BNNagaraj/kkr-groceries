@@ -23,13 +23,13 @@ export const ElegantCard = memo(function ElegantCard({ product }: { product: Pro
     return (
         <>
             <div
-                className="bg-white shadow-md overflow-hidden flex flex-col h-full hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.12)] hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 ease-out"
+                className="bg-white shadow-md overflow-hidden flex flex-col h-full hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 ease-out"
                 style={{ borderRadius: "var(--theme-card-radius, 1rem)" }}
             >
                 {/* Image with internal padding */}
                 <div className="p-2.5 sm:p-3 pb-0">
                     <div
-                        className={`relative w-full h-[140px] sm:h-[180px] rounded-xl bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`relative w-full aspect-[4/3] rounded-xl bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (

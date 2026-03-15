@@ -21,7 +21,7 @@ export const CatalogCard = memo(function CatalogCard({ product }: { product: Pro
     return (
         <>
             <div
-                className="bg-white shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full hover:shadow-md hover:-translate-y-[3px] active:scale-[0.98] transition-all duration-150 ease-out relative"
+                className="bg-white shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 ease-out relative"
                 style={{ borderRadius: "var(--theme-card-radius, 1rem)" }}
             >
                 {/* Badges */}
@@ -42,7 +42,7 @@ export const CatalogCard = memo(function CatalogCard({ product }: { product: Pro
 
                 {/* Image */}
                 <div
-                    className={`relative w-full h-[150px] sm:h-[200px] bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                    className={`relative w-full aspect-[4/3] bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                     onClick={() => hasImage && setLightboxOpen(true)}
                 >
                     {hasImage ? (

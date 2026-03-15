@@ -27,7 +27,7 @@ export const NeonPopCard = memo(function NeonPopCard({ product }: { product: Pro
         <>
             {/* Gradient border wrapper */}
             <div
-                className="p-[2px] h-full bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 hover:from-cyan-500 hover:via-pink-500 hover:to-purple-500 hover:scale-[1.03] hover:-translate-y-1 active:scale-[0.97] transition-all duration-300"
+                className="p-[2px] h-full bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 hover:from-cyan-500 hover:via-pink-500 hover:to-purple-500 hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300"
                 style={{ borderRadius: "var(--theme-card-radius, 1rem)" }}
             >
                 <div
@@ -36,7 +36,7 @@ export const NeonPopCard = memo(function NeonPopCard({ product }: { product: Pro
                 >
                     {/* Image */}
                     <div
-                        className={`relative w-full h-[140px] sm:h-[180px] bg-gradient-to-br from-purple-50 to-pink-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`relative aspect-[4/3] w-full bg-gradient-to-br from-purple-50 to-pink-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (

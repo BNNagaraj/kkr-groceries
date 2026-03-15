@@ -52,7 +52,7 @@ export const MetroCard = memo(function MetroCard({ product }: { product: Product
 
                 {/* Image */}
                 <div
-                    className={`relative w-full h-[120px] sm:h-[160px] bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
+                    className={`relative w-full aspect-[4/3] bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
                     onClick={() => hasImage && setLightboxOpen(true)}
                 >
                     {hasImage ? (

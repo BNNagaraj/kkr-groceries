@@ -21,7 +21,7 @@ export const ClassicCard = memo(function ClassicCard({ product }: { product: Pro
             >
                 <div className="p-2.5 sm:p-3 flex items-start gap-3 sm:gap-4 flex-grow">
                     <div
-                        className={`w-[60px] h-[60px] sm:w-[70px] sm:h-[70px] rounded-xl flex-shrink-0 bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden relative group/img ${hasImage ? "cursor-pointer" : ""}`}
+                        className={`w-14 h-14 sm:w-[70px] sm:h-[70px] rounded-xl flex-shrink-0 bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden relative group/img ${hasImage ? "cursor-pointer" : ""}`}
                         onClick={() => hasImage && setLightboxOpen(true)}
                         role={hasImage ? "button" : undefined}
                         aria-label={hasImage ? `View ${product.name} image` : undefined}

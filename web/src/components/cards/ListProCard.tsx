@@ -27,7 +27,7 @@ export const ListProCard = memo(function ListProCard({ product }: { product: Pro
                     <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
                         {/* Image */}
                         <div
-                            className={`w-[42px] h-[42px] sm:w-[52px] sm:h-[52px] rounded-lg shrink-0 bg-slate-50 border border-slate-100 relative overflow-hidden ${hasImage ? "cursor-pointer" : ""}`}
+                            className={`w-10 h-10 sm:w-[52px] sm:h-[52px] rounded-lg shrink-0 bg-slate-50 border border-slate-100 relative overflow-hidden ${hasImage ? "cursor-pointer" : ""}`}
                             onClick={() => hasImage && setLightboxOpen(true)}
                         >
                             {hasImage ? (
