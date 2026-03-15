@@ -9,11 +9,13 @@ import { CartControls, ImageLightbox } from "./shared";
 import { useTheme } from "@/contexts/ThemeContext";
 
 /**
- * Premium Ribbon — Compact with colored RIBBON tabs for each tier.
+ * Premium Ribbon — BLUE-INDIGO color scheme with full-width colored ribbon tabs.
+ *
+ * Visual identity: Indigo/blue gradient accents, ribbon tabs that stretch edge-to-edge
+ * with rounded right ends. Active ribbon pops with shadow + scale. Very different from
+ * Ticket (warm stone) and Shelf (emerald band).
  *
  * Image: respects theme settings (imageWidth, imagePosition).
- * Tiers shown as ribbon-like colored tabs extending from the left edge.
- * Active ribbon glows and extends further. Elegant, approachable.
  */
 export const PremiumRibbonCard = memo(function PremiumRibbonCard({ product }: { product: Product }) {
     const [imgError, setImgError] = useState(false);
@@ -37,26 +39,30 @@ export const PremiumRibbonCard = memo(function PremiumRibbonCard({ product }: { 
     const imgW = theme.cardLayout?.imageWidth || 25;
     const isHorizontal = imgPos === "left" || imgPos === "right";
 
-    // Ribbon colors — progressive green
+    // Ribbon colors — BLUE/INDIGO progressive (distinct from green themes)
     const RIBBON_COLORS = [
-        { bg: "bg-emerald-100", text: "text-emerald-800", activeBg: "bg-emerald-600", activeText: "text-white" },
-        { bg: "bg-emerald-200", text: "text-emerald-800", activeBg: "bg-emerald-600", activeText: "text-white" },
-        { bg: "bg-emerald-300", text: "text-emerald-900", activeBg: "bg-emerald-700", activeText: "text-white" },
-        { bg: "bg-emerald-400", text: "text-white", activeBg: "bg-emerald-800", activeText: "text-white" },
-        { bg: "bg-emerald-500", text: "text-white", activeBg: "bg-emerald-900", activeText: "text-white" },
+        { bg: "bg-blue-50", text: "text-blue-800", activeBg: "bg-indigo-600", activeText: "text-white" },
+        { bg: "bg-blue-100", text: "text-blue-800", activeBg: "bg-indigo-600", activeText: "text-white" },
+        { bg: "bg-indigo-200", text: "text-indigo-900", activeBg: "bg-indigo-700", activeText: "text-white" },
+        { bg: "bg-indigo-300", text: "text-white", activeBg: "bg-indigo-800", activeText: "text-white" },
+        { bg: "bg-indigo-400", text: "text-white", activeBg: "bg-indigo-900", activeText: "text-white" },
     ];
 
     return (
         <>
             <div
-                className="bg-white shadow-sm border border-slate-100 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 ease-out flex flex-col h-full"
-                style={{ borderRadius: "var(--theme-card-radius, 0.75rem)" }}
+                className="bg-white shadow-sm overflow-hidden hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 ease-out flex flex-col h-full"
+                style={{
+                    borderRadius: "var(--theme-card-radius, 0.75rem)",
+                    border: "1px solid #e0e7ff",
+                    borderLeft: "4px solid #6366f1",
+                }}
             >
-                {/* Dynamic layout: horizontal or vertical based on theme */}
+                {/* Dynamic layout based on theme settings */}
                 <div className={`flex ${isHorizontal ? (imgPos === "right" ? "flex-row-reverse" : "flex-row") : "flex-col"}`}>
                     {/* Image — respects theme settings */}
                     <div
-                        className={`relative shrink-0 bg-slate-100 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""} ${
+                        className={`relative shrink-0 bg-indigo-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""} ${
                             isHorizontal ? "aspect-auto" : "aspect-[16/9] w-full"
                         }`}
                         style={isHorizontal ? { width: `${imgW}%` } : undefined}
@@ -70,14 +76,14 @@ export const PremiumRibbonCard = memo(function PremiumRibbonCard({ product }: { 
                                 </div>
                             </>
                         ) : (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-xl font-bold text-slate-300">{product.name.charAt(0)}</span>
+                            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50">
+                                <span className="text-2xl font-bold text-indigo-200">{product.name.charAt(0)}</span>
                             </div>
                         )}
 
-                        {/* Savings badge */}
+                        {/* Savings badge — indigo */}
                         {maxSavingsPercent > 0 && tiers.length > 1 && (
-                            <div className="absolute top-1.5 left-1.5 bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                            <div className="absolute top-1.5 left-1.5 bg-indigo-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
                                 -{maxSavingsPercent}%
                             </div>
                         )}
@@ -85,35 +91,37 @@ export const PremiumRibbonCard = memo(function PremiumRibbonCard({ product }: { 
 
                     {/* Content */}
                     <div className="flex-1 min-w-0 flex flex-col">
-                        {/* Header: name + price */}
-                        <div className="flex items-center gap-3 p-3 pb-2">
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                    <h3 className="text-sm font-bold text-slate-800 leading-tight truncate">{product.name}</h3>
-                                    {product.hot && <Flame className="w-3 h-3 text-red-500 shrink-0" />}
-                                    {product.fresh && <LeafyGreen className="w-3 h-3 text-green-500 shrink-0" />}
+                        {/* Header with indigo accent line */}
+                        <div className="p-3 pb-2">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                        <h3 className="text-sm font-bold text-slate-800 leading-tight truncate">{product.name}</h3>
+                                        {product.hot && <Flame className="w-3 h-3 text-red-500 shrink-0" />}
+                                        {product.fresh && <LeafyGreen className="w-3 h-3 text-green-500 shrink-0" />}
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                                        <span className="font-telugu">{product.telugu}</span>
+                                        {product.hindi && <> · {product.hindi}</>}
+                                    </div>
+                                    {product.moqRequired !== false && (
+                                        <div className="text-[9px] text-slate-400 mt-0.5">Min: {product.moq} {product.unit}</div>
+                                    )}
                                 </div>
-                                <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                                    <span className="font-telugu">{product.telugu}</span>
-                                    {product.hindi && <> · {product.hindi}</>}
-                                </div>
-                                {product.moqRequired !== false && (
-                                    <div className="text-[9px] text-slate-400 mt-0.5">Min: {product.moq} {product.unit}</div>
-                                )}
-                            </div>
 
-                            {/* Price block */}
-                            <div className="text-right shrink-0">
-                                <div className="text-lg font-extrabold text-slate-800 leading-none tabular-nums">
-                                    Rs.{effectivePrice}
+                                {/* Price in indigo pill */}
+                                <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1 text-center shrink-0">
+                                    <div className="text-lg font-extrabold text-indigo-700 leading-none tabular-nums">
+                                        Rs.{effectivePrice}
+                                    </div>
+                                    <div className="text-[9px] text-indigo-400 font-medium">/{product.unit}</div>
                                 </div>
-                                <div className="text-[10px] text-slate-400">/{product.unit}</div>
                             </div>
                         </div>
 
-                        {/* Ribbon tiers — extending from left edge */}
+                        {/* RIBBON TIERS — full-width colored tabs, rounded right end */}
                         {tiers.length > 0 && (
-                            <div className="pb-1.5 space-y-0.5">
+                            <div className="pb-2 space-y-1">
                                 {tiers.map((tier, i) => {
                                     const isActive = i === activeIdx;
                                     const isPast = activeIdx >= 0 && i < activeIdx;
@@ -123,22 +131,22 @@ export const PremiumRibbonCard = memo(function PremiumRibbonCard({ product }: { 
                                     return (
                                         <div
                                             key={i}
-                                            className={`flex items-center justify-between pl-3 pr-3 py-1 transition-all duration-300 ${
+                                            className={`flex items-center justify-between pl-3 pr-3 py-1.5 transition-all duration-300 ${
                                                 isActive
-                                                    ? `${color.activeBg} ${color.activeText} shadow-sm`
+                                                    ? `${color.activeBg} ${color.activeText} shadow-md scale-[1.02] origin-left`
                                                     : isPast
                                                         ? `${color.bg} ${color.text} opacity-40`
                                                         : `${color.bg} ${color.text}`
                                             }`}
                                             style={{
                                                 marginLeft: isActive ? 0 : "8px",
-                                                borderRadius: "0 6px 6px 0",
-                                                marginRight: "12px",
+                                                borderRadius: "0 20px 20px 0",
+                                                marginRight: isActive ? "8px" : "16px",
                                             }}
                                         >
                                             <div className="flex items-center gap-1.5 min-w-0">
                                                 {isActive && (
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse shrink-0" />
+                                                    <span className="w-2 h-2 rounded-full bg-white/80 animate-pulse shrink-0" />
                                                 )}
                                                 <span className="text-[11px] font-semibold truncate">
                                                     {tier.range} {product.unit}

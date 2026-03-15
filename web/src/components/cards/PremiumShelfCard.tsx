@@ -9,12 +9,13 @@ import { CartControls, ImageLightbox } from "./shared";
 import { useTheme } from "@/contexts/ThemeContext";
 
 /**
- * Premium Shelf — Grocery shelf price-tag aesthetic.
+ * Premium Shelf — EMERALD HEADER BAND with grocery shelf price-tag aesthetic.
+ *
+ * Visual identity: Bold emerald gradient header band with white price label,
+ * vertical dot-connector ladder linking tier price tags. Very different from
+ * Ribbon (indigo tabs) and Ticket (sepia receipt).
  *
  * Image: respects theme settings (imageWidth, imagePosition).
- * Main price as a big "shelf label" block. Tiers shown as descending
- * price tags with a visual "ladder" connector. Active tag pops out.
- * Clean, utilitarian, instantly scannable.
  */
 export const PremiumShelfCard = memo(function PremiumShelfCard({ product }: { product: Product }) {
     const [imgError, setImgError] = useState(false);
@@ -44,11 +45,11 @@ export const PremiumShelfCard = memo(function PremiumShelfCard({ product }: { pr
                 className="bg-white shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 ease-out flex flex-col h-full"
                 style={{ borderRadius: "var(--theme-card-radius, 0.5rem)" }}
             >
-                {/* Dynamic layout: horizontal or vertical based on theme */}
+                {/* Dynamic layout based on theme settings */}
                 <div className={`flex ${isHorizontal ? (imgPos === "right" ? "flex-row-reverse" : "flex-row") : "flex-col"}`}>
                     {/* Image — respects theme settings */}
                     <div
-                        className={`relative shrink-0 bg-slate-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""} ${
+                        className={`relative shrink-0 bg-emerald-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""} ${
                             isHorizontal ? "aspect-auto" : "aspect-[16/9] w-full"
                         }`}
                         style={isHorizontal ? { width: `${imgW}%` } : undefined}
@@ -62,15 +63,15 @@ export const PremiumShelfCard = memo(function PremiumShelfCard({ product }: { pr
                                 </div>
                             </>
                         ) : (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-xl font-bold text-slate-300">{product.name.charAt(0)}</span>
+                            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-emerald-50 to-emerald-100">
+                                <span className="text-2xl font-bold text-emerald-200">{product.name.charAt(0)}</span>
                             </div>
                         )}
                     </div>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0 flex flex-col">
-                        {/* Shelf label header — colored band */}
+                        {/* EMERALD HEADER BAND — signature shelf label */}
                         <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 px-3 py-2 flex items-center justify-between">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-1">
@@ -84,7 +85,7 @@ export const PremiumShelfCard = memo(function PremiumShelfCard({ product }: { pr
                                 </div>
                             </div>
 
-                            {/* Big shelf price */}
+                            {/* Big shelf price label — white card embedded in header */}
                             <div className="bg-white rounded-lg px-2.5 py-1 text-center shrink-0 shadow-sm">
                                 <div className="text-lg font-extrabold text-emerald-700 leading-none tabular-nums">
                                     Rs.{effectivePrice}
@@ -95,23 +96,23 @@ export const PremiumShelfCard = memo(function PremiumShelfCard({ product }: { pr
                             </div>
                         </div>
 
-                        {/* Price tag ladder */}
+                        {/* VERTICAL DOT-CONNECTOR LADDER — signature shelf element */}
                         {tiers.length > 0 && (
                             <div className="px-3 py-2">
                                 <div className="flex items-start gap-2">
-                                    {/* Vertical connector line */}
+                                    {/* Vertical connector dots + line */}
                                     <div className="flex flex-col items-center pt-1 shrink-0">
                                         {tiers.map((_, i) => (
                                             <React.Fragment key={i}>
-                                                <div className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                                                <div className={`w-2.5 h-2.5 rounded-full transition-all duration-200 border-2 ${
                                                     i === activeIdx
-                                                        ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)] scale-125"
+                                                        ? "bg-emerald-500 border-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.5)] scale-125"
                                                         : activeIdx >= 0 && i < activeIdx
-                                                            ? "bg-slate-300"
-                                                            : "bg-slate-200"
+                                                            ? "bg-emerald-200 border-emerald-300"
+                                                            : "bg-slate-100 border-slate-200"
                                                 }`} />
                                                 {i < tiers.length - 1 && (
-                                                    <div className={`w-0.5 h-4 ${
+                                                    <div className={`w-0.5 h-5 ${
                                                         activeIdx >= 0 && i < activeIdx ? "bg-emerald-300" : "bg-slate-200"
                                                     }`} />
                                                 )}
@@ -119,8 +120,8 @@ export const PremiumShelfCard = memo(function PremiumShelfCard({ product }: { pr
                                         ))}
                                     </div>
 
-                                    {/* Tag rows */}
-                                    <div className="flex-1 space-y-1 min-w-0">
+                                    {/* Price tag rows */}
+                                    <div className="flex-1 space-y-1.5 min-w-0">
                                         {tiers.map((tier, i) => {
                                             const isActive = i === activeIdx;
                                             const isPast = activeIdx >= 0 && i < activeIdx;
@@ -131,10 +132,10 @@ export const PremiumShelfCard = memo(function PremiumShelfCard({ product }: { pr
                                                     key={i}
                                                     className={`flex items-center justify-between px-2 py-1 rounded-md transition-all duration-200 ${
                                                         isActive
-                                                            ? "bg-emerald-50 border border-emerald-300 shadow-sm"
+                                                            ? "bg-emerald-50 border-2 border-emerald-400 shadow-sm"
                                                             : isPast
                                                                 ? "bg-slate-50 border border-transparent opacity-40"
-                                                                : "bg-slate-50 border border-transparent"
+                                                                : "bg-slate-50 border border-slate-100"
                                                     }`}
                                                 >
                                                     <span className={`text-[11px] font-medium ${isActive ? "text-emerald-800 font-bold" : "text-slate-600"}`}>

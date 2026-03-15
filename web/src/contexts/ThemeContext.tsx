@@ -143,9 +143,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             tierstep: "#f9fafb",
             trade: "#f5f7fa",
             harvest: "#fffbf0",
-            premiumribbon: "#f8faf9",
-            premiumticket: "#faf9f7",
-            premiumshelf: "#f8faf9",
+            premiumribbon: "#f5f7ff",
+            premiumticket: "#fdfcf9",
+            premiumshelf: "#f5faf8",
         };
         const bg = PAGE_BG[theme.activeTheme] || "#f8faf9";
         root.style.setProperty("--theme-page-bg", bg);

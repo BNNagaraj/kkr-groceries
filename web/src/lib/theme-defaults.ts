@@ -284,24 +284,24 @@ export const THEME_PRESETS: ThemePreset[] = [
     {
         id: "premiumribbon",
         name: "Premium Ribbon",
-        description: "Colored ribbon tabs for each tier extending from left edge. Active ribbon glows and extends further. Elegant and approachable.",
+        description: "Blue-indigo ribbon tabs for each tier. Active ribbon scales up with shadow. Left indigo accent border. Bold and modern.",
         defaults: {
             activeTheme: "premiumribbon",
-            primaryColor: "#059669",
-            accentColor: "#f97316",
+            primaryColor: "#6366f1",
+            accentColor: "#3b82f6",
             grid: { mobile: 1, tablet: 2, desktop: 2, wide: 3 },
             cardStyle: { borderRadius: "xl" },
-            cardLayout: { imageWidth: 25, imagePosition: "left" },
+            cardLayout: { imageWidth: 28, imagePosition: "left" },
         },
     },
     {
         id: "premiumticket",
         name: "Premium Ticket",
-        description: "Receipt/ticket stub aesthetic with dashed tear-off divider and dot-leader tier lines. Compact and unique.",
+        description: "Warm sepia receipt-stub with monospace text, dashed tear-off, dot-leader lines and running total. Vintage charm.",
         defaults: {
             activeTheme: "premiumticket",
-            primaryColor: "#059669",
-            accentColor: "#f97316",
+            primaryColor: "#b45309",
+            accentColor: "#d97706",
             grid: { mobile: 1, tablet: 2, desktop: 2, wide: 3 },
             cardStyle: { borderRadius: "xl" },
             cardLayout: { imageWidth: 25, imagePosition: "left" },
@@ -310,7 +310,7 @@ export const THEME_PRESETS: ThemePreset[] = [
     {
         id: "premiumshelf",
         name: "Premium Shelf",
-        description: "Grocery shelf price-tag aesthetic. Emerald header band, vertical dot connector for tiers, price tag rows. Clean and scannable.",
+        description: "Bold emerald header band with embedded price label. Vertical dot-connector ladder linking tier tags. Clean grocery shelf feel.",
         defaults: {
             activeTheme: "premiumshelf",
             primaryColor: "#059669",
