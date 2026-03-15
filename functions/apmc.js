@@ -6,6 +6,7 @@
  * Cache TTL: 4 hours (single state), 6 hours (all-India multi-state).
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 
 const db = getFirestore();
@@ -313,5 +314,109 @@ exports.fetchMultiStateAPMCPrices = onCall(
       total: allRecords.length,
       stateBreakdown,
     };
+  }
+);
+
+// ─── Helper: normalize raw API records to per-kg prices ─────────────────
+function normalizeRecords(rawRecords, fallbackState) {
+  return rawRecords.map((r) => ({
+    state: r.state || fallbackState || "",
+    district: r.district || "",
+    market: r.market || "",
+    commodity: r.commodity || "",
+    variety: r.variety || "",
+    grade: r.grade || "",
+    arrivalDate: r.arrival_date || "",
+    minPrice: Math.round((Number(r.min_price) || 0) / 100),
+    maxPrice: Math.round((Number(r.max_price) || 0) / 100),
+    modalPrice: Math.round((Number(r.modal_price) || 0) / 100),
+  }));
+}
+
+/**
+ * scheduledPriceSnapshot — Scheduled Cloud Function
+ *
+ * Runs daily at 6:00 AM IST (0:30 UTC) to capture a daily price snapshot
+ * for Telangana into price_history/{YYYY-MM-DD}.
+ */
+exports.scheduledPriceSnapshot = onSchedule(
+  {
+    schedule: "30 0 * * *", // 0:30 UTC = 6:00 AM IST
+    timeZone: "Asia/Kolkata",
+    region: "asia-south1",
+    memory: "256MiB",
+  },
+  async () => {
+    // Compute today's date in IST
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(now.getTime() + istOffset);
+    const dateStr = istDate.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    const docRef = db.doc(`price_history/${dateStr}`);
+
+    // Skip if today's snapshot already exists
+    const existing = await docRef.get();
+    if (existing.exists) {
+      console.log(`Price snapshot for ${dateStr} already exists, skipping.`);
+      return;
+    }
+
+    try {
+      const rawRecords = await fetchStateRecords("Telangana");
+      const normalized = normalizeRecords(rawRecords, "Telangana");
+
+      await docRef.set({
+        records: normalized,
+        state: "Telangana",
+        fetchedAt: FieldValue.serverTimestamp(),
+        recordCount: normalized.length,
+      });
+
+      console.log(`Price snapshot saved for ${dateStr}: ${normalized.length} records.`);
+    } catch (e) {
+      console.error(`Failed to capture price snapshot for ${dateStr}:`, e.message);
+      throw e;
+    }
+  }
+);
+
+/**
+ * fetchPriceHistory — Callable Cloud Function
+ *
+ * Input:  { days?: number } (default 7, max 30)
+ * Output: { history: Array<{ date: string, records: APMCRecord[] }>, days: number }
+ */
+exports.fetchPriceHistory = onCall(
+  { region: "asia-south1", memory: "256MiB" },
+  async (request) => {
+    let days = Number(request.data?.days) || 7;
+    if (days < 1) days = 1;
+    if (days > 30) days = 30;
+
+    // Build list of date strings for the last N days (IST)
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const dates = [];
+    for (let i = 0; i < days; i++) {
+      const d = new Date(Date.now() + istOffset - i * 24 * 60 * 60 * 1000);
+      dates.push(d.toISOString().slice(0, 10));
+    }
+
+    // Read all docs in parallel
+    const refs = dates.map((d) => db.doc(`price_history/${d}`));
+    const snapshots = await db.getAll(...refs);
+
+    const history = [];
+    for (let i = 0; i < snapshots.length; i++) {
+      if (snapshots[i].exists) {
+        const data = snapshots[i].data();
+        history.push({
+          date: dates[i],
+          records: data.records || [],
+        });
+      }
+    }
+
+    return { history, days };
   }
 );

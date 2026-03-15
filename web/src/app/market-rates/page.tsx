@@ -5,29 +5,41 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowLeft, RefreshCw, TrendingUp, TrendingDown, BarChart3,
-  Wifi, WifiOff, Leaf, Activity, ArrowLeftRight, ChevronDown,
-  Zap, Globe, Clock, Database
+  WifiOff, Leaf, Activity, ArrowLeftRight, ChevronDown,
+  Zap, Globe, Clock, Database, GitCompare, Star
 } from "lucide-react";
 import {
   generateAPMCPrices,
   fetchRealAPMCPrices,
   fetchMultiStateAPMCPrices,
+  fetchPriceHistory,
   apiRecordsToPrices,
   getMarketsFromRecords,
   matchCommodityToProduct,
   computeSupplySignals,
   computeArbitrageOpportunities,
+  computeTrends,
+  getSeasonInfo,
+  isMarketOpen,
+  canonicalize,
   APMC_MARKETS,
   MARKET_LABELS,
   APMCMarket,
   APMCPrice,
   APMCApiRecord,
+  PriceHistoryEntry,
+  CommodityTrend,
 } from "@/lib/apmc";
 import { useAppStore } from "@/contexts/AppContext";
 import { SupplySignals } from "@/components/market/SupplySignals";
 import { ArbitrageOpportunities } from "@/components/market/ArbitrageOpportunities";
+import { Sparkline } from "@/components/market/Sparkline";
+import { ShareSheet } from "@/components/market/ShareSheet";
+import { PriceAlertButton } from "@/components/market/PriceAlertButton";
+import { CommodityDeepDive } from "@/components/market/CommodityDeepDive";
+import { MarketCompare } from "@/components/market/MarketCompare";
 
-type Tab = "prices" | "supply" | "arbitrage";
+type Tab = "prices" | "supply" | "arbitrage" | "compare";
 
 export default function MarketRatesPage() {
   const { products } = useAppStore();
@@ -50,6 +62,16 @@ export default function MarketRatesPage() {
   const [multiLoading, setMultiLoading] = useState(false);
   const [multiLoaded, setMultiLoaded] = useState(false);
   const [stateBreakdown, setStateBreakdown] = useState<Record<string, number>>({});
+
+  // Price history (for sparklines + trends)
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryEntry[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+
+  // Deep-dive modal
+  const [deepDiveCommodity, setDeepDiveCommodity] = useState<string | null>(null);
+
+  // Voice readout
+  const [isReading, setIsReading] = useState(false);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -93,6 +115,15 @@ export default function MarketRatesPage() {
     loadRealData();
   }, [loadRealData]);
 
+  // Load price history on mount
+  useEffect(() => {
+    if (historyLoaded) return;
+    fetchPriceHistory(7).then(h => {
+      setPriceHistory(h);
+      setHistoryLoaded(true);
+    });
+  }, [historyLoaded]);
+
   // Lazy-load multi-state data when arbitrage tab is clicked
   const loadMultiStateData = useCallback(async () => {
     if (multiLoaded || multiLoading) return;
@@ -103,8 +134,8 @@ export default function MarketRatesPage() {
         setMultiRecords(result.records);
         if (result.stateBreakdown) setStateBreakdown(result.stateBreakdown);
       }
-    } catch {
-      // silently fail — arbitrage will show empty state
+    } catch (e) {
+      console.warn("[APMC] Multi-state fetch failed:", e);
     } finally {
       setMultiLoading(false);
       setMultiLoaded(true);
@@ -138,6 +169,15 @@ export default function MarketRatesPage() {
     return computeArbitrageOpportunities(prices, multiRecords, selectedMarket);
   }, [prices, multiRecords, selectedMarket]);
 
+  // Compute trends from history
+  const trends = useMemo(() => {
+    if (priceHistory.length === 0) return new Map<string, CommodityTrend>();
+    const trendList = computeTrends(prices, priceHistory);
+    const map = new Map<string, CommodityTrend>();
+    for (const t of trendList) map.set(t.commodity, t);
+    return map;
+  }, [prices, priceHistory]);
+
   // Product image map
   const imageMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -147,6 +187,17 @@ export default function MarketRatesPage() {
     }
     return map;
   }, [prices, products]);
+
+  // "Best Buy" — top 3 surplus items
+  const bestBuys = useMemo(() => {
+    return new Set(
+      supplySignals
+        .filter(s => s.signal === "surplus")
+        .sort((a, b) => b.signalStrength - a.signalStrength)
+        .slice(0, 3)
+        .map(s => canonicalize(s.commodity))
+    );
+  }, [supplySignals]);
 
   const marketOptions = isRealData
     ? apiMarkets
@@ -161,20 +212,85 @@ export default function MarketRatesPage() {
   const shortageCount = supplySignals.filter(s => s.signal === "shortage").length;
   const surplusCount = supplySignals.filter(s => s.signal === "surplus").length;
 
+  // Market open status
+  const marketOpen = isMarketOpen(selectedMarket);
+
   const TABS: { id: Tab; label: string; sublabel: string; icon: React.ReactNode; count?: number }[] = [
     { id: "prices", label: "Live Prices", sublabel: `${prices.length} items`, icon: <BarChart3 className="w-[18px] h-[18px]" /> },
     { id: "supply", label: "Supply Intel", sublabel: `${shortageCount} alerts`, icon: <Activity className="w-[18px] h-[18px]" />, count: shortageCount },
+    { id: "compare", label: "Compare", sublabel: "Multi-market", icon: <GitCompare className="w-[18px] h-[18px]" /> },
     { id: "arbitrage", label: "Arbitrage", sublabel: "Cross-state", icon: <ArrowLeftRight className="w-[18px] h-[18px]" /> },
   ];
 
   const handleRefresh = () => {
     setRefreshKey((k) => k + 1);
     loadRealData();
+    setHistoryLoaded(false);
     if (multiLoaded) {
       setMultiLoaded(false);
       setMultiRecords(null);
     }
   };
+
+  // Voice readout
+  const handleReadAloud = useCallback(() => {
+    if (isReading || !window.speechSynthesis) return;
+    setIsReading(true);
+    const top10 = prices.slice(0, 10);
+    const text = `Today's market rates at ${selectedMarket}. ` +
+      top10.map(p => `${p.commodity}: ${p.modalPrice} rupees per kg`).join(". ") +
+      `. That's the top ${top10.length} prices for today.`;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-IN";
+    utterance.rate = 0.9;
+    utterance.onend = () => setIsReading(false);
+    utterance.onerror = () => setIsReading(false);
+    window.speechSynthesis.speak(utterance);
+  }, [prices, selectedMarket, isReading]);
+
+  // Deep-dive data
+  const deepDivePrice = useMemo(() => {
+    if (!deepDiveCommodity) return null;
+    return prices.find(p => p.commodity === deepDiveCommodity) || null;
+  }, [deepDiveCommodity, prices]);
+
+  const deepDiveHistory = useMemo(() => {
+    if (!deepDiveCommodity) return [];
+    const key = canonicalize(deepDiveCommodity);
+    const sorted = [...priceHistory].sort((a, b) => a.date.localeCompare(b.date));
+    const entries: Array<{ date: string; minPrice: number; modalPrice: number; maxPrice: number }> = [];
+    for (const entry of sorted) {
+      for (const rec of entry.records) {
+        if (canonicalize(rec.commodity) === key) {
+          entries.push({ date: entry.date, minPrice: rec.minPrice, modalPrice: rec.modalPrice, maxPrice: rec.maxPrice });
+          break;
+        }
+      }
+    }
+    return entries;
+  }, [deepDiveCommodity, priceHistory]);
+
+  const deepDiveAllMarkets = useMemo(() => {
+    if (!deepDiveCommodity || !apiRecords) return [];
+    const key = canonicalize(deepDiveCommodity);
+    const seen = new Set<string>();
+    const results: APMCPrice[] = [];
+    for (const r of apiRecords) {
+      if (canonicalize(r.commodity) !== key || seen.has(r.market)) continue;
+      seen.add(r.market);
+      results.push({
+        commodity: r.commodity,
+        variety: r.variety,
+        minPrice: r.minPrice,
+        modalPrice: r.modalPrice,
+        maxPrice: r.maxPrice,
+        date: r.arrivalDate,
+        market: r.market,
+        isReal: true,
+      });
+    }
+    return results.sort((a, b) => a.modalPrice - b.modalPrice);
+  }, [deepDiveCommodity, apiRecords]);
 
   return (
     <div className="min-h-screen bg-[#f8faf9]">
@@ -198,6 +314,16 @@ export default function MarketRatesPage() {
             </Link>
 
             <div className="flex items-center gap-2">
+              {/* Market hours badge */}
+              <div className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full font-semibold backdrop-blur-sm border ${
+                marketOpen
+                  ? "bg-emerald-500/20 text-emerald-200 border-emerald-400/30"
+                  : "bg-slate-500/20 text-slate-300 border-slate-400/30"
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${marketOpen ? "bg-emerald-400" : "bg-red-400"}`} />
+                {marketOpen ? "Market Open" : "Market Closed"}
+              </div>
+
               {/* Data source badge */}
               <div className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full font-semibold backdrop-blur-sm border ${
                 isRealData
@@ -263,20 +389,23 @@ export default function MarketRatesPage() {
 
               {marketDropdownOpen && (
                 <div className="absolute right-0 top-full mt-1.5 w-56 bg-[#0d2b1f] border border-emerald-500/20 rounded-xl shadow-2xl shadow-black/40 z-50 overflow-hidden py-1">
-                  {marketOptions.map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => { setSelectedMarket(m); setMarketDropdownOpen(false); }}
-                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
-                        selectedMarket === m
-                          ? "bg-emerald-500/15 text-emerald-300 font-semibold"
-                          : "text-white/70 hover:bg-white/[0.06] hover:text-white/90"
-                      }`}
-                    >
-                      <MapPinIcon className="w-3 h-3 opacity-50 shrink-0" />
-                      {isRealData ? m : MARKET_LABELS[m as APMCMarket] || m}
-                    </button>
-                  ))}
+                  {marketOptions.map((m) => {
+                    const mOpen = isMarketOpen(m);
+                    return (
+                      <button
+                        key={m}
+                        onClick={() => { setSelectedMarket(m); setMarketDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+                          selectedMarket === m
+                            ? "bg-emerald-500/15 text-emerald-300 font-semibold"
+                            : "text-white/70 hover:bg-white/[0.06] hover:text-white/90"
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${mOpen ? "bg-emerald-400" : "bg-red-400"}`} />
+                        {isRealData ? m : MARKET_LABELS[m as APMCMarket] || m}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -284,7 +413,7 @@ export default function MarketRatesPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 -mt-1 pb-8">
+      <main className="max-w-5xl mx-auto px-4 -mt-1 pb-24">
         {/* ═══════════════ KPI RIBBON ═══════════════ */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
           <KpiCard
@@ -320,20 +449,20 @@ export default function MarketRatesPage() {
 
         {/* ═══════════════ TAB NAVIGATION ═══════════════ */}
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm shadow-slate-200/50 p-1.5 mb-5">
-          <div className="flex gap-1">
+          <div className="flex gap-1 overflow-x-auto">
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 relative flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${
+                className={`flex-1 relative flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-bold transition-all shrink-0 ${
                   activeTab === tab.id
                     ? "bg-[#0a2f1f] text-white shadow-lg shadow-emerald-900/20"
                     : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
                 }`}
               >
                 <span className={activeTab === tab.id ? "text-emerald-400" : ""}>{tab.icon}</span>
-                <span className="hidden sm:inline">{tab.label}</span>
-                <span className="sm:hidden">{tab.label.split(" ")[0]}</span>
+                <span className="hidden sm:inline text-xs">{tab.label}</span>
+                <span className="sm:hidden text-xs">{tab.label.split(" ")[0]}</span>
                 {tab.count && tab.count > 0 && activeTab !== tab.id && (
                   <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
                     {tab.count}
@@ -368,6 +497,11 @@ export default function MarketRatesPage() {
                     <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                       {prices.length} Commodities
                     </span>
+                    {priceHistory.length > 0 && (
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        · {priceHistory.length}-day history
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider">
                     <span className="text-blue-500 flex items-center gap-1">
@@ -388,11 +522,22 @@ export default function MarketRatesPage() {
                     const img = imageMap[p.commodity];
                     const range = p.maxPrice - p.minPrice;
                     const modalPos = range > 0 ? ((p.modalPrice - p.minPrice) / range) * 100 : 50;
+                    const trend = trends.get(canonicalize(p.commodity));
+                    const isBestBuy = bestBuys.has(canonicalize(p.commodity));
+                    const season = getSeasonInfo(p.commodity);
+
+                    // Find Telugu name
+                    const matched = products.find(pr => {
+                      const pn = pr.name.toLowerCase();
+                      const cn = p.commodity.toLowerCase();
+                      return pn.includes(cn) || cn.includes(pn);
+                    });
 
                     return (
                       <div
                         key={`${p.commodity}-${idx}`}
-                        className="group flex items-center px-4 py-3 hover:bg-emerald-50/30 transition-colors"
+                        className="group flex items-center px-4 py-3 hover:bg-emerald-50/30 transition-colors cursor-pointer"
+                        onClick={() => setDeepDiveCommodity(p.commodity)}
                       >
                         {/* Index */}
                         <span className="w-7 text-[11px] text-slate-300 font-mono tabular-nums shrink-0">
@@ -411,15 +556,42 @@ export default function MarketRatesPage() {
                             </div>
                           )}
                           <div className="min-w-0">
-                            <span className="font-semibold text-slate-800 text-[13px] block truncate">{p.commodity}</span>
-                            {p.variety && p.variety !== "Other" && p.variety !== p.commodity && (
-                              <span className="text-[10px] text-slate-400 block truncate">{p.variety}</span>
-                            )}
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-slate-800 text-[13px] truncate">{p.commodity}</span>
+                              {isBestBuy && (
+                                <Star className="w-3 h-3 text-amber-500 fill-amber-400 shrink-0" />
+                              )}
+                              {!season.inSeason && (
+                                <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-red-50 text-red-500 shrink-0">OFF</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              {matched?.telugu && (
+                                <span className="text-[10px] text-slate-400 truncate">{matched.telugu}</span>
+                              )}
+                              {p.variety && p.variety !== "Other" && p.variety !== p.commodity && !matched?.telugu && (
+                                <span className="text-[10px] text-slate-400 truncate">{p.variety}</span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
+                        {/* Sparkline + Yesterday's change */}
+                        <div className="hidden sm:flex items-center gap-2 shrink-0 mx-2">
+                          {trend && trend.sparklinePath && (
+                            <Sparkline path={trend.sparklinePath} direction={trend.direction} width={50} height={18} />
+                          )}
+                          {trend && trend.change !== 0 && trend.prices.length >= 2 && (
+                            <span className={`text-[10px] font-bold tabular-nums ${
+                              trend.change > 0 ? "text-red-500" : "text-emerald-500"
+                            }`}>
+                              {trend.change > 0 ? "▲" : "▼"}₹{Math.abs(trend.change)}
+                            </span>
+                          )}
+                        </div>
+
                         {/* Price range visualization */}
-                        <div className="hidden sm:flex items-center gap-0 w-[120px] shrink-0 mx-3">
+                        <div className="hidden lg:flex items-center gap-0 w-[100px] shrink-0 mx-2">
                           <div className="relative w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                             <div
                               className="absolute h-full bg-gradient-to-r from-blue-300 via-emerald-400 to-red-300 rounded-full opacity-60"
@@ -434,15 +606,24 @@ export default function MarketRatesPage() {
 
                         {/* Prices */}
                         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                          <span className="text-blue-600/80 font-semibold text-xs tabular-nums w-12 text-right">
+                          <span className="text-blue-600/80 font-semibold text-xs tabular-nums w-10 text-right hidden sm:block">
                             ₹{p.minPrice}
                           </span>
                           <span className="text-emerald-700 font-extrabold text-sm tabular-nums w-14 text-right bg-emerald-50 px-2 py-0.5 rounded-lg">
                             ₹{p.modalPrice}
                           </span>
-                          <span className="text-red-600/80 font-semibold text-xs tabular-nums w-12 text-right">
+                          <span className="text-red-600/80 font-semibold text-xs tabular-nums w-10 text-right hidden sm:block">
                             ₹{p.maxPrice}
                           </span>
+                        </div>
+
+                        {/* Alert button */}
+                        <div className="ml-2 shrink-0" onClick={e => e.stopPropagation()}>
+                          <PriceAlertButton
+                            commodity={p.commodity}
+                            currentPrice={p.modalPrice}
+                            market={selectedMarket}
+                          />
                         </div>
                       </div>
                     );
@@ -467,6 +648,17 @@ export default function MarketRatesPage() {
         {activeTab === "supply" && (
           <div className="animate-in fade-in duration-300">
             <SupplySignals signals={supplySignals} products={products} />
+          </div>
+        )}
+
+        {/* ═══════════════ COMPARE TAB ═══════════════ */}
+        {activeTab === "compare" && (
+          <div className="animate-in fade-in duration-300">
+            <MarketCompare
+              apiRecords={apiRecords}
+              markets={marketOptions}
+              products={products}
+            />
           </div>
         )}
 
@@ -506,6 +698,29 @@ export default function MarketRatesPage() {
           </div>
         </div>
       </main>
+
+      {/* ═══════════════ SHARE SHEET (floating) ═══════════════ */}
+      {prices.length > 0 && (
+        <ShareSheet
+          prices={prices}
+          supplySignals={supplySignals}
+          market={selectedMarket}
+          date={date}
+          onReadAloud={handleReadAloud}
+        />
+      )}
+
+      {/* ═══════════════ DEEP-DIVE MODAL ═══════════════ */}
+      {deepDiveCommodity && deepDivePrice && (
+        <CommodityDeepDive
+          commodity={deepDiveCommodity}
+          currentPrice={deepDivePrice}
+          history={deepDiveHistory}
+          allMarketPrices={deepDiveAllMarkets}
+          products={products}
+          onClose={() => setDeepDiveCommodity(null)}
+        />
+      )}
     </div>
   );
 }

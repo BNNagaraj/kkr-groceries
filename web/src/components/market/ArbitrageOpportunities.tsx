@@ -275,6 +275,33 @@ export function ArbitrageOpportunities({ opportunities, products, loading, selec
                     <div className="text-[10px] text-red-500/70">{o.localState}</div>
                   </div>
                 </div>
+
+                {/* Savings Calculator */}
+                <div className={`mt-2.5 px-3 py-2 rounded-xl border border-dashed ${
+                  isHighMargin
+                    ? "bg-emerald-50/40 border-emerald-200/60"
+                    : "bg-amber-50/40 border-amber-200/60"
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      💰 On a <span className="font-bold text-slate-700">100 kg</span> order:
+                    </span>
+                    <span className={`text-sm font-extrabold tabular-nums ${
+                      isHighMargin ? "text-emerald-700" : "text-amber-700"
+                    }`}>
+                      Save ₹{(o.margin * 100).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  {o.margin >= 10 && (
+                    <div className="flex items-center gap-3 mt-1">
+                      {[500, 1000].map(qty => (
+                        <span key={qty} className="text-[10px] text-slate-400">
+                          {qty}kg → <span className="font-bold text-slate-600">₹{(o.margin * qty).toLocaleString("en-IN")}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );

@@ -5,6 +5,8 @@ export interface StockPurchase {
   productName: string;
   productId?: number;
   qty: number;
+  /** How much of this purchase has been allocated to stores via "Add Stock" receipts */
+  allocatedQty?: number;
   unit: string;
   pricePerUnit: number;
   totalCost: number;

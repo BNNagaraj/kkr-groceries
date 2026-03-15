@@ -335,7 +335,7 @@ export async function fetchMultiStateAPMCPrices(): Promise<{
 /**
  * Normalize a commodity name to a canonical key for matching.
  */
-function canonicalize(name: string): string {
+export function canonicalize(name: string): string {
   const lower = name.toLowerCase().trim();
   for (const [canonical, aliases] of Object.entries(NAME_ALIASES)) {
     if (aliases.some(a => lower.includes(a) || a.includes(lower))) {
@@ -487,4 +487,321 @@ export function computeArbitrageOpportunities(
   }
 
   return opportunities.sort((a, b) => b.margin - a.margin);
+}
+
+// ─── Price History & Trends ─────────────────────────────────────────────
+
+export interface PriceHistoryEntry {
+  date: string;
+  records: APMCApiRecord[];
+}
+
+export interface CommodityTrend {
+  commodity: string;
+  prices: { date: string; modalPrice: number }[];
+  change: number;
+  changePercent: number;
+  direction: "up" | "down" | "stable";
+  sparklinePath: string;
+}
+
+export interface SeasonInfo {
+  inSeason: boolean;
+  label: string;
+  months: string;
+}
+
+/**
+ * Fetch price history from Cloud Function.
+ */
+export async function fetchPriceHistory(days = 7): Promise<PriceHistoryEntry[]> {
+  try {
+    const fn = httpsCallable(functionsAsia, "fetchPriceHistory");
+    const result = await fn({ days });
+    const data = result.data as { history?: PriceHistoryEntry[] };
+    return data.history ?? [];
+  } catch (e) {
+    console.warn("[APMC] fetchPriceHistory failed:", e);
+    return [];
+  }
+}
+
+/**
+ * Generate an SVG path string from an array of numeric values.
+ * Normalizes values to fit within the given width x height viewBox.
+ */
+export function generateSparklinePath(values: number[], width: number, height: number): string {
+  if (values.length === 0) return "";
+  if (values.length === 1) return `M0,${height / 2} L${width},${height / 2}`;
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min;
+
+  // All values are the same — horizontal line at middle
+  if (range === 0) return `M0,${height / 2} L${width},${height / 2}`;
+
+  const stepX = width / (values.length - 1);
+  const parts: string[] = [];
+
+  for (let i = 0; i < values.length; i++) {
+    const x = Math.round(i * stepX * 100) / 100;
+    // Invert Y so higher values are at the top
+    const y = Math.round((1 - (values[i] - min) / range) * height * 100) / 100;
+    parts.push(i === 0 ? `M${x},${y}` : `L${x},${y}`);
+  }
+
+  return parts.join(" ");
+}
+
+/**
+ * Compute per-commodity trends from current prices and historical data.
+ */
+export function computeTrends(
+  currentPrices: APMCPrice[],
+  history: PriceHistoryEntry[]
+): CommodityTrend[] {
+  const trends: CommodityTrend[] = [];
+
+  // Sort history by date ascending
+  const sortedHistory = [...history].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  for (const price of currentPrices) {
+    const key = canonicalize(price.commodity);
+
+    // Collect historical modal prices for this commodity
+    const pricePoints: { date: string; modalPrice: number }[] = [];
+
+    for (const entry of sortedHistory) {
+      for (const rec of entry.records) {
+        if (canonicalize(rec.commodity) === key) {
+          pricePoints.push({ date: entry.date, modalPrice: rec.modalPrice });
+          break; // one match per day is enough
+        }
+      }
+    }
+
+    // Add today's price
+    pricePoints.push({ date: price.date, modalPrice: price.modalPrice });
+
+    if (pricePoints.length < 2) {
+      trends.push({
+        commodity: key,
+        prices: pricePoints,
+        change: 0,
+        changePercent: 0,
+        direction: "stable",
+        sparklinePath: generateSparklinePath(
+          pricePoints.map(p => p.modalPrice),
+          60,
+          20
+        ),
+      });
+      continue;
+    }
+
+    const firstPrice = pricePoints[0].modalPrice;
+    const lastPrice = pricePoints[pricePoints.length - 1].modalPrice;
+    const change = lastPrice - firstPrice;
+    const changePercent =
+      firstPrice > 0 ? Math.round((change / firstPrice) * 10000) / 100 : 0;
+
+    let direction: "up" | "down" | "stable" = "stable";
+    if (changePercent > 2) direction = "up";
+    else if (changePercent < -2) direction = "down";
+
+    trends.push({
+      commodity: key,
+      prices: pricePoints,
+      change,
+      changePercent,
+      direction,
+      sparklinePath: generateSparklinePath(
+        pricePoints.map(p => p.modalPrice),
+        60,
+        20
+      ),
+    });
+  }
+
+  return trends;
+}
+
+// ─── Commodity Seasons (South India / Hyderabad context) ────────────────
+
+export const COMMODITY_SEASONS: Record<
+  string,
+  { months: number[]; peakMonths?: number[] }
+> = {
+  "tomato": { months: [1,2,3,4,5,6,7,8,9,10,11,12], peakMonths: [11,12,1,2,3] },
+  "onion": { months: [1,2,3,4,5,6,7,8,9,10,11,12], peakMonths: [11,12,1,2,3,4,6,7,8,9] },
+  "green chilli": { months: [1,2,3,4,5,6,7,8,9,10,11,12], peakMonths: [10,11,12,1,2,3] },
+  "cauliflower": { months: [10,11,12,1,2,3] },
+  "cabbage": { months: [10,11,12,1,2,3] },
+  "carrot": { months: [10,11,12,1,2,3] },
+  "green peas": { months: [11,12,1,2,3] },
+  "spinach": { months: [10,11,12,1,2,3] },
+  "cucumber": { months: [2,3,4,5,6] },
+  "bottle gourd": { months: [2,3,4,5,6,9,10,11] },
+  "drumstick": { months: [2,3,4,5] },
+  "raw mango": { months: [2,3,4,5] },
+  "brinjal": { months: [1,2,3,4,5,6,7,8,9,10,11,12], peakMonths: [10,11,12,1,2,3] },
+  "lady finger": { months: [3,4,5,6,7,8,9,10], peakMonths: [5,6,7,8] },
+  "capsicum": { months: [10,11,12,1,2,3,4], peakMonths: [11,12,1,2] },
+  "bitter gourd": { months: [3,4,5,6,7,8,9], peakMonths: [5,6,7] },
+  "cluster beans": { months: [6,7,8,9,10], peakMonths: [7,8,9] },
+  "potato": { months: [1,2,3,4,5,6,7,8,9,10,11,12], peakMonths: [12,1,2,3] },
+  "beetroot": { months: [10,11,12,1,2,3] },
+  "radish": { months: [10,11,12,1,2,3] },
+  "garlic": { months: [1,2,3,4,5,6,7,8,9,10,11,12], peakMonths: [2,3,4,5] },
+  "ginger": { months: [1,2,3,4,5,6,7,8,9,10,11,12], peakMonths: [11,12,1,2,3] },
+  "sweet potato": { months: [10,11,12,1,2,3], peakMonths: [11,12,1] },
+  "ridge gourd": { months: [3,4,5,6,7,8,9], peakMonths: [5,6,7] },
+  "snake gourd": { months: [3,4,5,6,7,8], peakMonths: [4,5,6] },
+  "ash gourd": { months: [6,7,8,9,10,11], peakMonths: [8,9,10] },
+  "pumpkin": { months: [1,2,3,4,5,6,7,8,9,10,11,12], peakMonths: [9,10,11,12] },
+  "coriander": { months: [10,11,12,1,2,3], peakMonths: [11,12,1] },
+  "mint": { months: [10,11,12,1,2,3], peakMonths: [11,12,1,2] },
+  "curry leaves": { months: [1,2,3,4,5,6,7,8,9,10,11,12], peakMonths: [3,4,5,6] },
+  "methi": { months: [10,11,12,1,2,3], peakMonths: [11,12,1] },
+  "french beans": { months: [10,11,12,1,2,3], peakMonths: [11,12,1,2] },
+  "broad beans": { months: [10,11,12,1,2,3] },
+  "banana": { months: [1,2,3,4,5,6,7,8,9,10,11,12], peakMonths: [3,4,5,9,10,11] },
+  "lemon": { months: [1,2,3,4,5,6,7,8,9,10,11,12], peakMonths: [6,7,8,9] },
+  "coconut": { months: [1,2,3,4,5,6,7,8,9,10,11,12], peakMonths: [1,2,3,8,9,10] },
+};
+
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+/**
+ * Convert a sorted array of month numbers to a human-readable range string.
+ * e.g. [10,11,12,1,2,3] → "Oct-Mar"
+ */
+function monthRangeLabel(months: number[]): string {
+  if (months.length === 0) return "";
+  if (months.length === 12) return "Year-round";
+  return `${MONTH_NAMES[months[0] - 1]}-${MONTH_NAMES[months[months.length - 1] - 1]}`;
+}
+
+/**
+ * Get season information for a commodity.
+ */
+export function getSeasonInfo(commodity: string, month?: number): SeasonInfo {
+  const key = canonicalize(commodity);
+  const now = month ?? new Date().getMonth() + 1; // 1-based
+  const season = COMMODITY_SEASONS[key];
+
+  if (!season) {
+    return { inSeason: true, label: "Year-round", months: "Year-round" };
+  }
+
+  const inSeason = season.months.includes(now);
+  return {
+    inSeason,
+    label: inSeason ? "In Season" : "Off Season",
+    months: monthRangeLabel(season.months),
+  };
+}
+
+// ─── Market Hours ───────────────────────────────────────────────────────
+
+export const MARKET_HOURS: Record<string, { open: number; close: number }> = {
+  "Bowenpally": { open: 4, close: 10 },
+  "Gaddiannaram": { open: 4, close: 10 },
+  "Gudimalkapur": { open: 5, close: 11 },
+  "Monda": { open: 4, close: 10 },
+};
+
+/**
+ * Check if a market is currently open based on IST time.
+ */
+export function isMarketOpen(market: string): boolean {
+  const hours = MARKET_HOURS[market];
+  if (!hours) return false;
+
+  // Get current IST hour (UTC+5:30)
+  const now = new Date();
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+  const istMs = utcMs + 5.5 * 3600000;
+  const istHour = new Date(istMs).getHours();
+
+  return istHour >= hours.open && istHour < hours.close;
+}
+
+// ─── WhatsApp & CSV Export ──────────────────────────────────────────────
+
+/**
+ * Generate a formatted text message for WhatsApp sharing.
+ */
+export function generateWhatsAppMessage(
+  prices: APMCPrice[],
+  supplySignals: SupplySignal[],
+  market: string,
+  date: string
+): string {
+  const lines: string[] = [];
+
+  lines.push(`📊 *${market} Mandi Prices*`);
+  lines.push(`📅 ${date}`);
+  lines.push("");
+
+  // Top shortages
+  const shortages = supplySignals
+    .filter(s => s.signal === "shortage")
+    .slice(0, 3);
+  if (shortages.length > 0) {
+    lines.push("🔴 *Shortages:*");
+    for (const s of shortages) {
+      lines.push(`  ${s.commodity} — ₹${s.modalPrice}/kg (${s.signalStrength}%)`);
+    }
+    lines.push("");
+  }
+
+  // Top surpluses
+  const surpluses = supplySignals
+    .filter(s => s.signal === "surplus")
+    .slice(0, 3);
+  if (surpluses.length > 0) {
+    lines.push("🟢 *Surpluses:*");
+    for (const s of surpluses) {
+      lines.push(`  ${s.commodity} — ₹${s.modalPrice}/kg (${s.signalStrength}%)`);
+    }
+    lines.push("");
+  }
+
+  // Top 10 prices
+  const sorted = [...prices].sort((a, b) => a.commodity.localeCompare(b.commodity)).slice(0, 10);
+  lines.push("💰 *Top Prices:*");
+  for (const p of sorted) {
+    lines.push(`  ${p.commodity}: ₹${p.minPrice}-${p.maxPrice} (modal ₹${p.modalPrice})`);
+  }
+
+  lines.push("");
+  lines.push("_via KKR Groceries_");
+
+  return lines.join("\n");
+}
+
+/**
+ * Export prices to CSV format string.
+ */
+export function exportPricesToCSV(
+  prices: APMCPrice[],
+  market: string,
+  date: string
+): string {
+  const rows: string[] = [];
+  rows.push("Commodity,Variety,Min Price,Modal Price,Max Price,Market,Date");
+
+  for (const p of prices) {
+    const variety = p.variety ? `"${p.variety.replace(/"/g, '""')}"` : "";
+    const commodity = `"${p.commodity.replace(/"/g, '""')}"`;
+    rows.push(
+      `${commodity},${variety},${p.minPrice},${p.modalPrice},${p.maxPrice},"${market}",${date}`
+    );
+  }
+
+  return rows.join("\n");
 }

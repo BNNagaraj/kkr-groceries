@@ -19,7 +19,6 @@ import { StoreInventoryItem, StockTransaction } from "@/types/inventory";
 import {
   Warehouse,
   Package,
-  PackagePlus,
   ShoppingBag,
   DollarSign,
   TrendingDown,
@@ -30,7 +29,6 @@ import {
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 
-const StockReceiptForm = dynamic(() => import("@/components/inventory/StockReceiptForm"), { ssr: false });
 const AgentSaleDialog = dynamic(() => import("@/components/agent/AgentSaleDialog"), { ssr: false });
 
 export default function AgentDashboard() {
@@ -40,7 +38,6 @@ export default function AgentDashboard() {
   const [inventory, setInventory] = useState<StoreInventoryItem[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [receiptOpen, setReceiptOpen] = useState(false);
   const [saleOpen, setSaleOpen] = useState(false);
   const [view, setView] = useState<"inventory" | "history">("inventory");
 
@@ -171,9 +168,6 @@ export default function AgentDashboard() {
           <Button size="sm" variant="secondary" className="bg-orange-100 text-orange-700 hover:bg-orange-200" onClick={() => setSaleOpen(true)}>
             <ShoppingBag className="w-4 h-4" /> Record Sale
           </Button>
-          <Button size="sm" onClick={() => setReceiptOpen(true)}>
-            <PackagePlus className="w-4 h-4" /> Add Stock
-          </Button>
         </div>
       </div>
 
@@ -266,12 +260,6 @@ export default function AgentDashboard() {
       )}
 
       {/* Dialogs */}
-      <StockReceiptForm
-        open={receiptOpen}
-        onClose={() => setReceiptOpen(false)}
-        fixedStoreId={agentStoreId}
-        fixedStoreName={store?.name || ""}
-      />
       <AgentSaleDialog
         open={saleOpen}
         onClose={() => setSaleOpen(false)}

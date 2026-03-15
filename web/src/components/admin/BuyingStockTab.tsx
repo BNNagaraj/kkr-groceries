@@ -22,6 +22,7 @@ import {
   where,
   QueryConstraint,
 } from "firebase/firestore";
+import { StockTransaction } from "@/types/inventory";
 import {
   Plus,
   ChevronDown,
@@ -88,6 +89,9 @@ export default function BuyingStockTab() {
   // Inline editing
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<StockPurchase>>({});
+
+  // Allocation tracking: how much of each product has been allocated to stores
+  const [allocatedByProduct, setAllocatedByProduct] = useState<Map<string, number>>(new Map());
 
   // Load purchases
   const loadPurchases = useCallback(
@@ -174,6 +178,35 @@ export default function BuyingStockTab() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFilter, customFrom, customTo]);
+
+  // Fetch allocation data (receipt transactions grouped by productId)
+  useEffect(() => {
+    if (purchases.length === 0) return;
+    async function fetchAllocations() {
+      try {
+        // Get the date range matching current filter
+        const cutoff = Timestamp.fromDate(
+          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        );
+        const receiptsQuery = query(
+          collection(db, col("stockTransactions")),
+          where("type", "==", "receipt"),
+          where("createdAt", ">=", cutoff)
+        );
+        const snap = await getDocs(receiptsQuery);
+        const allocMap = new Map<string, number>();
+        snap.docs.forEach((d) => {
+          const data = d.data() as StockTransaction;
+          const key = data.productId;
+          allocMap.set(key, (allocMap.get(key) || 0) + (data.qty || 0));
+        });
+        setAllocatedByProduct(allocMap);
+      } catch (err) {
+        console.error("[BuyingStock] Failed to fetch allocations:", err);
+      }
+    }
+    fetchAllocations();
+  }, [purchases, col]);
 
   // Product name autocomplete
   const handleProductNameChange = (val: string) => {
@@ -497,20 +530,32 @@ export default function BuyingStockTab() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-          <div className="text-2xl font-bold text-blue-700">{filtered.length}</div>
-          <div className="text-xs text-blue-600 font-medium">Purchases</div>
-        </div>
-        <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
-          <div className="text-2xl font-bold text-amber-700">{totalItems.toLocaleString("en-IN")}</div>
-          <div className="text-xs text-amber-600 font-medium">Total Qty Bought</div>
-        </div>
-        <div className="bg-red-50 p-4 rounded-xl border border-red-100">
-          <div className="text-2xl font-bold text-red-700">{formatCurrency(totalSpend)}</div>
-          <div className="text-xs text-red-600 font-medium">Total Spend</div>
-        </div>
-      </div>
+      {(() => {
+        const totalAllocated = Array.from(allocatedByProduct.values()).reduce((s, v) => s + v, 0);
+        const unallocated = totalItems - totalAllocated;
+        return (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+              <div className="text-2xl font-bold text-blue-700">{filtered.length}</div>
+              <div className="text-xs text-blue-600 font-medium">Purchases</div>
+            </div>
+            <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+              <div className="text-2xl font-bold text-amber-700">{totalItems.toLocaleString("en-IN")}</div>
+              <div className="text-xs text-amber-600 font-medium">Total Qty Bought</div>
+            </div>
+            <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+              <div className="text-2xl font-bold text-emerald-700">{totalAllocated.toLocaleString("en-IN")}</div>
+              <div className="text-xs text-emerald-600 font-medium">Allocated to Stores</div>
+            </div>
+            <div className={`p-4 rounded-xl border ${unallocated > 0 ? "bg-orange-50 border-orange-100" : "bg-red-50 border-red-100"}`}>
+              <div className={`text-2xl font-bold ${unallocated > 0 ? "text-orange-700" : "text-red-700"}`}>{unallocated.toLocaleString("en-IN")}</div>
+              <div className={`text-xs font-medium ${unallocated > 0 ? "text-orange-600" : "text-red-600"}`}>
+                {unallocated > 0 ? "Pending Allocation" : "Fully Allocated"}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Purchase Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -535,6 +580,7 @@ export default function BuyingStockTab() {
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Product</th>
                   <th className="px-4 py-3 text-center">Qty</th>
+                  <th className="px-4 py-3 text-center">Allocated</th>
                   <th className="px-4 py-3">Unit</th>
                   <th className="px-4 py-3 text-right">Price/Unit</th>
                   <th className="px-4 py-3 text-right">Total</th>
@@ -575,6 +621,7 @@ export default function BuyingStockTab() {
                             className="text-sm h-8 w-20 text-center"
                           />
                         </td>
+                        <td className="px-4 py-3 text-center text-xs text-slate-400">—</td>
                         <td className="px-4 py-3">
                           <select
                             value={editData.unit || "kg"}
@@ -657,6 +704,27 @@ export default function BuyingStockTab() {
                       <td className="px-4 py-3 text-center font-mono text-slate-700">
                         {p.qty}
                       </td>
+                      <td className="px-4 py-3 text-center">
+                        {(() => {
+                          const productKey = p.productId ? String(p.productId) : "";
+                          const allocated = productKey ? (allocatedByProduct.get(productKey) || 0) : 0;
+                          if (!productKey) return <span className="text-xs text-slate-300">—</span>;
+                          const pct = p.qty > 0 ? Math.min(100, Math.round((allocated / p.qty) * 100)) : 0;
+                          return (
+                            <div className="flex flex-col items-center">
+                              <span className={`text-xs font-bold ${allocated >= p.qty ? "text-emerald-600" : "text-orange-600"}`}>
+                                {allocated}/{p.qty}
+                              </span>
+                              <div className="w-12 h-1.5 bg-slate-200 rounded-full mt-1 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all ${allocated >= p.qty ? "bg-emerald-500" : "bg-orange-400"}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="px-4 py-3 text-slate-500">{p.unit}</td>
                       <td className="px-4 py-3 text-right text-slate-600">
                         {formatCurrency(p.pricePerUnit)}
@@ -697,6 +765,9 @@ export default function BuyingStockTab() {
                   </td>
                   <td className="px-4 py-3 text-center text-slate-700">
                     {totalItems}
+                  </td>
+                  <td className="px-4 py-3 text-center text-emerald-600 text-xs">
+                    {Array.from(allocatedByProduct.values()).reduce((s, v) => s + v, 0)} allocated
                   </td>
                   <td className="px-4 py-3" colSpan={2}></td>
                   <td className="px-4 py-3 text-right text-emerald-700">

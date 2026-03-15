@@ -24,6 +24,7 @@ const delivery = require("./delivery");
 const gstin = require("./gstin");
 const storage = require("./storage");
 const apmc = require("./apmc");
+const alerts = require("./alerts");
 
 module.exports = {
   ...orders,
@@ -34,4 +35,5 @@ module.exports = {
   ...gstin,
   ...storage,
   ...apmc,
+  ...alerts,
 };
