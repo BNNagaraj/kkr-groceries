@@ -100,7 +100,7 @@ export interface Store {
 
 /* ─── Theme System ─── */
 
-export type ThemeId = "classic" | "premium" | "catalog" | "elegant" | "storefront" | "magazine" | "listpro" | "metro" | "polaroid" | "glass" | "darkluxe" | "editorial" | "neonpop" | "mandi" | "slab" | "tierstep" | "trade" | "harvest" | "premiumcompact" | "premiummini" | "premiumdense";
+export type ThemeId = "classic" | "premium" | "catalog" | "elegant" | "storefront" | "magazine" | "listpro" | "metro" | "polaroid" | "glass" | "darkluxe" | "editorial" | "neonpop" | "mandi" | "slab" | "tierstep" | "trade" | "harvest" | "premiumcompact" | "premiummini" | "premiumdense" | "premiumribbon" | "premiumticket" | "premiumshelf";
 
 export interface GridConfig {
   mobile: number;

@@ -281,4 +281,43 @@ export const THEME_PRESETS: ThemePreset[] = [
             cardLayout: { imageWidth: 25, imagePosition: "left" },
         },
     },
+    {
+        id: "premiumribbon",
+        name: "Premium Ribbon",
+        description: "Colored ribbon tabs for each tier extending from left edge. Active ribbon glows and extends further. Elegant and approachable.",
+        defaults: {
+            activeTheme: "premiumribbon",
+            primaryColor: "#059669",
+            accentColor: "#f97316",
+            grid: { mobile: 1, tablet: 2, desktop: 2, wide: 3 },
+            cardStyle: { borderRadius: "xl" },
+            cardLayout: { imageWidth: 25, imagePosition: "left" },
+        },
+    },
+    {
+        id: "premiumticket",
+        name: "Premium Ticket",
+        description: "Receipt/ticket stub aesthetic with dashed tear-off divider and dot-leader tier lines. Compact and unique.",
+        defaults: {
+            activeTheme: "premiumticket",
+            primaryColor: "#059669",
+            accentColor: "#f97316",
+            grid: { mobile: 1, tablet: 2, desktop: 2, wide: 3 },
+            cardStyle: { borderRadius: "xl" },
+            cardLayout: { imageWidth: 25, imagePosition: "left" },
+        },
+    },
+    {
+        id: "premiumshelf",
+        name: "Premium Shelf",
+        description: "Grocery shelf price-tag aesthetic. Emerald header band, vertical dot connector for tiers, price tag rows. Clean and scannable.",
+        defaults: {
+            activeTheme: "premiumshelf",
+            primaryColor: "#059669",
+            accentColor: "#f97316",
+            grid: { mobile: 1, tablet: 2, desktop: 2, wide: 3 },
+            cardStyle: { borderRadius: "lg" },
+            cardLayout: { imageWidth: 25, imagePosition: "left" },
+        },
+    },
 ];

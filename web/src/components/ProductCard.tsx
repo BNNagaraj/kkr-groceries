@@ -24,6 +24,9 @@ import { HarvestCard } from "./cards/HarvestCard";
 import { PremiumCompactCard } from "./cards/PremiumCompactCard";
 import { PremiumMiniCard } from "./cards/PremiumMiniCard";
 import { PremiumDenseCard } from "./cards/PremiumDenseCard";
+import { PremiumRibbonCard } from "./cards/PremiumRibbonCard";
+import { PremiumTicketCard } from "./cards/PremiumTicketCard";
+import { PremiumShelfCard } from "./cards/PremiumShelfCard";
 
 export const ProductCard = memo(function ProductCard({ product }: { product: Product }) {
     const { theme } = useTheme();
@@ -69,6 +72,12 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
             return <PremiumMiniCard product={product} />;
         case "premiumdense":
             return <PremiumDenseCard product={product} />;
+        case "premiumribbon":
+            return <PremiumRibbonCard product={product} />;
+        case "premiumticket":
+            return <PremiumTicketCard product={product} />;
+        case "premiumshelf":
+            return <PremiumShelfCard product={product} />;
         case "classic":
         default:
             return <ClassicCard product={product} />;
