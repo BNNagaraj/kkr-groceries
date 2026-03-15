@@ -16,6 +16,11 @@ import { GlassCard } from "./cards/GlassCard";
 import { DarkLuxeCard } from "./cards/DarkLuxeCard";
 import { EditorialCard } from "./cards/EditorialCard";
 import { NeonPopCard } from "./cards/NeonPopCard";
+import { MandiCard } from "./cards/MandiCard";
+import { SlabCard } from "./cards/SlabCard";
+import { TierStepCard } from "./cards/TierStepCard";
+import { TradeCard } from "./cards/TradeCard";
+import { HarvestCard } from "./cards/HarvestCard";
 
 export const ProductCard = memo(function ProductCard({ product }: { product: Product }) {
     const { theme } = useTheme();
@@ -45,6 +50,16 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
             return <EditorialCard product={product} />;
         case "neonpop":
             return <NeonPopCard product={product} />;
+        case "mandi":
+            return <MandiCard product={product} />;
+        case "slab":
+            return <SlabCard product={product} />;
+        case "tierstep":
+            return <TierStepCard product={product} />;
+        case "trade":
+            return <TradeCard product={product} />;
+        case "harvest":
+            return <HarvestCard product={product} />;
         case "classic":
         default:
             return <ClassicCard product={product} />;

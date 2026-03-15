@@ -138,12 +138,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             darkluxe: "#111318",
             editorial: "#faf9f6",
             neonpop: "#faf8ff",
+            mandi: "#0a1f14",
+            slab: "#f8faf9",
+            tierstep: "#f9fafb",
+            trade: "#f5f7fa",
+            harvest: "#fffbf0",
         };
         const bg = PAGE_BG[theme.activeTheme] || "#f8faf9";
         root.style.setProperty("--theme-page-bg", bg);
 
         // Set body class for dark themes
-        if (theme.activeTheme === "darkluxe") {
+        if (theme.activeTheme === "darkluxe" || theme.activeTheme === "mandi") {
             document.body.classList.add("theme-dark-page");
         } else {
             document.body.classList.remove("theme-dark-page");
