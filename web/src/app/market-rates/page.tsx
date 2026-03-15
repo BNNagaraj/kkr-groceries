@@ -179,7 +179,7 @@ export default function MarketRatesPage() {
   return (
     <div className="min-h-screen bg-[#f8faf9]">
       {/* ═══════════════ HEADER ═══════════════ */}
-      <header className="relative overflow-hidden">
+      <header className="relative" style={{ zIndex: 20 }}>
         {/* Gradient background with texture */}
         <div className="absolute inset-0 bg-gradient-to-br from-[#0a2f1f] via-[#0d3b28] to-[#062019]" />
         <div className="absolute inset-0 opacity-[0.04]" style={{
@@ -191,7 +191,7 @@ export default function MarketRatesPage() {
           <div className="flex items-center justify-between mb-4">
             <Link
               href="/"
-              className="flex items-center gap-1.5 text-emerald-300/70 hover:text-emerald-200 transition-colors text-sm font-medium"
+              className="flex items-center gap-1.5 text-emerald-200 hover:text-white transition-colors text-sm font-medium"
             >
               <ArrowLeft className="w-4 h-4" />
               <span className="hidden sm:inline">Back to Store</span>
@@ -201,8 +201,8 @@ export default function MarketRatesPage() {
               {/* Data source badge */}
               <div className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full font-semibold backdrop-blur-sm border ${
                 isRealData
-                  ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/20"
-                  : "bg-amber-500/15 text-amber-300 border-amber-500/20"
+                  ? "bg-emerald-500/20 text-emerald-200 border-emerald-400/30"
+                  : "bg-amber-500/20 text-amber-200 border-amber-400/30"
               }`}>
                 {isRealData ? (
                   <>
@@ -224,7 +224,7 @@ export default function MarketRatesPage() {
               <button
                 onClick={handleRefresh}
                 disabled={apiLoading}
-                className="p-2 rounded-lg text-emerald-300/60 hover:text-emerald-200 hover:bg-white/5 transition-all disabled:opacity-40"
+                className="p-2 rounded-lg text-emerald-200 hover:text-white hover:bg-white/10 transition-all disabled:opacity-40"
               >
                 <RefreshCw className={`w-4 h-4 ${apiLoading ? "animate-spin" : ""}`} />
               </button>
@@ -242,9 +242,9 @@ export default function MarketRatesPage() {
                   Market Intelligence
                 </h1>
               </div>
-              <p className="text-emerald-300/50 text-sm ml-10">
+              <p className="text-emerald-200/80 text-sm ml-10">
                 APMC wholesale rates · {date}
-                {isRealData && <span className="ml-1.5 text-emerald-400/40">via data.gov.in</span>}
+                {isRealData && <span className="ml-1.5 text-emerald-300/60">via data.gov.in</span>}
               </p>
             </div>
 
@@ -254,11 +254,11 @@ export default function MarketRatesPage() {
                 onClick={() => setMarketDropdownOpen(!marketDropdownOpen)}
                 className="flex items-center gap-2 bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.08] backdrop-blur-sm rounded-xl px-3.5 py-2.5 transition-all group"
               >
-                <MapPinIcon className="w-3.5 h-3.5 text-emerald-400/70" />
-                <span className="text-sm font-semibold text-white/90 max-w-[140px] truncate">
+                <MapPinIcon className="w-3.5 h-3.5 text-emerald-300" />
+                <span className="text-sm font-semibold text-white max-w-[140px] truncate">
                   {selectedMarket}
                 </span>
-                <ChevronDown className={`w-3.5 h-3.5 text-white/40 transition-transform ${marketDropdownOpen ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-3.5 h-3.5 text-white/60 transition-transform ${marketDropdownOpen ? "rotate-180" : ""}`} />
               </button>
 
               {marketDropdownOpen && (
