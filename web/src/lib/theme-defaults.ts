@@ -242,4 +242,43 @@ export const THEME_PRESETS: ThemePreset[] = [
             cardLayout: { imageWidth: 35, imagePosition: "top" },
         },
     },
+    {
+        id: "premiumcompact",
+        name: "Premium Compact",
+        description: "Same Premium Wholesale DNA but ~40% shorter. Compact tier rows, smaller image, active tier highlighting + next-tier nudge.",
+        defaults: {
+            activeTheme: "premiumcompact",
+            primaryColor: "#059669",
+            accentColor: "#f97316",
+            grid: { mobile: 1, tablet: 2, desktop: 2, wide: 3 },
+            cardStyle: { borderRadius: "lg" },
+            cardLayout: { imageWidth: 25, imagePosition: "left" },
+        },
+    },
+    {
+        id: "premiummini",
+        name: "Premium Mini",
+        description: "Ultra-compact with tier PILLS instead of rows. Everything tight. Active pill lights up green. Perfect for 2-column mobile grids.",
+        defaults: {
+            activeTheme: "premiummini",
+            primaryColor: "#059669",
+            accentColor: "#f97316",
+            grid: { mobile: 2, tablet: 2, desktop: 3, wide: 4 },
+            cardStyle: { borderRadius: "xl" },
+            cardLayout: { imageWidth: 25, imagePosition: "left" },
+        },
+    },
+    {
+        id: "premiumdense",
+        name: "Premium Dense",
+        description: "Information-dense with 2-column tier grid. Active tier has emerald glow ring. Inline order total. ~50% shorter than original Premium.",
+        defaults: {
+            activeTheme: "premiumdense",
+            primaryColor: "#059669",
+            accentColor: "#f97316",
+            grid: { mobile: 1, tablet: 2, desktop: 2, wide: 3 },
+            cardStyle: { borderRadius: "lg" },
+            cardLayout: { imageWidth: 25, imagePosition: "left" },
+        },
+    },
 ];

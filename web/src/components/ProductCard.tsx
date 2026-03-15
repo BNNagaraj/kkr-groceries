@@ -21,6 +21,9 @@ import { SlabCard } from "./cards/SlabCard";
 import { TierStepCard } from "./cards/TierStepCard";
 import { TradeCard } from "./cards/TradeCard";
 import { HarvestCard } from "./cards/HarvestCard";
+import { PremiumCompactCard } from "./cards/PremiumCompactCard";
+import { PremiumMiniCard } from "./cards/PremiumMiniCard";
+import { PremiumDenseCard } from "./cards/PremiumDenseCard";
 
 export const ProductCard = memo(function ProductCard({ product }: { product: Product }) {
     const { theme } = useTheme();
@@ -60,6 +63,12 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
             return <TradeCard product={product} />;
         case "harvest":
             return <HarvestCard product={product} />;
+        case "premiumcompact":
+            return <PremiumCompactCard product={product} />;
+        case "premiummini":
+            return <PremiumMiniCard product={product} />;
+        case "premiumdense":
+            return <PremiumDenseCard product={product} />;
         case "classic":
         default:
             return <ClassicCard product={product} />;
