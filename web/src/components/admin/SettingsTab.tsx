@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import {
   Save, MapPin, Store, FileText, Plus, X, Loader2, Mail, Eye, EyeOff, Send,
   RefreshCw, AlertTriangle, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp,
-  Settings2, Activity, TestTube2, RotateCcw, Users,
+  Settings2, Activity, TestTube2, RotateCcw, Users, ArrowLeft, Palette, Warehouse,
+  MessageSquare, ShoppingCart,
 } from "lucide-react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
@@ -121,6 +122,7 @@ export default function SettingsTab() {
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [showAdvancedSmtp, setShowAdvancedSmtp] = useState(false);
   const [sendingToAll, setSendingToAll] = useState(false);
+  const [activePanel, setActivePanel] = useState<string | null>(null);
 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -489,9 +491,67 @@ export default function SettingsTab() {
     );
   }
 
+  // ─── Control Panel Config ───
+  const PANELS = [
+    { id: "delivery", label: "Delivery Zone", desc: "Center, radius & zone", icon: MapPin, color: "emerald" },
+    { id: "business", label: "Business", desc: "Store info & charges", icon: Store, color: "blue" },
+    { id: "checkout", label: "Checkout Form", desc: "Fields & custom inputs", icon: ShoppingCart, color: "amber" },
+    { id: "email", label: "Email Center", desc: "SMTP, activity & testing", icon: Mail, color: "purple" },
+    { id: "sms", label: "SMS Gateway", desc: "MSG91 configuration", icon: MessageSquare, color: "sky" },
+    { id: "stores", label: "Stores", desc: "Warehouses & agents", icon: Warehouse, color: "orange" },
+    { id: "theme", label: "Theme & Cards", desc: "Appearance & layout", icon: Palette, color: "pink" },
+  ] as const;
+
+  const COLOR_MAP: Record<string, { bg: string; iconBg: string; iconText: string; border: string; hoverBg: string }> = {
+    emerald: { bg: "bg-emerald-50/50", iconBg: "bg-emerald-100", iconText: "text-emerald-600", border: "border-emerald-200/60", hoverBg: "hover:bg-emerald-50" },
+    blue:    { bg: "bg-blue-50/50",    iconBg: "bg-blue-100",    iconText: "text-blue-600",    border: "border-blue-200/60",    hoverBg: "hover:bg-blue-50" },
+    amber:   { bg: "bg-amber-50/50",   iconBg: "bg-amber-100",   iconText: "text-amber-600",   border: "border-amber-200/60",   hoverBg: "hover:bg-amber-50" },
+    purple:  { bg: "bg-purple-50/50",  iconBg: "bg-purple-100",  iconText: "text-purple-600",  border: "border-purple-200/60",  hoverBg: "hover:bg-purple-50" },
+    sky:     { bg: "bg-sky-50/50",     iconBg: "bg-sky-100",     iconText: "text-sky-600",     border: "border-sky-200/60",     hoverBg: "hover:bg-sky-50" },
+    orange:  { bg: "bg-orange-50/50",  iconBg: "bg-orange-100",  iconText: "text-orange-600",  border: "border-orange-200/60",  hoverBg: "hover:bg-orange-50" },
+    pink:    { bg: "bg-pink-50/50",    iconBg: "bg-pink-100",    iconText: "text-pink-600",    border: "border-pink-200/60",    hoverBg: "hover:bg-pink-50" },
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Delivery Zone Settings */}
+    <div className="space-y-4">
+      {/* ─── Control Panel Grid (shown when no panel is active) ─── */}
+      {!activePanel && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {PANELS.map((panel) => {
+            const c = COLOR_MAP[panel.color];
+            const Icon = panel.icon;
+            return (
+              <button
+                key={panel.id}
+                onClick={() => setActivePanel(panel.id)}
+                className={`group relative flex flex-col items-center gap-2 p-4 sm:p-5 rounded-2xl border ${c.border} ${c.bg} ${c.hoverBg} hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 text-center`}
+              >
+                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl ${c.iconBg} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                  <Icon className={`w-6 h-6 sm:w-7 sm:h-7 ${c.iconText}`} />
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-slate-800 leading-tight">{panel.label}</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5 leading-tight">{panel.desc}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ─── Back Button (shown when a panel is active) ─── */}
+      {activePanel && (
+        <button
+          onClick={() => setActivePanel(null)}
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Settings
+        </button>
+      )}
+
+      {/* ─── Delivery Zone Settings ─── */}
+      {activePanel === "delivery" && (
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100">
           <div className="flex items-center justify-between">
@@ -587,8 +647,10 @@ export default function SettingsTab() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Business Settings */}
+      {activePanel === "business" && (
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -702,8 +764,10 @@ export default function SettingsTab() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Checkout Form Configuration */}
+      {activePanel === "checkout" && (
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -898,8 +962,10 @@ export default function SettingsTab() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Email Management Center */}
+      {activePanel === "email" && (
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {/* Header */}
         <div className="p-6 border-b border-slate-100">
@@ -1439,14 +1505,16 @@ export default function SettingsTab() {
           )}
         </div>
       </div>
+      )}
 
       {/* SMS Gateway Settings (MSG91 — Future Use) */}
+      {activePanel === "sms" && (
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                <Mail className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-sky-600" />
               </div>
               <div>
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -1551,12 +1619,13 @@ export default function SettingsTab() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Stores / Warehouses */}
-      <StoresSection />
+      {activePanel === "stores" && <StoresSection />}
 
       {/* Store Theme Settings */}
-      <ThemeSettingsSection />
+      {activePanel === "theme" && <ThemeSettingsSection />}
     </div>
   );
 }
