@@ -159,6 +159,35 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Stores / Warehouses (admin only)
+    match /stores/{storeId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Store Inventory (admin + agents for their own store)
+    match /storeInventory/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Stock Transactions (admin + agents for their own store)
+    match /stockTransactions/{txnId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Delivery Tracking tokens (public read by doc ID, admin write)
+    match /deliveryTracking/{token} {
+      allow read: if true;  // Public — customers access via token URL
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Delivery OTP collection (Cloud Functions only)
+    match /delivery_otps/{docId} {
+      allow read, write: if false;  // Server-side only
+    }
+
     // ─── Test Mode collections (prefixed duplicates) ───
 
     match /test_orders/{orderId} {
@@ -188,6 +217,26 @@ service cloud.firestore {
       allow create: if isAdmin();
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow delete: if isAdmin();
+    }
+
+    match /test_stores/{storeId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /test_storeInventory/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /test_stockTransactions/{txnId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /test_deliveryTracking/{token} {
+      allow read: if true;  // Public — customers access via token URL
+      allow create, update, delete: if isAdmin();
     }
   }
 }

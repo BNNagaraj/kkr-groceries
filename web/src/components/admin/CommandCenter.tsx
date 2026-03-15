@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { db, functions } from "@/lib/firebase";
+import { getOtpAuth, isOtpConfigValid } from "@/lib/firebase-otp";
 import {
   collection,
   onSnapshot,
@@ -11,20 +12,37 @@ import {
   getDoc,
   updateDoc,
   serverTimestamp,
+  query,
+  where,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import {
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  signOut,
+  type ConfirmationResult,
+} from "firebase/auth";
 import { useMode } from "@/contexts/ModeContext";
+import { usePresenceData } from "@/contexts/PresenceContext";
+import type { PresenceDoc } from "@/contexts/PresenceContext";
 import { Order, OrderStatus, STATUS_TIMESTAMP_FIELDS } from "@/types/order";
-import type { DeliverySettings } from "@/types/settings";
+import type { DeliverySettings, Store } from "@/types/settings";
 import { DEFAULT_DELIVERY } from "@/types/settings";
 import { parseTotal, exportOrdersToCSV } from "@/lib/helpers";
 import { normalizeIndianPhone } from "@/lib/validation";
 import { toast } from "sonner";
 import type { OtpChannel } from "@/types/settings";
+
+declare global {
+  interface Window {
+    otpRecaptchaVerifier?: RecaptchaVerifier;
+  }
+}
 import type { OnlineUserMarker } from "./c2/OrderMap";
 
 import LiveMetrics from "./c2/LiveMetrics";
 import OrderSearch from "./c2/OrderSearch";
+import StoreFilter from "./c2/StoreFilter";
 
 // Heavy components — lazy-loaded to reduce initial compile/bundle
 const OrderPipeline = dynamic(() => import("./c2/OrderPipeline"), { ssr: false });
@@ -38,6 +56,8 @@ const OrderMap = dynamic(() => import("./c2/OrderMap"), {
   ),
 });
 const MiniCharts = dynamic(() => import("./c2/MiniCharts"), { ssr: false });
+const StoreAnalytics = dynamic(() => import("./c2/StoreAnalytics"), { ssr: false });
+const AssignDeliveryDialog = dynamic(() => import("./AssignDeliveryDialog"), { ssr: false });
 
 import {
   Zap,
@@ -52,6 +72,8 @@ import {
   VolumeX,
   Search,
   Download,
+  X,
+  Warehouse,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -69,16 +91,7 @@ interface C2LayoutConfig {
   bottomHeight: number;
 }
 
-interface PresenceDoc {
-  uid: string;
-  userId?: string;
-  displayName: string | null;
-  email: string | null;
-  phone: string | null;
-  lastSeen: Timestamp | null;
-  online?: boolean;
-  status?: string;
-}
+// PresenceDoc is imported from @/contexts/PresenceContext
 
 // ─── Date Range Options ──────────────────────────────────────────────────────
 const C2_DATE_RANGES: { key: C2DateRange; label: string; shortLabel: string }[] = [
@@ -203,13 +216,28 @@ interface CommandCenterProps {
 // ─── Main Command Center ─────────────────────────────────────────────────────
 export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps) {
   const { col, mode } = useMode();
+  const { presenceList } = usePresenceData();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [onlineUsers, setOnlineUsers] = useState<PresenceDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [deliveryZone, setDeliveryZone] = useState<DeliverySettings>(DEFAULT_DELIVERY);
+  const [stores, setStores] = useState<Store[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // ── Derive online users from shared presence context ──
+  const onlineUsers = useMemo(() => {
+    const now = Date.now();
+    const twoMinutesAgo = now - 2 * 60 * 1000;
+    return presenceList.filter((p) => {
+      const isMarkedOnline = p.online === true || p.status === "online";
+      if (!isMarkedOnline) return false;
+      const lastSeenMs = p.lastSeen && typeof p.lastSeen.toMillis === "function"
+        ? p.lastSeen.toMillis()
+        : 0;
+      return lastSeenMs > twoMinutesAgo;
+    });
+  }, [presenceList]);
 
   // ── Theme state ──
   const [c2Theme, setC2Theme] = useState<C2Theme>(() =>
@@ -234,6 +262,9 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
   // ── Feature 1: Date range ──
   const [dateRange, setDateRange] = useState<C2DateRange>("today");
 
+  // ── Store filter (empty = all stores) ──
+  const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
+
   // ── Feature 2: Mute state ──
   const [isMuted, setIsMuted] = useState<boolean>(() =>
     readStorage<boolean>("kkr-c2-muted", false)
@@ -244,6 +275,8 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
 
   // ── Feature 6: Search ──
   const [searchOpen, setSearchOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [metricDetail, setMetricDetail] = useState<string | null>(null);
 
   // ── OTP on Fulfill ──
   const [otpRequired, setOtpRequired] = useState(false);
@@ -254,12 +287,22 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpError, setOtpError] = useState("");
+  // SMS via Firebase Phone Auth (second project)
+  const [smsConfirmation, setSmsConfirmation] = useState<ConfirmationResult | null>(null);
+  const [smsSent, setSmsSent] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+
+  // ── Assign Delivery Dialog ──
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assignDialogOrder, setAssignDialogOrder] = useState<Order | null>(null);
+  // After assignment (or skip), call this to proceed with the original status change
+  const pendingAssignCallbackRef = useRef<(() => void) | null>(null);
 
   // ── Load OTP settings ──
   useEffect(() => {
     (async () => {
       try {
-        const snap = await getDoc(doc(db, col("settings"), "checkout"));
+        const snap = await getDoc(doc(db, "settings", "checkout"));
         if (snap.exists()) {
           const data = snap.data();
           setOtpRequired(data.requireDeliveryOTP === true);
@@ -269,7 +312,17 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
         console.warn("[C2] Failed to fetch OTP settings:", e);
       }
     })();
-  }, [col]);
+  }, []);
+
+  // Cleanup reCAPTCHA on unmount
+  useEffect(() => {
+    return () => {
+      if (window.otpRecaptchaVerifier) {
+        window.otpRecaptchaVerifier.clear();
+        window.otpRecaptchaVerifier = undefined;
+      }
+    };
+  }, []);
 
   // Sync bottom height when layout preset changes
   useEffect(() => {
@@ -277,10 +330,15 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     writeStorage("kkr-c2-bottom-h", layout.bottomHeight);
   }, [layout.bottomHeight]);
 
-  // ── Real-time order listener ──
+  // ── Real-time order listener (last 30 days) ──
   useEffect(() => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const unsub = onSnapshot(
-      collection(db, col("orders")),
+      query(
+        collection(db, col("orders")),
+        where("createdAt", ">=", Timestamp.fromDate(thirtyDaysAgo))
+      ),
       (snap) => {
         const data: Order[] = snap.docs.map((d) => ({
           id: d.id,
@@ -297,34 +355,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     return unsub;
   }, [col]);
 
-  // ── Presence listener ──
-  useEffect(() => {
-    const unsub = onSnapshot(
-      collection(db, "presence"),
-      (snap) => {
-        const now = Date.now();
-        const twoMinutesAgo = now - 2 * 60 * 1000;
-        const users: PresenceDoc[] = [];
-        snap.docs.forEach((d) => {
-          const data = d.data() as PresenceDoc;
-          const lastSeen = data.lastSeen;
-          let lastSeenMs = 0;
-          if (lastSeen && typeof lastSeen.toMillis === "function") {
-            lastSeenMs = lastSeen.toMillis();
-          }
-          const isMarkedOnline = data.online === true || data.status === "online";
-          if (isMarkedOnline && lastSeenMs > twoMinutesAgo) {
-            users.push({ ...data, uid: data.uid || data.userId || d.id, lastSeen });
-          }
-        });
-        setOnlineUsers(users);
-      },
-      (err) => {
-        console.warn("[C2] Presence listener error:", err.message);
-      }
-    );
-    return unsub;
-  }, []);
+  // Presence data is now provided by PresenceContext (shared listener)
 
   // ── Load delivery zone settings ──
   useEffect(() => {
@@ -340,6 +371,18 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
       }
     })();
   }, []);
+
+  // ── Load stores for map ──
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, col("stores")),
+      (snap) => {
+        setStores(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Store)).filter((s) => s.isActive));
+      },
+      (err) => console.warn("[C2] Stores listener error:", err.message)
+    );
+    return unsub;
+  }, [col]);
 
   // ── Feature 2: New order sound detection ──
   useEffect(() => {
@@ -385,6 +428,15 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
         return false;
       });
 
+      // For delivery boys, find their currently assigned order
+      const isDeliveryBoy = !!u.isDelivery;
+      let assignedOrder: Order | undefined;
+      if (isDeliveryBoy) {
+        assignedOrder = sorted.find(
+          (o) => o.assignedTo === u.uid && (o.status === "Accepted" || o.status === "Shipped")
+        );
+      }
+
       return {
         uid: u.uid,
         displayName: u.displayName,
@@ -392,6 +444,12 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
         lat: userOrder?.lat,
         lng: userOrder?.lng,
         location: userOrder?.location,
+        isDelivery: isDeliveryBoy,
+        gpsLat: u.lat,   // GPS from presence doc
+        gpsLng: u.lng,   // GPS from presence doc
+        assignedOrderId: assignedOrder?.id,
+        assignedOrderCustomer: assignedOrder?.customerName,
+        assignedOrderStatus: assignedOrder?.status,
       };
     });
   }, [onlineUsers, orders]);
@@ -401,19 +459,29 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
   const yesterdayOrders = useMemo(() => orders.filter(isYesterday), [orders]);
 
   const filteredOrders = useMemo(() => {
+    let result: Order[];
     switch (dateRange) {
       case "today":
-        return todayOrders;
+        result = todayOrders;
+        break;
       case "yesterday":
-        return yesterdayOrders;
+        result = yesterdayOrders;
+        break;
       case "7days":
-        return orders.filter(isWithin7Days);
+        result = orders.filter(isWithin7Days);
+        break;
       case "all":
-        return orders;
+        result = orders;
+        break;
       default:
-        return todayOrders;
+        result = todayOrders;
     }
-  }, [dateRange, orders, todayOrders, yesterdayOrders]);
+    // Apply store filter
+    if (selectedStoreIds.length > 0) {
+      result = result.filter((o) => o.assignedStoreId && selectedStoreIds.includes(o.assignedStoreId));
+    }
+    return result;
+  }, [dateRange, orders, todayOrders, yesterdayOrders, selectedStoreIds]);
 
   // ── KPIs (from filteredOrders) ──
   const displayRevenue = useMemo(
@@ -459,8 +527,8 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     }
   }, [dateRange]);
 
-  // ── Status change handler ──
-  const handleStatusChange = useCallback(
+  // ── Core status writer (no interception) ──
+  const doStatusChange = useCallback(
     async (orderId: string, newStatus: OrderStatus) => {
       try {
         const updates: Record<string, unknown> = {
@@ -483,6 +551,25 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
       }
     },
     [col]
+  );
+
+  // ── Status change handler (intercepts Accepted/Shipped for delivery assignment) ──
+  const handleStatusChange = useCallback(
+    async (orderId: string, newStatus: OrderStatus) => {
+      // Intercept "Accepted" and "Shipped" to offer delivery assignment
+      if (newStatus === "Accepted" || newStatus === "Shipped") {
+        const order = filteredOrders.find((o) => o.id === orderId) || null;
+        if (order) {
+          setAssignDialogOrder(order);
+          setAssignDialogOpen(true);
+          // Store callback to fire after assignment dialog closes
+          pendingAssignCallbackRef.current = () => doStatusChange(orderId, newStatus);
+          return;
+        }
+      }
+      await doStatusChange(orderId, newStatus);
+    },
+    [doStatusChange, filteredOrders]
   );
 
   // ── Feature 7: Bulk status change ──
@@ -521,12 +608,15 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
         setOtpDialogOrder(order);
         setOtpCode("");
         setOtpSent(false);
+        setSmsSent(false);
+        setEmailSent(false);
+        setSmsConfirmation(null);
         setOtpError("");
       } else {
-        handleStatusChange(order.id, "Fulfilled");
+        doStatusChange(order.id, "Fulfilled");
       }
     },
-    [otpRequired, handleStatusChange]
+    [otpRequired, doStatusChange]
   );
 
   const handleC2SendOtp = useCallback(async () => {
@@ -535,33 +625,113 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     setOtpError("");
 
     const wantEmail = otpChannels === "email" || otpChannels === "both";
+    const wantSms = otpChannels === "sms" || otpChannels === "both";
     const hasEmail = !!otpDialogOrder.userEmail;
-    let ok = false;
+    const hasPhone = !!otpDialogOrder.phone;
+
+    let emailOk = false;
+    let smsOk = false;
     const errors: string[] = [];
 
-    // Send Email OTP via Cloud Function
+    // 1. Send Email OTP via Cloud Function
     if (wantEmail && hasEmail) {
       try {
         const sendFn = httpsCallable(functions, "sendDeliveryOTP");
         await sendFn({ orderId: otpDialogOrder.id, orderCollection: col("orders") });
-        ok = true;
+        emailOk = true;
       } catch (e: unknown) {
-        errors.push(e instanceof Error ? e.message : "Email OTP failed");
+        const msg = e instanceof Error ? e.message : "Email OTP failed";
+        errors.push(`Email: ${msg}`);
       }
     }
 
-    // SMS OTP — use the same Cloud Function approach (email channel) for simplicity
-    // Full SMS via Firebase Phone Auth is available in Customer Orders tab
-    if (!ok && !hasEmail) {
-      errors.push("No email available for OTP delivery");
+    // 2. Send SMS OTP via Firebase Phone Auth (second project)
+    if (wantSms && hasPhone) {
+      try {
+        if (!isOtpConfigValid()) {
+          throw Object.assign(new Error("OTP Firebase config missing. Rebuild with NEXT_PUBLIC_OTP_FIREBASE_* env vars."), { code: "config/missing" });
+        }
+
+        const cleanPhone = `+91${normalizeIndianPhone(otpDialogOrder.phone)}`;
+
+        console.log("[C2 OTP SMS] Step 1: Getting OTP Auth instance...");
+        const otpAuthInstance = getOtpAuth();
+
+        // Always clear & recreate RecaptchaVerifier
+        if (window.otpRecaptchaVerifier) {
+          try { window.otpRecaptchaVerifier.clear(); } catch { /* ignore */ }
+          window.otpRecaptchaVerifier = undefined;
+        }
+
+        const containerId = "c2-otp-recaptcha-container";
+        const containerEl = document.getElementById(containerId);
+        if (!containerEl) {
+          throw Object.assign(new Error("reCAPTCHA container not found in DOM"), { code: "recaptcha/no-container" });
+        }
+
+        console.log("[C2 OTP SMS] Step 2: Creating RecaptchaVerifier...");
+        window.otpRecaptchaVerifier = new RecaptchaVerifier(otpAuthInstance, containerId, {
+          size: "invisible",
+        });
+
+        if (window.location.hostname !== "localhost") {
+          console.log("[C2 OTP SMS] Step 2b: Rendering reCAPTCHA (production)...");
+          await window.otpRecaptchaVerifier.render();
+        }
+
+        console.log("[C2 OTP SMS] Step 3: Calling signInWithPhoneNumber for", cleanPhone);
+        const confirmation = await signInWithPhoneNumber(otpAuthInstance, cleanPhone, window.otpRecaptchaVerifier);
+        console.log("[C2 OTP SMS] Step 3 OK. SMS sent successfully.");
+        setSmsConfirmation(confirmation);
+        smsOk = true;
+      } catch (err: unknown) {
+        const error = err as { code?: string; message?: string };
+        console.error("[C2 OTP SMS] Firebase Phone Auth error:", error.code, error.message, err);
+
+        // Cleanup reCAPTCHA on error
+        if (window.otpRecaptchaVerifier) {
+          try { window.otpRecaptchaVerifier.clear(); } catch { /* ignore */ }
+          window.otpRecaptchaVerifier = undefined;
+        }
+
+        if (error.code === "auth/too-many-requests") {
+          errors.push("SMS: Too many attempts. Wait a few minutes.");
+        } else if (error.code === "auth/invalid-phone-number") {
+          errors.push("SMS: Invalid phone number format.");
+        } else if (error.code === "auth/invalid-api-key") {
+          errors.push("SMS: API key issue. Check OTP project API key restrictions.");
+        } else if (error.code === "auth/unauthorized-domain" || error.code === "auth/operation-not-allowed") {
+          errors.push(`SMS: Domain not authorized. Add "${window.location.hostname}" to OTP project's Authorized Domains.`);
+        } else if (error.code === "auth/internal-error" || error.code === "auth/captcha-check-failed") {
+          errors.push(`SMS: reCAPTCHA failed. Ensure "${window.location.hostname}" is in OTP project's Authorized Domains.`);
+        } else if (error.code === "config/missing") {
+          errors.push(`SMS: ${error.message}`);
+        } else {
+          errors.push(`SMS: ${error.message || "Failed to send"} (${error.code || "unknown"})`);
+        }
+      }
     }
 
-    setOtpSent(ok);
-    if (ok) toast.success("OTP sent to buyer's email");
-    if (errors.length > 0 && !ok) {
+    // Update state based on results
+    setSmsSent(smsOk);
+    setEmailSent(emailOk);
+    setOtpSent(emailOk || smsOk);
+
+    if (emailOk || smsOk) {
+      const channels: string[] = [];
+      if (smsOk) channels.push("SMS");
+      if (emailOk) channels.push("Email");
+      toast.success(`OTP sent via ${channels.join(" & ")}`);
+    }
+
+    if (errors.length > 0 && !emailOk && !smsOk) {
       setOtpError(errors.join("\n"));
       toast.error("Failed to send OTP");
+    } else if (errors.length > 0) {
+      // Partial success — show warning
+      setOtpError(errors.join("\n"));
     }
+
     setOtpSending(false);
   }, [otpDialogOrder, otpChannels, col]);
 
@@ -570,20 +740,49 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     setOtpVerifying(true);
     setOtpError("");
 
-    try {
-      const verifyFn = httpsCallable(functions, "verifyDeliveryOTP");
-      await verifyFn({ orderId: otpDialogOrder.id, otp: otpCode });
+    let verified = false;
 
-      // OTP verified — fulfill the order
-      await handleStatusChange(otpDialogOrder.id, "Fulfilled");
-      setOtpDialogOrder(null);
-      toast.success("OTP verified — order fulfilled!");
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Invalid OTP";
-      setOtpError(msg);
+    // Try 1: SMS verification via Firebase Phone Auth (if SMS was sent)
+    if (smsConfirmation) {
+      try {
+        await smsConfirmation.confirm(otpCode);
+        // Clean up ghost auth session on second project
+        try { await signOut(getOtpAuth()); } catch { /* ignore */ }
+        verified = true;
+      } catch {
+        // SMS code didn't match — try email next
+      }
     }
+
+    // Try 2: Email OTP verification via Cloud Function (if email was sent)
+    if (!verified && emailSent) {
+      try {
+        const verifyFn = httpsCallable(functions, "verifyDeliveryOTP");
+        await verifyFn({ orderId: otpDialogOrder.id, otp: otpCode });
+        verified = true;
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Invalid OTP";
+        if (!smsConfirmation) {
+          setOtpError(msg);
+        }
+      }
+    }
+
+    if (verified) {
+      // Clean up RecaptchaVerifier
+      if (window.otpRecaptchaVerifier) {
+        window.otpRecaptchaVerifier.clear();
+        window.otpRecaptchaVerifier = undefined;
+      }
+      toast.success("OTP verified — order fulfilled!");
+      await doStatusChange(otpDialogOrder.id, "Fulfilled");
+      setOtpDialogOrder(null);
+    } else if (!otpError) {
+      setOtpError("Incorrect OTP. Please check the code and try again.");
+    }
+
     setOtpVerifying(false);
-  }, [otpDialogOrder, otpCode, handleStatusChange]);
+  }, [otpDialogOrder, otpCode, doStatusChange, smsConfirmation, emailSent, otpError]);
 
   // ── Fullscreen toggle ──
   const toggleFullscreen = () => {
@@ -751,6 +950,15 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2">
+          {/* Store filter */}
+          {stores.length > 0 && (
+            <StoreFilter
+              stores={stores}
+              selectedStoreIds={selectedStoreIds}
+              onSelectionChange={setSelectedStoreIds}
+            />
+          )}
+
           {/* Feature 1: Date range selector — pills on md+, select on mobile */}
           <div className="hidden md:flex items-center gap-1 mr-1">
             {C2_DATE_RANGES.map((range, i) => (
@@ -890,21 +1098,137 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
           yesterdayRevenue={dateRange === "today" ? yesterdayRevenue : undefined}
           revenueLabel={revenueLabel}
           theme={c2Theme}
+          onCardClick={(metric) => setMetricDetail(metricDetail === metric ? null : metric)}
         />
       </div>
+
+      {/* ─── Metric Detail Panel ─────────────────────────────── */}
+      {metricDetail && (
+        <div className="px-4 py-2 shrink-0 overflow-hidden" style={{ borderBottom: "1px solid var(--c2-border-subtle)", maxHeight: 200 }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--c2-text-muted)" }}>
+              {metricDetail === "revenue" && "Fulfilled Orders (Revenue)"}
+              {metricDetail === "active" && "Active Orders"}
+              {metricDetail === "users" && "Online Users"}
+              {metricDetail === "fulfillment" && "Fulfillment Breakdown"}
+              {metricDetail === "aov" && "Fulfilled Order Values"}
+              {metricDetail === "pending" && "Pending Revenue Orders"}
+            </span>
+            <button onClick={() => setMetricDetail(null)} className="p-0.5 rounded hover:opacity-70">
+              <X className="w-3.5 h-3.5" style={{ color: "var(--c2-text-muted)" }} />
+            </button>
+          </div>
+          <div className="overflow-y-auto max-h-[140px] no-scrollbar">
+            {(metricDetail === "revenue" || metricDetail === "aov") && (() => {
+              const fulfilled = filteredOrders.filter((o) => o.status === "Fulfilled");
+              return fulfilled.length === 0 ? (
+                <div className="text-[10px] py-2" style={{ color: "var(--c2-text-muted)" }}>No fulfilled orders</div>
+              ) : (
+                <table className="w-full text-[10px]">
+                  <thead><tr style={{ color: "var(--c2-text-muted)" }}><th className="text-left py-1 font-semibold">Customer</th><th className="text-left py-1 font-semibold">Items</th><th className="text-right py-1 font-semibold">Value</th></tr></thead>
+                  <tbody>{fulfilled.sort((a, b) => parseTotal(b.totalValue) - parseTotal(a.totalValue)).map((o) => (
+                    <tr key={o.id} className="cursor-pointer hover:brightness-110" style={{ borderTop: "1px solid var(--c2-border-subtle)" }}
+                      onClick={() => { setSelectedOrderId(o.id); onNavigateToOrder?.(o.id); }}>
+                      <td className="py-1" style={{ color: "var(--c2-text)" }}>{o.customerName || "Customer"}</td>
+                      <td className="py-1" style={{ color: "var(--c2-text-muted)" }}>{o.cart?.length || 0}</td>
+                      <td className="py-1 text-right font-semibold" style={{ color: "#10b981" }}>₹{parseTotal(o.totalValue).toLocaleString("en-IN")}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              );
+            })()}
+            {metricDetail === "active" && (() => {
+              const active = filteredOrders.filter((o) => o.status !== "Fulfilled" && o.status !== "Rejected");
+              return active.length === 0 ? (
+                <div className="text-[10px] py-2" style={{ color: "var(--c2-text-muted)" }}>No active orders</div>
+              ) : (
+                <table className="w-full text-[10px]">
+                  <thead><tr style={{ color: "var(--c2-text-muted)" }}><th className="text-left py-1 font-semibold">Customer</th><th className="text-left py-1 font-semibold">Status</th><th className="text-right py-1 font-semibold">Value</th></tr></thead>
+                  <tbody>{active.map((o) => (
+                    <tr key={o.id} className="cursor-pointer hover:brightness-110" style={{ borderTop: "1px solid var(--c2-border-subtle)" }}
+                      onClick={() => setSelectedOrderId(o.id)}>
+                      <td className="py-1" style={{ color: "var(--c2-text)" }}>{o.customerName || "Customer"}</td>
+                      <td className="py-1"><span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ background: `${o.status === "Pending" ? "#f59e0b" : o.status === "Accepted" ? "#3b82f6" : "#8b5cf6"}20`, color: o.status === "Pending" ? "#f59e0b" : o.status === "Accepted" ? "#3b82f6" : "#8b5cf6" }}>{o.status}</span></td>
+                      <td className="py-1 text-right font-semibold" style={{ color: "var(--c2-text)" }}>₹{parseTotal(o.totalValue).toLocaleString("en-IN")}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              );
+            })()}
+            {metricDetail === "users" && (
+              onlineUsers.length === 0 ? (
+                <div className="text-[10px] py-2" style={{ color: "var(--c2-text-muted)" }}>No users online</div>
+              ) : (
+                <div className="space-y-1">
+                  {onlineUsers.map((u) => (
+                    <div key={u.uid} className="flex items-center gap-2 py-1" style={{ borderTop: "1px solid var(--c2-border-subtle)" }}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                      <span className="text-[10px] font-medium truncate" style={{ color: "var(--c2-text)" }}>{u.displayName || u.email || "User"}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+            {metricDetail === "fulfillment" && (() => {
+              const total = filteredOrders.length;
+              const statuses = [
+                { label: "Fulfilled", count: filteredOrders.filter((o) => o.status === "Fulfilled").length, color: "#10b981" },
+                { label: "Shipped", count: filteredOrders.filter((o) => o.status === "Shipped").length, color: "#8b5cf6" },
+                { label: "Accepted", count: filteredOrders.filter((o) => o.status === "Accepted").length, color: "#3b82f6" },
+                { label: "Pending", count: filteredOrders.filter((o) => o.status === "Pending").length, color: "#f59e0b" },
+                { label: "Rejected", count: filteredOrders.filter((o) => o.status === "Rejected").length, color: "#ef4444" },
+              ];
+              return (
+                <div className="space-y-1.5">
+                  {statuses.map((s) => (
+                    <div key={s.label} className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
+                      <span className="text-[10px] flex-1" style={{ color: "var(--c2-text-secondary)" }}>{s.label}</span>
+                      <span className="text-[10px] font-bold" style={{ color: "var(--c2-text)" }}>{s.count}</span>
+                      <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--c2-bg-secondary)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${total > 0 ? (s.count / total) * 100 : 0}%`, background: s.color }} />
+                      </div>
+                      <span className="text-[9px] w-8 text-right" style={{ color: "var(--c2-text-muted)" }}>{total > 0 ? Math.round((s.count / total) * 100) : 0}%</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            {metricDetail === "pending" && (() => {
+              const pending = filteredOrders.filter((o) => o.status !== "Fulfilled" && o.status !== "Rejected");
+              return pending.length === 0 ? (
+                <div className="text-[10px] py-2" style={{ color: "var(--c2-text-muted)" }}>No pending revenue</div>
+              ) : (
+                <table className="w-full text-[10px]">
+                  <thead><tr style={{ color: "var(--c2-text-muted)" }}><th className="text-left py-1 font-semibold">Customer</th><th className="text-left py-1 font-semibold">Status</th><th className="text-right py-1 font-semibold">Value</th></tr></thead>
+                  <tbody>{pending.map((o) => (
+                    <tr key={o.id} style={{ borderTop: "1px solid var(--c2-border-subtle)" }}>
+                      <td className="py-1" style={{ color: "var(--c2-text)" }}>{o.customerName || "Customer"}</td>
+                      <td className="py-1"><span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ background: `${o.status === "Pending" ? "#f59e0b" : o.status === "Accepted" ? "#3b82f6" : "#8b5cf6"}20`, color: o.status === "Pending" ? "#f59e0b" : o.status === "Accepted" ? "#3b82f6" : "#8b5cf6" }}>{o.status}</span></td>
+                      <td className="py-1 text-right font-semibold" style={{ color: "#f97316" }}>₹{parseTotal(o.totalValue).toLocaleString("en-IN")}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* ─── Map Expanded Mode ─────────────────────────────── */}
       {isMapExpanded ? (
         <div className="flex-1 overflow-hidden min-h-0">
           <OrderMap
-            orders={orders}
+            orders={filteredOrders}
             theme={c2Theme}
             onStatusChange={handleStatusChange}
             onViewFullOrder={onNavigateToOrder}
             deliveryZone={deliveryZone}
             onlineUsers={onlineUsersWithLocation}
+            stores={stores}
             isExpanded={true}
             onToggleExpand={() => setIsMapExpanded(false)}
+            highlightOrderId={selectedOrderId}
           />
         </div>
       ) : (
@@ -920,14 +1244,16 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
               }}
             >
               <OrderMap
-                orders={orders}
+                orders={filteredOrders}
                 theme={c2Theme}
                 onStatusChange={handleStatusChange}
                 onViewFullOrder={onNavigateToOrder}
                 deliveryZone={deliveryZone}
                 onlineUsers={onlineUsersWithLocation}
+                stores={stores}
                 isExpanded={false}
                 onToggleExpand={() => setIsMapExpanded(true)}
+                highlightOrderId={selectedOrderId}
               />
             </div>
 
@@ -939,6 +1265,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
                 onBulkStatusChange={handleBulkStatusChange}
                 onFulfillClick={handleFulfillClick}
                 theme={c2Theme}
+                onOrderSelect={(id) => setSelectedOrderId(id)}
               />
             </div>
           </div>
@@ -967,9 +1294,16 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
               <ActivityFeed orders={orders} onlineUsers={onlineUsersWithLocation} theme={c2Theme} />
             </div>
 
-            {/* Mini Charts */}
-            <div className="overflow-hidden" style={{ gridColumn: `span ${layout.chartCols}` }}>
-              <MiniCharts orders={filteredOrders} allOrders={orders} theme={c2Theme} dateRange={dateRange} />
+            {/* Mini Charts + Store Analytics */}
+            <div className="overflow-hidden flex flex-col lg:flex-row" style={{ gridColumn: `span ${layout.chartCols}` }}>
+              <div className={`overflow-hidden ${stores.length > 0 ? "lg:w-1/2 lg:border-r" : "w-full"}`} style={{ borderColor: "var(--c2-border-subtle)" }}>
+                <MiniCharts orders={filteredOrders} allOrders={orders} theme={c2Theme} dateRange={dateRange} />
+              </div>
+              {stores.length > 0 && (
+                <div className="overflow-hidden lg:w-1/2">
+                  <StoreAnalytics orders={filteredOrders} stores={stores} theme={c2Theme} />
+                </div>
+              )}
             </div>
           </div>
         </>
@@ -993,61 +1327,133 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-800">Delivery OTP Verification</h3>
               <button
-                onClick={() => setOtpDialogOrder(null)}
+                onClick={() => {
+                  setOtpDialogOrder(null);
+                  // Cleanup reCAPTCHA when closing dialog
+                  if (window.otpRecaptchaVerifier) {
+                    window.otpRecaptchaVerifier.clear();
+                    window.otpRecaptchaVerifier = undefined;
+                  }
+                }}
                 className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400"
               >
                 ✕
               </button>
             </div>
 
-            <div className="text-sm text-slate-600">
+            {/* Customer info with channel display */}
+            <div className="rounded-lg bg-slate-50 p-3 text-sm space-y-1.5">
               <p><strong>{otpDialogOrder.customerName}</strong></p>
-              {otpDialogOrder.userEmail && <p className="text-xs text-slate-400">{otpDialogOrder.userEmail}</p>}
-              {otpDialogOrder.phone && <p className="text-xs text-slate-400">{otpDialogOrder.phone}</p>}
+              {otpDialogOrder.phone && <p className="text-xs text-slate-500">📱 {otpDialogOrder.phone}</p>}
+              {otpDialogOrder.userEmail && <p className="text-xs text-slate-500">📧 {otpDialogOrder.userEmail}</p>}
+              <p className="text-xs text-slate-400 pt-1 border-t border-slate-200">
+                Channel: <span className="font-semibold uppercase tracking-wider">{otpChannels === "both" ? "SMS & Email" : otpChannels === "sms" ? "SMS" : "Email"}</span>
+              </p>
             </div>
 
-            {!otpSent ? (
-              <button
-                onClick={handleC2SendOtp}
-                disabled={otpSending}
-                className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
-              >
-                {otpSending ? "Sending OTP..." : "Send OTP to Buyer"}
-              </button>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-emerald-600 font-medium">✓ OTP sent! Enter the code below:</p>
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                  placeholder="Enter 6-digit OTP"
-                  className="w-full text-center text-2xl tracking-[0.5em] font-mono border-2 border-slate-200 rounded-xl py-3 focus:border-emerald-500 focus:outline-none"
-                />
-                <button
-                  onClick={handleC2VerifyOtp}
-                  disabled={otpVerifying || otpCode.length < 4}
-                  className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                >
-                  {otpVerifying ? "Verifying..." : "Verify & Fulfill"}
-                </button>
-                <button
-                  onClick={handleC2SendOtp}
-                  disabled={otpSending}
-                  className="w-full py-2 text-sm text-slate-500 hover:text-slate-700"
-                >
-                  Resend OTP
-                </button>
-              </div>
-            )}
+            {(() => {
+              const wantEmail = otpChannels === "email" || otpChannels === "both";
+              const wantSms = otpChannels === "sms" || otpChannels === "both";
+              const hasEmail = !!otpDialogOrder.userEmail;
+              const hasPhone = !!otpDialogOrder.phone;
+              const canSend = (wantEmail && hasEmail) || (wantSms && hasPhone);
+
+              const channelParts: string[] = [];
+              if (wantSms && hasPhone) channelParts.push("SMS");
+              if (wantEmail && hasEmail) channelParts.push("Email");
+              const channelLabel = channelParts.length > 0 ? channelParts.join(" & ") : "N/A";
+
+              return !otpSent ? (
+                <div className="space-y-3">
+                  <button
+                    onClick={handleC2SendOtp}
+                    disabled={otpSending || !canSend}
+                    className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                  >
+                    {otpSending ? "Sending OTP..." : `Send OTP via ${channelLabel}`}
+                  </button>
+                  {!canSend && (
+                    <div className="text-sm text-amber-600 bg-amber-50 rounded-lg p-2">
+                      No contact info for selected channel{otpChannels === "both" ? "s" : ""}.
+                      {!hasPhone && wantSms && <span className="block text-xs mt-0.5">Phone number missing.</span>}
+                      {!hasEmail && wantEmail && <span className="block text-xs mt-0.5">Email missing.</span>}
+                      <button
+                        className="mt-2 w-full py-1.5 text-xs border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors"
+                        onClick={() => {
+                          doStatusChange(otpDialogOrder.id, "Fulfilled");
+                          setOtpDialogOrder(null);
+                        }}
+                      >
+                        Fulfill Without OTP
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Show which channels succeeded */}
+                  <div className="space-y-1">
+                    {smsSent && (
+                      <p className="text-sm text-emerald-600 font-medium">✓ SMS sent to {otpDialogOrder.phone}</p>
+                    )}
+                    {emailSent && (
+                      <p className="text-sm text-emerald-600 font-medium">✓ Email sent to {otpDialogOrder.userEmail}</p>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                    placeholder="Enter 6-digit OTP"
+                    className="w-full text-center text-2xl tracking-[0.5em] font-mono border-2 border-slate-200 rounded-xl py-3 focus:border-emerald-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleC2VerifyOtp}
+                    disabled={otpVerifying || otpCode.length < 4}
+                    className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                  >
+                    {otpVerifying ? "Verifying..." : "Verify & Fulfill"}
+                  </button>
+                  <button
+                    onClick={handleC2SendOtp}
+                    disabled={otpSending}
+                    className="w-full py-2 text-sm text-slate-500 hover:text-slate-700"
+                  >
+                    Resend OTP
+                  </button>
+                </div>
+              );
+            })()}
 
             {otpError && (
-              <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{otpError}</div>
+              <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2 whitespace-pre-line">{otpError}</div>
             )}
           </div>
         </div>
       )}
+      {/* ─── Assign Delivery Dialog ─────────────────────── */}
+      <AssignDeliveryDialog
+        open={assignDialogOpen}
+        order={assignDialogOrder}
+        onClose={() => {
+          setAssignDialogOpen(false);
+          setAssignDialogOrder(null);
+          pendingAssignCallbackRef.current = null;
+        }}
+        onAssigned={() => {
+          setAssignDialogOpen(false);
+          setAssignDialogOrder(null);
+          // Proceed with the original status change
+          if (pendingAssignCallbackRef.current) {
+            pendingAssignCallbackRef.current();
+            pendingAssignCallbackRef.current = null;
+          }
+        }}
+      />
+
+      {/* Hidden reCAPTCHA container for SMS OTP */}
+      <div id="c2-otp-recaptcha-container" />
     </div>
   );
 }

@@ -9,13 +9,14 @@ import { doc, setDoc, deleteDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import Link from "next/link";
 import Image from "next/image";
-import { Settings, PackageSearch, Activity, ArrowLeft, LogOut, Save, Upload, Loader2, Search, Cog, Users, ShoppingBasket, BookOpen, FlaskConical, Plus, Zap, Trash2 } from "lucide-react";
+import { Settings, PackageSearch, Activity, ArrowLeft, LogOut, Save, Upload, Loader2, Search, Cog, Users, ShoppingBasket, BookOpen, FlaskConical, Plus, Zap, Trash2, Warehouse, Package } from "lucide-react";
 import { formatTiersForDisplay } from "@/lib/pricing";
 import { PRODUCT_CATEGORIES } from "@/lib/constants";
 import { useMode } from "@/contexts/ModeContext";
 import { ModeToggle } from "@/components/admin/ModeToggle";
 import { useRouter } from "next/navigation";
 import { markOffline } from "@/hooks/usePresence";
+import { PresenceProvider } from "@/contexts/PresenceContext";
 import { toast } from "sonner";
 
 // ── Lazy-loaded tab components (only compiled when the tab is first opened) ──
@@ -46,6 +47,12 @@ const BuyingStockTab = dynamic(() => import("@/components/admin/BuyingStockTab")
 const AccountsTab = dynamic(() => import("@/components/admin/AccountsTab"), {
     loading: TabLoader, ssr: false,
 });
+const InventoryTab = dynamic(() => import("@/components/admin/InventoryTab"), {
+    loading: TabLoader, ssr: false,
+});
+const StoreHub = dynamic(() => import("@/components/admin/StoreHub"), {
+    loading: TabLoader, ssr: false,
+});
 const AddProductModal = dynamic(() => import("@/components/admin/AddProductModal"), {
     ssr: false,
 });
@@ -72,7 +79,7 @@ export default function AdminDashboard() {
     const { mode } = useMode();
     const router = useRouter();
 
-    const [activeTab, setActiveTab] = useState<"command" | "prices" | "orders" | "stats" | "users" | "stock" | "accounts" | "settings">("command");
+    const [activeTab, setActiveTab] = useState<"command" | "prices" | "orders" | "stats" | "users" | "stock" | "accounts" | "inventory" | "storehub" | "settings">("command");
     const [highlightOrderId, setHighlightOrderId] = useState<string | null>(null);
 
     // Navigate from C2 map to Orders tab, highlighting a specific order
@@ -214,6 +221,7 @@ export default function AdminDashboard() {
     }
 
     return (
+        <PresenceProvider>
         <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
             {/* Hidden file input for image upload */}
             <input
@@ -341,6 +349,18 @@ export default function AdminDashboard() {
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'accounts' ? 'bg-slate-800 text-white shadow-inner' : 'hover:bg-slate-800/50 hover:text-white'}`}
                     >
                         <BookOpen className="w-5 h-5" /> Accounts
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("storehub")}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'storehub' ? 'bg-gradient-to-r from-purple-500/20 to-indigo-500/20 text-purple-400 shadow-inner border border-purple-500/20' : 'hover:bg-slate-800/50 hover:text-purple-300'}`}
+                    >
+                        <Warehouse className="w-5 h-5" /> Store Hub
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("inventory")}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'inventory' ? 'bg-slate-800 text-white shadow-inner' : 'hover:bg-slate-800/50 hover:text-white'}`}
+                    >
+                        <Package className="w-5 h-5" /> Inventory
                     </button>
                     <button
                         onClick={() => setActiveTab("settings")}
@@ -641,6 +661,10 @@ export default function AdminDashboard() {
 
                     {activeTab === "accounts" && <AccountsTab />}
 
+                    {activeTab === "inventory" && <InventoryTab />}
+
+                    {activeTab === "storehub" && <StoreHub onNavigateToOrder={navigateToOrder} />}
+
                     {activeTab === "settings" && <SettingsTab />}
 
                     {/* Add Product Modal */}
@@ -669,5 +693,6 @@ export default function AdminDashboard() {
                 </div>
             </div>
         </div>
+        </PresenceProvider>
     );
 }

@@ -78,6 +78,26 @@ export const DEFAULT_CHECKOUT: CheckoutFormSettings = {
   customFields: [],
 };
 
+/* ─── Stores / Warehouses ─── */
+
+export type StoreType = "own" | "agent";
+
+export interface Store {
+  id: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  phone: string;
+  isActive: boolean;
+  type: StoreType;
+  agentUid?: string;
+  agentName?: string;
+  agentPhone?: string;
+  reorderAlertThreshold?: number;
+  createdAt: import("firebase/firestore").Timestamp;
+}
+
 /* ─── Theme System ─── */
 
 export type ThemeId = "classic" | "premium" | "catalog" | "elegant" | "storefront" | "magazine" | "listpro" | "metro" | "polaroid" | "glass" | "darkluxe" | "editorial" | "neonpop";

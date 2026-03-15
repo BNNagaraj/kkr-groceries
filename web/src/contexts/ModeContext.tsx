@@ -27,6 +27,10 @@ const NAMESPACED = new Set([
     "stockPurchases",
     "accountEntries",
     "notifications",
+    "stores",
+    "storeInventory",
+    "stockTransactions",
+    "deliveryTracking",
 ]);
 
 function resolveCollection(baseName: string, mode: AppMode): string {

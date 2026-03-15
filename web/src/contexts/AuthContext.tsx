@@ -9,12 +9,18 @@ import { usePresence } from "@/hooks/usePresence";
 interface AuthContextType {
     currentUser: User | null;
     isAdmin: boolean;
+    isDelivery: boolean;
+    isAgent: boolean;
+    agentStoreId: string | null;
     loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
     currentUser: null,
     isAdmin: false,
+    isDelivery: false,
+    isAgent: false,
+    agentStoreId: null,
     loading: true,
 });
 
@@ -30,6 +36,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [adminEmails, setAdminEmails] = useState<string[]>(FALLBACK_ADMIN_EMAILS);
     const [hasClaim, setHasClaim] = useState(false);
+    const [hasDeliveryClaim, setHasDeliveryClaim] = useState(false);
+    const [hasAgentClaim, setHasAgentClaim] = useState(false);
+    const [agentStoreId, setAgentStoreId] = useState<string | null>(null);
 
     // Listen to Firestore settings/admins for dynamic admin list
     useEffect(() => {
@@ -58,19 +67,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 try {
                     const result = await user.getIdTokenResult();
                     setHasClaim(result.claims.admin === true);
+                    setHasDeliveryClaim(result.claims.delivery === true);
+                    setHasAgentClaim(result.claims.agent === true);
+                    setAgentStoreId((result.claims.agentStoreId as string) || null);
                 } catch {
                     setHasClaim(false);
+                    setHasDeliveryClaim(false);
+                    setHasAgentClaim(false);
+                    setAgentStoreId(null);
                 }
             } else {
                 setHasClaim(false);
+                setHasDeliveryClaim(false);
+                setHasAgentClaim(false);
+                setAgentStoreId(null);
             }
             setLoading(false);
         });
         return unsubscribe;
     }, []);
 
+    const isDelivery = hasDeliveryClaim;
+
     // Presence tracking — writes heartbeat to Firestore presence collection
-    usePresence(currentUser);
+    // Pass delivery role so GPS coordinates are included for delivery boys
+    usePresence(currentUser, isDelivery ? "delivery" : undefined);
 
     const isAdmin = hasClaim || (
         currentUser?.email
@@ -78,8 +99,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             : false
     );
 
+    const isAgent = hasAgentClaim;
+
     return (
-        <AuthContext.Provider value={{ currentUser, isAdmin, loading }}>
+        <AuthContext.Provider value={{ currentUser, isAdmin, isDelivery, isAgent, agentStoreId, loading }}>
             {children}
         </AuthContext.Provider>
     );

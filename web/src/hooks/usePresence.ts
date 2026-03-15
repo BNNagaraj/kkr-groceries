@@ -24,7 +24,7 @@ export async function markOffline(uid: string): Promise<void> {
   }
 }
 
-export function usePresence(user: User | null) {
+export function usePresence(user: User | null, role?: "delivery") {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Keep a ref to the current uid so beforeunload can access it synchronously
   const uidRef = useRef<string | null>(null);
@@ -37,23 +37,40 @@ export function usePresence(user: User | null) {
 
     uidRef.current = user.uid;
     const presenceRef = doc(db, "presence", user.uid);
+    const isDelivery = role === "delivery";
 
     const writeOnline = async () => {
       try {
-        await setDoc(
-          presenceRef,
-          {
-            uid: user.uid,
-            userId: user.uid,
-            displayName: user.displayName || null,
-            email: user.email || null,
-            phone: user.phoneNumber || null,
-            lastSeen: serverTimestamp(),
-            online: true,
-            status: "online",
-          },
-          { merge: true }
-        );
+        const data: Record<string, unknown> = {
+          uid: user.uid,
+          userId: user.uid,
+          displayName: user.displayName || null,
+          email: user.email || null,
+          phone: user.phoneNumber || null,
+          lastSeen: serverTimestamp(),
+          online: true,
+          status: "online",
+          isDelivery,
+        };
+
+        // For delivery boys, capture GPS coordinates (passive — only on heartbeat)
+        if (isDelivery && typeof navigator !== "undefined" && navigator.geolocation) {
+          try {
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: false,
+                timeout: 5000,
+                maximumAge: 60000,
+              });
+            });
+            data.lat = pos.coords.latitude;
+            data.lng = pos.coords.longitude;
+          } catch {
+            // Geolocation denied or unavailable — continue without coordinates
+          }
+        }
+
+        await setDoc(presenceRef, data, { merge: true });
       } catch (e) {
         console.debug("[Presence] write failed:", e);
       }
@@ -94,5 +111,5 @@ export function usePresence(user: User | null) {
         markOffline(uidRef.current);
       }
     };
-  }, [user]);
+  }, [user, role]);
 }

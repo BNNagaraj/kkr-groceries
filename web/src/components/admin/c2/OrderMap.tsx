@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import type { C2Theme } from "../CommandCenter";
 import { Order, OrderStatus } from "@/types/order";
-import type { DeliverySettings } from "@/types/settings";
+import type { DeliverySettings, Store } from "@/types/settings";
 import { MapPin, Loader2, Maximize2, Minimize2, Flame, Eye, EyeOff } from "lucide-react";
 import MapStyleSettings, { loadMapSettings, buildMapStyles } from "../../MapStyleSettings";
 
@@ -93,6 +93,28 @@ function createUserPinSvg(): string {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 
+function createStorePinSvg(): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="42" viewBox="0 0 36 42">
+    <defs><filter id="sd"><feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.25"/></filter></defs>
+    <rect x="3" y="3" width="30" height="30" rx="8" fill="#7c3aed" filter="url(#sd)" opacity="0.95"/>
+    <rect x="3" y="3" width="30" height="30" rx="8" stroke="white" stroke-width="2" fill="none"/>
+    <path d="M12 12h12v3H12z M11 15h14v10H11z M15 20h6v5H15z" fill="white" opacity="0.9"/>
+    <polygon points="18,36 14,30 22,30" fill="#7c3aed" opacity="0.95"/>
+  </svg>`;
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+}
+
+function createDeliveryBoyPinSvg(): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <circle cx="16" cy="16" r="14" fill="#059669" stroke="white" stroke-width="2.5" opacity="0.9"/>
+    <circle cx="11" cy="21" r="3" fill="none" stroke="white" stroke-width="1.5"/>
+    <circle cx="22" cy="21" r="3" fill="none" stroke="white" stroke-width="1.5"/>
+    <path d="M8 21h3 M19 21h3 M14 21V14h6l3 4h-3" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="14" y="12" width="4" height="5" rx="0.5" fill="white" opacity="0.4"/>
+  </svg>`;
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 interface GeoCoord { lat: number; lng: number; }
 
@@ -159,7 +181,7 @@ function buildInfoWindowHTML(order: Order, theme: C2Theme): string {
     <div style="font-family:system-ui,sans-serif;max-width:300px;padding:4px 0;background:transparent;">
       <div style="margin-bottom:8px;">
         <div style="font-weight:700;font-size:13px;color:${textPrimary};">${escapeHTML(order.customerName || "Customer")}</div>
-        ${order.shopName ? `<div style="font-size:10px;color:${textSecondary};margin-top:1px;">${escapeHTML(order.shopName)}</div>` : ""}
+        ${order.shopName && order.shopName.toLowerCase() !== "not specified" ? `<div style="font-size:10px;color:${textSecondary};margin-top:1px;">${escapeHTML(order.shopName)}</div>` : ""}
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:${cardBg};border-radius:8px;border:1px solid ${borderColor};">
         <span style="font-weight:800;color:#059669;font-size:14px;">\u20B9${totalVal.toLocaleString("en-IN")}</span>
@@ -197,6 +219,15 @@ export interface OnlineUserMarker {
   lat?: number;
   lng?: number;
   location?: string;
+  isDelivery?: boolean;
+  /** GPS lat from presence doc (delivery boys only) */
+  gpsLat?: number;
+  /** GPS lng from presence doc (delivery boys only) */
+  gpsLng?: number;
+  /** Currently assigned order info */
+  assignedOrderId?: string;
+  assignedOrderCustomer?: string;
+  assignedOrderStatus?: string;
 }
 
 // ─── Main C2 Map Component ──────────────────────────────────────────────────
@@ -207,8 +238,10 @@ interface OrderMapProps {
   onViewFullOrder?: (orderId: string) => void;
   deliveryZone?: DeliverySettings;
   onlineUsers?: OnlineUserMarker[];
+  stores?: Store[];
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  highlightOrderId?: string | null;
 }
 
 export default function OrderMap({
@@ -218,8 +251,10 @@ export default function OrderMap({
   onViewFullOrder,
   deliveryZone,
   onlineUsers,
+  stores,
   isExpanded,
   onToggleExpand,
+  highlightOrderId,
 }: OrderMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -246,7 +281,10 @@ export default function OrderMap({
   const heatmapLayerRef = useRef<any>(null);
   const zoneCircleRef = useRef<any>(null);
   const userMarkersRef = useRef<any[]>([]);
+  const storeMarkersRef = useRef<any[]>([]);
+  const deliveryMarkersRef = useRef<any[]>([]);
   const resolvedCoordsRef = useRef<Map<string, GeoCoord>>(new Map());
+  const markerMapRef = useRef<Map<string, any>>(new Map());
 
   // Expose global callbacks for info window button events
   useEffect(() => {
@@ -386,6 +424,7 @@ export default function OrderMap({
     // Clear existing order markers
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
+    markerMapRef.current.clear();
 
     // Clear existing heatmap
     if (heatmapLayerRef.current) {
@@ -443,6 +482,7 @@ export default function OrderMap({
       });
 
       markersRef.current.push(marker);
+      markerMapRef.current.set(order.id, marker);
     });
 
     // Create heatmap layer (visible only in "heat" mode)
@@ -484,63 +524,213 @@ export default function OrderMap({
       });
     }
 
-    // ─── Online User Markers ──────────────────────────────────────────────
+    // ─── Store Markers ─────────────────────────────────────────────────
+    storeMarkersRef.current.forEach((m) => m.setMap(null));
+    storeMarkersRef.current = [];
+
+    if (stores && stores.length > 0 && mapView === "pins") {
+      const storePinUrl = createStorePinSvg();
+      // Compute per-store order stats
+      const storeOrderStats = new Map<string, { count: number; revenue: number; pending: number; accepted: number; shipped: number; fulfilled: number }>();
+      for (const order of orders) {
+        if (!order.assignedStoreId) continue;
+        const stats = storeOrderStats.get(order.assignedStoreId) || { count: 0, revenue: 0, pending: 0, accepted: 0, shipped: 0, fulfilled: 0 };
+        stats.count++;
+        stats.revenue += parseTotal(order.totalValue);
+        const s = (order.status || "Pending").toLowerCase();
+        if (s === "pending") stats.pending++;
+        else if (s === "accepted") stats.accepted++;
+        else if (s === "shipped") stats.shipped++;
+        else if (s === "fulfilled") stats.fulfilled++;
+        storeOrderStats.set(order.assignedStoreId, stats);
+      }
+
+      for (const store of stores) {
+        if (!store.lat || !store.lng || !store.isActive) continue;
+
+        const storeStats = storeOrderStats.get(store.id) || { count: 0, revenue: 0, pending: 0, accepted: 0, shipped: 0, fulfilled: 0 };
+        const storeMarker = new window.google.maps.Marker({
+          position: { lat: store.lat, lng: store.lng },
+          map,
+          title: `${store.name} (Store)`,
+          icon: {
+            url: storePinUrl,
+            scaledSize: new window.google.maps.Size(32, 38),
+            anchor: new window.google.maps.Point(16, 38),
+          },
+          opacity: 1,
+          zIndex: 5,
+        });
+
+        storeMarker.addListener("click", () => {
+          const isDark = theme === "dark";
+          const text = isDark ? "#e2e8f0" : "#0f172a";
+          const muted = isDark ? "#94a3b8" : "#64748b";
+          const borderColor = isDark ? "#334155" : "#e2e8f0";
+          const cardBg = isDark ? "#0f172a" : "#f8fafc";
+          const typeLabel = (store.type || "own") === "own"
+            ? `<span style="background:#ecfdf5;color:#059669;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600;">Own Run</span>`
+            : `<span style="background:#fff7ed;color:#ea580c;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600;">Agent: ${escapeHTML(store.agentName || "")}</span>`;
+
+          infoWindow.setContent(`
+            <div style="font-family:system-ui,sans-serif;max-width:260px;padding:4px 0;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <div style="width:32px;height:32px;border-radius:8px;background:#7c3aed;display:flex;align-items:center;justify-content:center;">
+                  <span style="color:white;font-weight:700;font-size:14px;">\uD83C\uDFE0</span>
+                </div>
+                <div>
+                  <div style="font-weight:700;font-size:13px;color:${text};">${escapeHTML(store.name)}</div>
+                  <div style="margin-top:2px;">${typeLabel}</div>
+                </div>
+              </div>
+              <div style="font-size:10px;color:${muted};margin-bottom:8px;">\uD83D\uDCCD ${escapeHTML(store.address || "")}</div>
+              ${store.phone ? `<div style="font-size:10px;color:${muted};margin-bottom:8px;">\uD83D\uDCF1 ${escapeHTML(store.phone)}</div>` : ""}
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px;background:${cardBg};border:1px solid ${borderColor};border-radius:8px;">
+                <div style="text-align:center;">
+                  <div style="font-size:16px;font-weight:800;color:${text};">${storeStats.count}</div>
+                  <div style="font-size:9px;color:${muted};">Orders</div>
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:16px;font-weight:800;color:#059669;">\u20B9${storeStats.revenue.toLocaleString("en-IN")}</div>
+                  <div style="font-size:9px;color:${muted};">Revenue</div>
+                </div>
+              </div>
+              ${storeStats.count > 0 ? `
+              <div style="display:flex;gap:4px;margin-top:6px;justify-content:center;">
+                ${storeStats.pending > 0 ? `<span style="background:#fef3c7;color:#b45309;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600;">${storeStats.pending} Pending</span>` : ""}
+                ${storeStats.accepted > 0 ? `<span style="background:#dbeafe;color:#1d4ed8;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600;">${storeStats.accepted} Accepted</span>` : ""}
+                ${storeStats.shipped > 0 ? `<span style="background:#ede9fe;color:#6d28d9;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600;">${storeStats.shipped} Shipped</span>` : ""}
+                ${storeStats.fulfilled > 0 ? `<span style="background:#ecfdf5;color:#059669;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600;">${storeStats.fulfilled} Done</span>` : ""}
+              </div>
+              ` : ""}
+            </div>
+          `);
+          infoWindow.open(map, storeMarker);
+        });
+
+        storeMarkersRef.current.push(storeMarker);
+      }
+    }
+
+    // ─── Online User & Delivery Boy Markers ─────────────────────────────
     userMarkersRef.current.forEach((m) => m.setMap(null));
     userMarkersRef.current = [];
+    deliveryMarkersRef.current.forEach((m) => m.setMap(null));
+    deliveryMarkersRef.current = [];
 
     if (onlineUsers && mapView === "pins") {
       const userPinUrl = createUserPinSvg();
+      const deliveryPinUrl = createDeliveryBoyPinSvg();
       const geocodeCache = loadGeocodeCache();
 
       for (const user of onlineUsers) {
+        const isDeliveryBoy = !!user.isDelivery;
+
+        // For delivery boys, prefer their GPS position from presence doc
         let userCoord: GeoCoord | null = null;
-        if (user.lat && user.lng) {
+        if (isDeliveryBoy && user.gpsLat && user.gpsLng) {
+          userCoord = { lat: user.gpsLat, lng: user.gpsLng };
+        } else if (user.lat && user.lng) {
           userCoord = { lat: user.lat, lng: user.lng };
         } else if (user.location && geocodeCache[user.location]) {
           userCoord = geocodeCache[user.location];
         }
         if (!userCoord) continue;
 
-        const userMarker = new window.google.maps.Marker({
-          position: userCoord,
-          map,
-          title: `${user.displayName || user.email || "User"} (online)`,
-          icon: {
-            url: userPinUrl,
-            scaledSize: new window.google.maps.Size(22, 22),
-            anchor: new window.google.maps.Point(11, 11),
-          },
-          opacity: 0.9,
-          zIndex: 1,
-        });
+        if (isDeliveryBoy) {
+          // Delivery boy marker — green motorbike pin
+          const dMarker = new window.google.maps.Marker({
+            position: userCoord,
+            map,
+            title: `${user.displayName || user.email || "Delivery"} (delivering)`,
+            icon: {
+              url: deliveryPinUrl,
+              scaledSize: new window.google.maps.Size(28, 28),
+              anchor: new window.google.maps.Point(14, 14),
+            },
+            opacity: 1,
+            zIndex: 4,
+          });
 
-        userMarker.addListener("click", () => {
-          const isDark = theme === "dark";
-          const bg = isDark ? "#1e293b" : "#ffffff";
-          const text = isDark ? "#e2e8f0" : "#0f172a";
-          const muted = isDark ? "#94a3b8" : "#64748b";
-          infoWindow.setContent(`
-            <div style="font-family:system-ui,sans-serif;padding:4px 0;">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                <div style="width:28px;height:28px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;">
-                  <span style="color:white;font-weight:700;font-size:11px;">${(user.displayName || user.email || "?")[0].toUpperCase()}</span>
-                </div>
-                <div>
-                  <div style="font-weight:700;font-size:12px;color:${text};">${user.displayName || "User"}</div>
-                  ${user.email ? `<div style="font-size:10px;color:${muted};">${user.email}</div>` : ""}
-                </div>
-              </div>
-              <div style="display:flex;align-items:center;gap:4px;">
-                <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;"></span>
-                <span style="font-size:10px;color:#22c55e;font-weight:600;">Online Now</span>
-              </div>
-              ${user.location ? `<div style="font-size:10px;color:${muted};margin-top:4px;">\uD83D\uDCCD ${user.location}</div>` : ""}
-            </div>
-          `);
-          infoWindow.open(map, userMarker);
-        });
+          dMarker.addListener("click", () => {
+            const isDark = theme === "dark";
+            const text = isDark ? "#e2e8f0" : "#0f172a";
+            const muted = isDark ? "#94a3b8" : "#64748b";
+            const cardBg = isDark ? "#0f172a" : "#f8fafc";
+            const borderColor = isDark ? "#334155" : "#e2e8f0";
+            const assignmentHtml = user.assignedOrderCustomer
+              ? `<div style="padding:6px 8px;background:${cardBg};border:1px solid ${borderColor};border-radius:6px;margin-top:6px;">
+                  <div style="font-size:9px;color:${muted};margin-bottom:2px;">Current Delivery</div>
+                  <div style="font-size:11px;font-weight:600;color:${text};">${escapeHTML(user.assignedOrderCustomer)}</div>
+                  ${user.assignedOrderStatus ? `<span style="background:${(STATUS_CONFIG[user.assignedOrderStatus] || STATUS_CONFIG.Pending).color};color:white;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600;margin-top:2px;display:inline-block;">${user.assignedOrderStatus}</span>` : ""}
+                </div>`
+              : `<div style="font-size:10px;color:${muted};margin-top:6px;font-style:italic;">No active delivery</div>`;
 
-        userMarkersRef.current.push(userMarker);
+            infoWindow.setContent(`
+              <div style="font-family:system-ui,sans-serif;max-width:240px;padding:4px 0;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                  <div style="width:28px;height:28px;border-radius:50%;background:#059669;display:flex;align-items:center;justify-content:center;">
+                    <span style="color:white;font-weight:700;font-size:13px;">\uD83D\uDE9A</span>
+                  </div>
+                  <div>
+                    <div style="font-weight:700;font-size:12px;color:${text};">${escapeHTML(user.displayName || "Delivery Boy")}</div>
+                    ${user.email ? `<div style="font-size:10px;color:${muted};">${escapeHTML(user.email)}</div>` : ""}
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <span style="width:6px;height:6px;border-radius:50%;background:#059669;"></span>
+                  <span style="font-size:10px;color:#059669;font-weight:600;">On Delivery</span>
+                </div>
+                ${assignmentHtml}
+                ${user.location ? `<div style="font-size:10px;color:${muted};margin-top:4px;">\uD83D\uDCCD ${escapeHTML(user.location)}</div>` : ""}
+              </div>
+            `);
+            infoWindow.open(map, dMarker);
+          });
+
+          deliveryMarkersRef.current.push(dMarker);
+        } else {
+          // Regular user marker — blue person pin
+          const userMarker = new window.google.maps.Marker({
+            position: userCoord,
+            map,
+            title: `${user.displayName || user.email || "User"} (online)`,
+            icon: {
+              url: userPinUrl,
+              scaledSize: new window.google.maps.Size(22, 22),
+              anchor: new window.google.maps.Point(11, 11),
+            },
+            opacity: 0.9,
+            zIndex: 1,
+          });
+
+          userMarker.addListener("click", () => {
+            const isDark = theme === "dark";
+            const text = isDark ? "#e2e8f0" : "#0f172a";
+            const muted = isDark ? "#94a3b8" : "#64748b";
+            infoWindow.setContent(`
+              <div style="font-family:system-ui,sans-serif;padding:4px 0;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                  <div style="width:28px;height:28px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;">
+                    <span style="color:white;font-weight:700;font-size:11px;">${(user.displayName || user.email || "?")[0].toUpperCase()}</span>
+                  </div>
+                  <div>
+                    <div style="font-weight:700;font-size:12px;color:${text};">${user.displayName || "User"}</div>
+                    ${user.email ? `<div style="font-size:10px;color:${muted};">${user.email}</div>` : ""}
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;"></span>
+                  <span style="font-size:10px;color:#22c55e;font-weight:600;">Online Now</span>
+                </div>
+                ${user.location ? `<div style="font-size:10px;color:${muted};margin-top:4px;">\uD83D\uDCCD ${escapeHTML(user.location)}</div>` : ""}
+              </div>
+            `);
+            infoWindow.open(map, userMarker);
+          });
+
+          userMarkersRef.current.push(userMarker);
+        }
       }
     }
 
@@ -568,7 +758,7 @@ export default function OrderMap({
       map.setCenter(savedCenter);
       map.setZoom(savedZoom);
     }
-  }, [mappableOrders, resolveCoordinates, theme, pinSize, mapCenter, deliveryZone, showZone, mapView, onlineUsers]);
+  }, [mappableOrders, resolveCoordinates, theme, pinSize, mapCenter, deliveryZone, showZone, mapView, onlineUsers, stores, orders]);
 
   // ─── Load Google Maps & init ───────────────────────────────────────────────
   useEffect(() => {
@@ -591,12 +781,61 @@ export default function OrderMap({
     }
   }, [initMapAndMarkers]);
 
+  // ─── Highlight order pin when selected from pipeline ─────────────────────
+  useEffect(() => {
+    if (!highlightOrderId || !mapInstance.current || !window.google) return;
+    const marker = markerMapRef.current.get(highlightOrderId);
+    if (!marker) return;
+
+    const map = mapInstance.current;
+    const infoWindow = infoWindowRef.current;
+
+    // Smooth pan to the marker
+    map.panTo(marker.getPosition());
+    if (map.getZoom() < 14) map.setZoom(14);
+
+    // Bounce animation (3 bounces ≈ 2.1s)
+    marker.setAnimation(window.google.maps.Animation.BOUNCE);
+    const bounceTimer = setTimeout(() => marker.setAnimation(null), 2100);
+
+    // Open info window
+    const order = orders.find((o) => o.id === highlightOrderId);
+    if (order && infoWindow) {
+      infoWindow.setContent(buildInfoWindowHTML(order, theme));
+      infoWindow.open(map, marker);
+
+      window.google.maps.event.addListenerOnce(infoWindow, "domready", () => {
+        document.querySelectorAll("[data-c2-action]").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            const action = (btn as HTMLElement).getAttribute("data-c2-action")!;
+            const oid = (btn as HTMLElement).getAttribute("data-order-id")!;
+            window.__c2MapStatusChange?.(oid, action);
+            infoWindow.close();
+          });
+        });
+        document.querySelectorAll("[data-c2-view-order]").forEach((link) => {
+          link.addEventListener("click", (e) => {
+            e.preventDefault();
+            const oid = (link as HTMLElement).getAttribute("data-c2-view-order")!;
+            window.__c2MapViewOrder?.(oid);
+            infoWindow.close();
+          });
+        });
+      });
+    }
+
+    return () => clearTimeout(bounceTimer);
+  }, [highlightOrderId, orders, theme]);
+
   const handlePinSizeChange = (size: PinSize) => {
     setPinSize(size);
     try { localStorage.setItem("kkr-c2-pin-size", size); } catch {}
   };
 
-  const onlineUserCount = onlineUsers?.filter((u) => u.lat || u.location).length || 0;
+  const onlineUserCount = onlineUsers?.filter((u) => !u.isDelivery && (u.lat || u.location)).length || 0;
+  const deliveryBoyCount = onlineUsers?.filter((u) => u.isDelivery && (u.gpsLat || u.lat || u.location)).length || 0;
+  const storeCount = stores?.filter((s) => s.isActive && s.lat && s.lng).length || 0;
 
   return (
     <div className="h-full flex flex-col">
@@ -775,6 +1014,42 @@ export default function OrderMap({
                       style={{ color: theme === "dark" ? "#94a3b8" : "#475569" }}
                     >
                       {deliveryZone.zoneName} ({deliveryZone.radiusKm}km)
+                    </span>
+                  </div>
+                )}
+
+                {storeCount > 0 && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="w-2 h-2 rounded shrink-0 bg-purple-600" />
+                    <span
+                      className="text-[9px] flex-1"
+                      style={{ color: theme === "dark" ? "#94a3b8" : "#475569" }}
+                    >
+                      Stores
+                    </span>
+                    <span
+                      className="text-[9px] font-bold"
+                      style={{ color: theme === "dark" ? "#64748b" : "#94a3b8" }}
+                    >
+                      {storeCount}
+                    </span>
+                  </div>
+                )}
+
+                {deliveryBoyCount > 0 && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="w-2 h-2 rounded-full shrink-0 bg-emerald-600" />
+                    <span
+                      className="text-[9px] flex-1"
+                      style={{ color: theme === "dark" ? "#94a3b8" : "#475569" }}
+                    >
+                      Delivery Boys
+                    </span>
+                    <span
+                      className="text-[9px] font-bold"
+                      style={{ color: theme === "dark" ? "#64748b" : "#94a3b8" }}
+                    >
+                      {deliveryBoyCount}
                     </span>
                   </div>
                 )}

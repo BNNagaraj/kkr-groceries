@@ -8,7 +8,7 @@ import { MapPin, Truck, ChevronRight, User, Trash2, BookMarked, Check, ShoppingC
 import { functions, db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { collection, query, where, orderBy, limit, getDocs, doc, getDoc } from "firebase/firestore";
-import { MapPicker, LocationDetails } from "./MapPicker";
+import { MapPicker, LocationDetails, RecentLocation } from "./MapPicker";
 import { validateName, validatePhone, validateAddress, sanitizeInput, normalizeIndianPhone } from "@/lib/validation";
 import { resolveSlabPrice, getAppliedTierLabel } from "@/lib/pricing";
 import { useMode } from "@/contexts/ModeContext";
@@ -144,6 +144,8 @@ interface SavedAddress {
     /** Derived from recent order (not from addresses subcollection) */
     fromOrder?: boolean;
     shopName?: string;
+    lat?: number;
+    lng?: number;
 }
 
 export function CartDrawer({
@@ -221,33 +223,35 @@ export function CartDrawer({
                 });
             });
 
-            // 2. Fetch most recent order's address as "last used"
+            // 2. Fetch recent orders' addresses as "last used" (up to 5 unique)
             try {
                 const orderQ = query(
                     collection(db, col("orders")),
                     where("userId", "==", currentUser.uid),
                     orderBy("createdAt", "desc"),
-                    limit(1)
+                    limit(10)
                 );
                 const orderSnap = await getDocs(orderQ);
-                if (!orderSnap.empty) {
-                    const recentOrder = orderSnap.docs[0].data();
+                const seenLocs = new Set(allAddresses.map(a => a.loc.trim().toLowerCase()));
+
+                for (const d of orderSnap.docs) {
+                    const recentOrder = d.data();
                     const recentLoc = recentOrder.location || recentOrder.deliveryAddress || "";
-                    // Only add if not already in saved addresses
-                    const alreadySaved = allAddresses.some(
-                        (a) => a.loc.trim().toLowerCase() === recentLoc.trim().toLowerCase()
-                    );
-                    if (recentLoc && !alreadySaved) {
-                        allAddresses.unshift({
-                            id: "__recent_order__",
-                            name: recentOrder.customerName || "",
-                            phone: recentOrder.phone || recentOrder.customerPhone || "",
-                            loc: recentLoc,
-                            pin: recentOrder.pincode || "",
-                            shopName: recentOrder.shopName || "",
-                            fromOrder: true,
-                        });
-                    }
+                    const key = recentLoc.trim().toLowerCase();
+                    if (!recentLoc || seenLocs.has(key)) continue;
+                    seenLocs.add(key);
+
+                    allAddresses.push({
+                        id: `__recent_${d.id}__`,
+                        name: recentOrder.customerName || "",
+                        phone: recentOrder.phone || recentOrder.customerPhone || "",
+                        loc: recentLoc,
+                        pin: recentOrder.pincode || "",
+                        shopName: recentOrder.shopName || "",
+                        fromOrder: true,
+                        lat: recentOrder.lat || undefined,
+                        lng: recentOrder.lng || undefined,
+                    });
                 }
             } catch {
                 // Index might not exist; skip silently
@@ -273,6 +277,13 @@ export function CartDrawer({
         if (addr.phone) setPhone(normalizeIndianPhone(addr.phone));
         if (addr.loc) setAddress(addr.loc);
         if (addr.shopName) setShopName(addr.shopName);
+        // Restore GPS coordinates if saved with the address
+        if (addr.lat && addr.lng) {
+            setLocationDetails({
+                street: "", city: "", state: "", pincode: addr.pin || "",
+                lat: addr.lat, lng: addr.lng,
+            });
+        }
         setFormErrors({});
     };
 
@@ -282,6 +293,32 @@ export function CartDrawer({
             loadSavedAddresses();
         }
     }, [step, currentUser, loadSavedAddresses]);
+
+    // Auto-detect GPS when entering checkout (silent, non-blocking)
+    // This ensures orders always have lat/lng for store routing,
+    // even if the user doesn't open the map picker.
+    useEffect(() => {
+        if (step >= 2 && !locationDetails && typeof navigator !== "undefined" && navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    setLocationDetails((prev) => {
+                        // Don't override if user already picked via map
+                        if (prev?.lat && prev?.lng) return prev;
+                        return {
+                            street: "",
+                            city: "",
+                            state: "",
+                            pincode: "",
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
+                        };
+                    });
+                },
+                () => { /* silently ignore denial */ },
+                { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+            );
+        }
+    }, [step, locationDetails]);
 
     // Pre-fill GSTIN from user profile (once per cart open)
     useEffect(() => {
@@ -401,6 +438,7 @@ export function CartDrawer({
             const resolvedCart = cartItems.map((item) => {
                 const effectivePrice = resolveSlabPrice(item.qty, item.price, item.priceTiers);
                 return {
+                    id: String(item.id),  // product doc ID for inventory matching
                     name: item.name,
                     qty: item.qty,
                     price: effectivePrice,
@@ -412,6 +450,30 @@ export function CartDrawer({
                     appliedTier: getAppliedTierLabel(item.qty, item.price, item.priceTiers, item.unit) || "",
                 };
             });
+
+            // ── Client-side delivery zone check ──
+            if (locationDetails?.lat && locationDetails?.lng) {
+                try {
+                    const { getDoc, doc: firestoreDoc } = await import("firebase/firestore");
+                    const dzSnap = await getDoc(firestoreDoc(db, "settings", "delivery"));
+                    if (dzSnap.exists()) {
+                        const dz = dzSnap.data() as { centerLat?: number; centerLng?: number; radiusKm?: number; zoneName?: string };
+                        if (dz.centerLat && dz.centerLng && dz.radiusKm) {
+                            const { haversineDistance } = await import("@/lib/geo");
+                            const dist = haversineDistance(locationDetails.lat, locationDetails.lng, dz.centerLat, dz.centerLng);
+                            if (dist > dz.radiusKm) {
+                                toast.error("Outside delivery zone", {
+                                    description: `Your location is ${dist.toFixed(1)} km away. We deliver within ${dz.radiusKm} km of ${dz.zoneName || "our center"}.`,
+                                });
+                                setLoading(false);
+                                return;
+                            }
+                        }
+                    }
+                } catch (zoneErr) {
+                    console.warn("[Cart] Zone check failed, proceeding:", zoneErr);
+                }
+            }
 
             const payload: Record<string, unknown> = {
                 cart: resolvedCart,
@@ -987,18 +1049,32 @@ export function CartDrawer({
                             </div>
                         </div>
                     )}
+                    {/* MapPicker rendered INSIDE SheetContent so it stays within
+                       Radix's FocusScope — otherwise the search input can't receive focus.
+                       position:fixed on MapPicker's root div escapes the Sheet's layout. */}
+                    {mapOpen && (
+                        <MapPicker
+                            isOpen={mapOpen}
+                            onClose={() => setMapOpen(false)}
+                            onLocationSelect={(addr, details) => {
+                                setAddress(addr);
+                                setLocationDetails(details);
+                            }}
+                            recentLocations={savedAddresses
+                                .filter(a => a.loc)
+                                .slice(0, 5)
+                                .map(a => ({
+                                    id: a.id,
+                                    label: a.shopName || a.name || "",
+                                    address: a.loc,
+                                    lat: a.lat,
+                                    lng: a.lng,
+                                    pincode: a.pin,
+                                }))}
+                        />
+                    )}
                 </SheetContent>
             </Sheet>
-            {mapOpen && (
-                <MapPicker
-                    isOpen={mapOpen}
-                    onClose={() => setMapOpen(false)}
-                    onLocationSelect={(addr, details) => {
-                        setAddress(addr);
-                        setLocationDetails(details);
-                    }}
-                />
-            )}
         </>
     );
 }

@@ -45,29 +45,27 @@ export function Footer() {
           <div>
             <h3 className="font-bold text-sm uppercase tracking-wider text-emerald-300 mb-4">Contact</h3>
             <div className="space-y-3">
-              {biz.contactPhone && (
-                <a href={`tel:${biz.contactPhone}`} className="flex items-center gap-2 text-sm text-emerald-100 hover:text-white transition-colors">
+              {(biz.contactPhone || !biz.contactEmail) && (
+                <a href={`tel:${biz.contactPhone || "+91-9876543210"}`} className="flex items-center gap-2 text-sm text-emerald-100 hover:text-white transition-colors">
                   <Phone className="w-4 h-4 text-emerald-400" />
-                  {biz.contactPhone}
+                  {biz.contactPhone || "+91-9876543210"}
                 </a>
               )}
-              {biz.contactEmail && (
-                <a href={`mailto:${biz.contactEmail}`} className="flex items-center gap-2 text-sm text-emerald-100 hover:text-white transition-colors">
+              {(biz.contactEmail || !biz.contactPhone) && (
+                <a href={`mailto:${biz.contactEmail || "orders@kkrgroceries.com"}`} className="flex items-center gap-2 text-sm text-emerald-100 hover:text-white transition-colors">
                   <Mail className="w-4 h-4 text-emerald-400" />
-                  {biz.contactEmail}
+                  {biz.contactEmail || "orders@kkrgroceries.com"}
                 </a>
               )}
-              {biz.address && (
-                <a
-                  href={`https://maps.google.com/?q=${encodeURIComponent(biz.address)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-start gap-2 text-sm text-emerald-100 hover:text-white transition-colors"
-                >
-                  <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  {biz.address}
-                </a>
-              )}
+              <a
+                href={`https://maps.google.com/?q=${encodeURIComponent(biz.address || "Bowenpally, Hyderabad, Telangana")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2 text-sm text-emerald-100 hover:text-white transition-colors"
+              >
+                <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                {biz.address || "Bowenpally, Hyderabad, Telangana"}
+              </a>
             </div>
           </div>
 

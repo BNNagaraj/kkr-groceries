@@ -182,7 +182,7 @@ export default function OrderSearch({ open, onOpenChange, orders, onSelectOrder 
                       <span className="text-sm font-medium truncate" style={{ color: "var(--c2-text, #0f172a)" }}>
                         {order.customerName || "Customer"}
                       </span>
-                      {order.shopName && (
+                      {order.shopName && order.shopName.toLowerCase() !== "not specified" && (
                         <span className="text-[10px] truncate" style={{ color: "var(--c2-text-muted, #94a3b8)" }}>
                           {order.shopName}
                         </span>

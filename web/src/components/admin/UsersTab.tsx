@@ -1,8 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { functions } from "@/lib/firebase";
+import { functions, db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
+import { collection, getDocs } from "firebase/firestore";
+import { useMode } from "@/contexts/ModeContext";
+import { Store } from "@/types/settings";
 import {
   Users,
   Shield,
@@ -19,6 +22,9 @@ import {
   ChevronDown,
   ChevronUp,
   UserCheck,
+  Truck,
+  Warehouse,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,14 +51,18 @@ interface RegisteredUser {
   lastSignIn: string | null;
   disabled: boolean;
   isAdmin: boolean;
+  isDelivery: boolean;
+  isAgent: boolean;
+  agentStoreId: string | null;
   orderCount: number;
   totalSpent: number;
 }
 
 interface ConfirmAction {
-  type: "admin" | "disable";
+  type: "admin" | "disable" | "delivery" | "agent";
   user: RegisteredUser;
   newValue: boolean;
+  storeId?: string;
 }
 
 function formatDate(dateStr: string | null): string {
@@ -69,12 +79,26 @@ function formatDate(dateStr: string | null): string {
 }
 
 export default function UsersTab() {
+  const { col } = useMode();
   const [users, setUsers] = useState<RegisteredUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedUid, setExpandedUid] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [agentStores, setAgentStores] = useState<Store[]>([]);
+  const [agentStorePickerUid, setAgentStorePickerUid] = useState<string | null>(null);
+  const [selectedStoreId, setSelectedStoreId] = useState("");
+
+  // Load agent-type stores
+  useEffect(() => {
+    getDocs(collection(db, col("stores")))
+      .then((snap) => {
+        const all = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Store));
+        setAgentStores(all.filter((s) => s.type === "agent" && s.isActive));
+      })
+      .catch(() => {});
+  }, [col]);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -128,6 +152,60 @@ export default function UsersTab() {
     }
   };
 
+  const handleDeliveryToggle = async () => {
+    if (!confirmAction || confirmAction.type !== "delivery") return;
+    const { user, newValue } = confirmAction;
+
+    setActionLoading(true);
+    try {
+      const setDeliveryClaim = httpsCallable<{ uid: string; delivery: boolean }, { success: boolean }>(
+        functions,
+        "setDeliveryClaim"
+      );
+      await setDeliveryClaim({ uid: user.uid, delivery: newValue });
+      setUsers((prev) =>
+        prev.map((u) => (u.uid === user.uid ? { ...u, isDelivery: newValue } : u))
+      );
+      toast.success(newValue ? "Delivery role granted." : "Delivery role revoked.");
+    } catch (e) {
+      console.error("[UsersTab] Failed to update delivery role:", e);
+      toast.error("Failed to update delivery role.");
+    } finally {
+      setActionLoading(false);
+      setConfirmAction(null);
+    }
+  };
+
+  const handleAgentToggle = async () => {
+    if (!confirmAction || confirmAction.type !== "agent") return;
+    const { user, newValue, storeId } = confirmAction;
+
+    setActionLoading(true);
+    try {
+      const setAgentClaim = httpsCallable<{ uid: string; agent: boolean; storeId?: string }, { success: boolean }>(
+        functions,
+        "setAgentClaim"
+      );
+      await setAgentClaim({ uid: user.uid, agent: newValue, storeId: storeId || undefined });
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.uid === user.uid
+            ? { ...u, isAgent: newValue, agentStoreId: newValue ? (storeId || null) : null }
+            : u
+        )
+      );
+      toast.success(newValue ? "Agent role granted." : "Agent role revoked.");
+    } catch (e) {
+      console.error("[UsersTab] Failed to update agent role:", e);
+      toast.error("Failed to update agent role.");
+    } finally {
+      setActionLoading(false);
+      setConfirmAction(null);
+      setAgentStorePickerUid(null);
+      setSelectedStoreId("");
+    }
+  };
+
   const handleDisableToggle = async () => {
     if (!confirmAction || confirmAction.type !== "disable") return;
     const { user, newValue } = confirmAction;
@@ -165,7 +243,17 @@ export default function UsersTab() {
   });
 
   const adminCount = users.filter((u) => u.isAdmin).length;
+  const deliveryCount = users.filter((u) => u.isDelivery).length;
+  const agentCount = users.filter((u) => u.isAgent).length;
   const disabledCount = users.filter((u) => u.disabled).length;
+
+  const handleConfirm = () => {
+    if (!confirmAction) return;
+    if (confirmAction.type === "admin") handleAdminToggle();
+    else if (confirmAction.type === "delivery") handleDeliveryToggle();
+    else if (confirmAction.type === "agent") handleAgentToggle();
+    else handleDisableToggle();
+  };
 
   return (
     <div className="space-y-4">
@@ -188,7 +276,7 @@ export default function UsersTab() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
           <div className="text-2xl font-bold text-slate-800">{users.length}</div>
           <div className="text-xs text-slate-500 font-semibold">Total Users</div>
@@ -196,6 +284,14 @@ export default function UsersTab() {
         <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
           <div className="text-2xl font-bold text-emerald-700">{adminCount}</div>
           <div className="text-xs text-slate-500 font-semibold">Admins</div>
+        </div>
+        <div className="bg-white rounded-xl border border-blue-200 p-3 text-center">
+          <div className="text-2xl font-bold text-blue-700">{deliveryCount}</div>
+          <div className="text-xs text-slate-500 font-semibold">Delivery Boys</div>
+        </div>
+        <div className="bg-white rounded-xl border border-orange-200 p-3 text-center">
+          <div className="text-2xl font-bold text-orange-700">{agentCount}</div>
+          <div className="text-xs text-slate-500 font-semibold">Agents</div>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
           <div className="text-2xl font-bold text-red-600">{disabledCount}</div>
@@ -252,10 +348,10 @@ export default function UsersTab() {
                 {/* Avatar */}
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 ${
-                    u.isAdmin ? "bg-emerald-600" : u.disabled ? "bg-red-400" : "bg-slate-400"
+                    u.isAdmin ? "bg-emerald-600" : u.isAgent ? "bg-orange-600" : u.isDelivery ? "bg-blue-600" : u.disabled ? "bg-red-400" : "bg-slate-400"
                   }`}
                 >
-                  {initials}
+                  {u.isAgent && !u.isAdmin ? <Warehouse className="w-5 h-5" /> : u.isDelivery && !u.isAdmin ? <Truck className="w-5 h-5" /> : initials}
                 </div>
 
                 {/* Info */}
@@ -267,6 +363,16 @@ export default function UsersTab() {
                     {u.isAdmin && (
                       <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px]">
                         Admin
+                      </Badge>
+                    )}
+                    {u.isDelivery && (
+                      <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-[10px]">
+                        Delivery
+                      </Badge>
+                    )}
+                    {u.isAgent && (
+                      <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-[10px]">
+                        Agent
                       </Badge>
                     )}
                     {u.disabled && (
@@ -344,6 +450,7 @@ export default function UsersTab() {
 
                   {/* Actions */}
                   <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
+                    {/* Admin toggle */}
                     {u.isAdmin ? (
                       <Button
                         variant="outline"
@@ -368,6 +475,85 @@ export default function UsersTab() {
                       </Button>
                     )}
 
+                    {/* Delivery toggle */}
+                    {u.isDelivery ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setConfirmAction({ type: "delivery", user: u, newValue: false })
+                        }
+                        className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                      >
+                        <Truck className="w-3.5 h-3.5" /> Revoke Delivery
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setConfirmAction({ type: "delivery", user: u, newValue: true })
+                        }
+                        className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                      >
+                        <Truck className="w-3.5 h-3.5" /> Grant Delivery
+                      </Button>
+                    )}
+
+                    {/* Agent toggle */}
+                    {u.isAgent ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setConfirmAction({ type: "agent", user: u, newValue: false })
+                        }
+                        className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                      >
+                        <Warehouse className="w-3.5 h-3.5" /> Revoke Agent
+                      </Button>
+                    ) : agentStorePickerUid === u.uid ? (
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={selectedStoreId}
+                          onChange={(e) => setSelectedStoreId(e.target.value)}
+                          className="text-sm border border-orange-200 rounded-lg p-1.5 bg-white"
+                        >
+                          <option value="">Pick store...</option>
+                          {agentStores.filter((s) => !s.agentUid || s.agentUid === u.uid).map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                        <Button
+                          size="sm"
+                          disabled={!selectedStoreId}
+                          onClick={() =>
+                            setConfirmAction({ type: "agent", user: u, newValue: true, storeId: selectedStoreId })
+                          }
+                          className="bg-orange-600 hover:bg-orange-700"
+                        >
+                          Assign
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { setAgentStorePickerUid(null); setSelectedStoreId(""); }}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAgentStorePickerUid(u.uid)}
+                        className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                      >
+                        <Warehouse className="w-3.5 h-3.5" /> Grant Agent
+                      </Button>
+                    )}
+
+                    {/* Disable/Enable toggle */}
                     {u.disabled ? (
                       <Button
                         variant="outline"
@@ -408,18 +594,26 @@ export default function UsersTab() {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {confirmAction?.type === "admin"
-                ? confirmAction.newValue
-                  ? "Grant Admin Access?"
-                  : "Revoke Admin Access?"
-                : confirmAction?.newValue
-                ? "Disable User Account?"
-                : "Enable User Account?"}
+                ? confirmAction.newValue ? "Grant Admin Access?" : "Revoke Admin Access?"
+                : confirmAction?.type === "delivery"
+                ? confirmAction.newValue ? "Grant Delivery Role?" : "Revoke Delivery Role?"
+                : confirmAction?.type === "agent"
+                ? confirmAction.newValue ? "Grant Agent Role?" : "Revoke Agent Role?"
+                : confirmAction?.newValue ? "Disable User Account?" : "Enable User Account?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmAction?.type === "admin"
                 ? confirmAction.newValue
                   ? `This will grant admin privileges to ${confirmAction.user.displayName || confirmAction.user.email || "this user"}. They will be able to manage products, orders, and other users.`
                   : `This will revoke admin privileges from ${confirmAction.user.displayName || confirmAction.user.email || "this user"}. They will no longer be able to access the admin dashboard.`
+                : confirmAction?.type === "delivery"
+                ? confirmAction.newValue
+                  ? `This will grant the delivery role to ${confirmAction.user.displayName || confirmAction.user.phone || "this user"}. They will see a delivery dashboard with assigned orders and navigation.`
+                  : `This will revoke the delivery role from ${confirmAction.user.displayName || confirmAction.user.phone || "this user"}. They will no longer see the delivery dashboard.`
+                : confirmAction?.type === "agent"
+                ? confirmAction.newValue
+                  ? `This will grant the agent role to ${confirmAction.user.displayName || confirmAction.user.phone || "this user"}. They will manage inventory and delivery for their assigned store.`
+                  : `This will revoke the agent role from ${confirmAction.user.displayName || confirmAction.user.phone || "this user"}. They will no longer manage any store.`
                 : confirmAction?.newValue
                 ? `This will disable the account for ${confirmAction?.user.displayName || confirmAction?.user.email || "this user"}. They will not be able to sign in or place orders.`
                 : `This will re-enable the account for ${confirmAction?.user.displayName || confirmAction?.user.email || "this user"}. They will be able to sign in and place orders again.`}
@@ -428,11 +622,15 @@ export default function UsersTab() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={actionLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmAction?.type === "admin" ? handleAdminToggle : handleDisableToggle}
+              onClick={handleConfirm}
               disabled={actionLoading}
               className={
                 confirmAction?.type === "disable" && confirmAction.newValue
                   ? "bg-red-600 hover:bg-red-700"
+                  : confirmAction?.type === "delivery"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : confirmAction?.type === "agent"
+                  ? "bg-orange-600 hover:bg-orange-700"
                   : ""
               }
             >

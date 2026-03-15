@@ -14,6 +14,7 @@ import { functions } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ThemeSettingsSection from "./ThemeSettingsSection";
+import StoresSection from "./StoresSection";
 import {
   DeliverySettings,
   BusinessSettings,
@@ -1550,6 +1551,9 @@ export default function SettingsTab() {
           </div>
         </div>
       </div>
+
+      {/* Stores / Warehouses */}
+      <StoresSection />
 
       {/* Store Theme Settings */}
       <ThemeSettingsSection />

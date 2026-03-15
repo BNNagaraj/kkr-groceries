@@ -19,4 +19,5 @@ export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getA
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
+export const functionsAsia = getFunctions(app, "asia-south1");
 export const storage = getStorage(app);
