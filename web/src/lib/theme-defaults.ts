@@ -284,11 +284,11 @@ export const THEME_PRESETS: ThemePreset[] = [
     {
         id: "premiumribbon",
         name: "Premium Ribbon",
-        description: "OrchardSage — clean, clutter-free wholesale card. Muted sage accent, structured tier block with active-slab highlight, generous whitespace.",
+        description: "Blue-indigo ribbon tabs for each tier. Active ribbon scales up with shadow. Left indigo accent border. Bold and modern.",
         defaults: {
             activeTheme: "premiumribbon",
-            primaryColor: "#569C7E",
-            accentColor: "#427B63",
+            primaryColor: "#6366f1",
+            accentColor: "#3b82f6",
             grid: { mobile: 1, tablet: 2, desktop: 2, wide: 3 },
             cardStyle: { borderRadius: "xl" },
             cardLayout: { imageWidth: 28, imagePosition: "left" },
