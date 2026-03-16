@@ -3,25 +3,39 @@
 import React, { useState, memo } from "react";
 import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
-import { Flame, LeafyGreen, ZoomIn, TrendingDown } from "lucide-react";
+import { Flame, LeafyGreen, ZoomIn, ArrowRight } from "lucide-react";
 import { formatTiersForDisplay, getActiveTierIndex, getNextTierNudge, resolveSlabPrice } from "@/lib/pricing";
-import { CartControls, ImageLightbox } from "./shared";
-import { useTheme } from "@/contexts/ThemeContext";
+import { CartControls, ImageLightbox, useImageLayout } from "./shared";
 
 /**
- * Premium Ribbon — BLUE-INDIGO color scheme with full-width colored ribbon tabs.
+ * Premium Ribbon — "OrchardSage" redesign.
  *
- * Visual identity: Indigo/blue gradient accents, ribbon tabs that stretch edge-to-edge
- * with rounded right ends. Active ribbon pops with shadow + scale. Very different from
- * Ticket (warm stone) and Shelf (emerald band).
+ * Clean, clutter-free wholesale card. Muted sage-green accent, structured
+ * tier block with left-border highlight on the active slab, generous whitespace.
+ * Designed for scannability — price + name dominate, tiers are elegant & compact.
  *
- * Image: respects theme settings (imageWidth, imagePosition).
+ * Signature: "Structured Tier Block" — thin left-accent line on active tier,
+ * small ACTIVE pill, sage-green nudge bar. No ribbons, no visual noise.
  */
+
+/* ─── Palette (OrchardSage) ─── */
+const C = {
+    sage:      "#569C7E",
+    sageDark:  "#427B63",
+    sageLight: "#ECF8F3",
+    text1:     "#1A202C",
+    text2:     "#4A5568",
+    muted:     "#718096",
+    border:    "#E5E7EB",
+    bg:        "#FFFFFF",
+    hot:       "#EF4444",
+} as const;
+
 export const PremiumRibbonCard = memo(function PremiumRibbonCard({ product }: { product: Product }) {
     const [imgError, setImgError] = useState(false);
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const { cart } = useAppStore();
-    const { theme } = useTheme();
+    const img = useImageLayout();
     const hasImage = !!product.image && !imgError;
 
     const tiers = product.priceTiers?.length ? formatTiersForDisplay(product.priceTiers) : [];
@@ -32,131 +46,127 @@ export const PremiumRibbonCard = memo(function PremiumRibbonCard({ product }: { 
     const nudge = getNextTierNudge(qty, basePrice, product.priceTiers || [], product.unit);
     const effectivePrice = qty > 0 && product.priceTiers?.length
         ? resolveSlabPrice(qty, basePrice, product.priceTiers) : basePrice;
-    const lowestPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : basePrice;
-    const maxSavingsPercent = basePrice > 0 ? Math.round(((basePrice - lowestPrice) / basePrice) * 100) : 0;
-
-    const imgPos = theme.cardLayout?.imagePosition || "left";
-    const imgW = theme.cardLayout?.imageWidth || 25;
-    const isHorizontal = imgPos === "left" || imgPos === "right";
-
-    // Ribbon colors — BLUE/INDIGO progressive (distinct from green themes)
-    const RIBBON_COLORS = [
-        { bg: "bg-blue-50", text: "text-blue-800", activeBg: "bg-indigo-600", activeText: "text-white" },
-        { bg: "bg-blue-100", text: "text-blue-800", activeBg: "bg-indigo-600", activeText: "text-white" },
-        { bg: "bg-indigo-200", text: "text-indigo-900", activeBg: "bg-indigo-700", activeText: "text-white" },
-        { bg: "bg-indigo-300", text: "text-white", activeBg: "bg-indigo-800", activeText: "text-white" },
-        { bg: "bg-indigo-400", text: "text-white", activeBg: "bg-indigo-900", activeText: "text-white" },
-    ];
 
     return (
         <>
             <div
-                className="bg-white shadow-sm overflow-hidden hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 ease-out flex flex-col h-full"
+                className="bg-white overflow-hidden flex flex-col h-full transition-all duration-200 ease-out hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.99]"
                 style={{
                     borderRadius: "var(--theme-card-radius, 0.75rem)",
-                    border: "1px solid #e0e7ff",
-                    borderLeft: "4px solid #6366f1",
+                    border: `1px solid ${C.border}`,
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
                 }}
             >
-                {/* Dynamic layout based on theme settings */}
-                <div className={`flex ${isHorizontal ? (imgPos === "right" ? "flex-row-reverse" : "flex-row") : "flex-col"}`}>
-                    {/* Image — respects theme settings */}
+                {/* Image + Content wrapper — respects theme layout */}
+                <div className={`flex ${img.containerClass} flex-1`}>
+
+                    {/* ── Image ── */}
                     <div
-                        className={`relative shrink-0 bg-indigo-50 overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""} ${
-                            isHorizontal ? "aspect-auto" : "aspect-[16/9] w-full"
-                        }`}
-                        style={isHorizontal ? { width: `${imgW}%` } : undefined}
+                        className={`relative shrink-0 overflow-hidden group/img ${img.imageClass} ${hasImage ? "cursor-pointer" : ""}`}
+                        style={{
+                            ...img.imageStyle,
+                            backgroundColor: "#f7faf9",
+                        }}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
                             <>
-                                <Image src={product.image} alt={product.name} fill sizes={isHorizontal ? `${imgW}vw` : "100vw"} className="object-cover" unoptimized={!product.image.includes("googleapis.com")} onError={() => setImgError(true)} />
-                                <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/15 transition-colors flex items-center justify-center">
+                                <Image
+                                    src={product.image}
+                                    alt={product.name}
+                                    fill
+                                    sizes={img.imageSizes}
+                                    className="object-cover"
+                                    unoptimized={!product.image.includes("googleapis.com")}
+                                    onError={() => setImgError(true)}
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors flex items-center justify-center">
                                     <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover/img:opacity-100 transition-opacity drop-shadow-lg" />
                                 </div>
                             </>
                         ) : (
-                            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50">
-                                <span className="text-2xl font-bold text-indigo-200">{product.name.charAt(0)}</span>
+                            <div className="absolute inset-0 flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f0faf5 0%, #e8f4ee 100%)" }}>
+                                <span className="text-3xl font-semibold" style={{ color: "#c6ddd2" }}>{product.name.charAt(0)}</span>
                             </div>
                         )}
 
-                        {/* Savings badge — indigo */}
-                        {maxSavingsPercent > 0 && tiers.length > 1 && (
-                            <div className="absolute top-1.5 left-1.5 bg-indigo-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
-                                -{maxSavingsPercent}%
+                        {/* Badges — top-right, small & clean */}
+                        {(product.hot || product.fresh) && (
+                            <div className="absolute top-2 right-2 flex gap-1 z-10">
+                                {product.hot && (
+                                    <span className="inline-flex items-center text-[10px] font-semibold text-white px-1.5 py-0.5 rounded-full" style={{ backgroundColor: C.hot }}>
+                                        <Flame className="w-2.5 h-2.5 mr-0.5" />HOT
+                                    </span>
+                                )}
+                                {product.fresh && (
+                                    <span className="inline-flex items-center text-[10px] font-semibold text-white px-1.5 py-0.5 rounded-full" style={{ backgroundColor: C.sage }}>
+                                        <LeafyGreen className="w-2.5 h-2.5 mr-0.5" />FRESH
+                                    </span>
+                                )}
                             </div>
                         )}
                     </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0 flex flex-col">
-                        {/* Header with indigo accent line */}
-                        <div className="p-3 pb-2">
-                            <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                        <h3 className="text-sm font-bold text-slate-800 leading-tight truncate">{product.name}</h3>
-                                        {product.hot && <Flame className="w-3 h-3 text-red-500 shrink-0" />}
-                                        {product.fresh && <LeafyGreen className="w-3 h-3 text-green-500 shrink-0" />}
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                                        <span className="font-telugu">{product.telugu}</span>
-                                        {product.hindi && <> · {product.hindi}</>}
-                                    </div>
-                                    {product.moqRequired !== false && (
-                                        <div className="text-[9px] text-slate-400 mt-0.5">Min: {product.moq} {product.unit}</div>
-                                    )}
-                                </div>
+                    {/* ── Content ── */}
+                    <div className="flex-1 min-w-0 flex flex-col p-4 sm:p-5">
 
-                                {/* Price in indigo pill */}
-                                <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1 text-center shrink-0">
-                                    <div className="text-lg font-extrabold text-indigo-700 leading-none tabular-nums">
-                                        Rs.{effectivePrice}
-                                    </div>
-                                    <div className="text-[9px] text-indigo-400 font-medium">/{product.unit}</div>
-                                </div>
+                        {/* Product name */}
+                        <h3 className="text-base sm:text-lg font-semibold leading-tight truncate" style={{ color: C.text1 }}>
+                            {product.name}
+                        </h3>
+
+                        {/* Telugu / Hindi */}
+                        <p className="text-xs sm:text-sm mt-0.5 truncate" style={{ color: C.muted }}>
+                            <span className="font-telugu">{product.telugu}</span>
+                            {product.hindi && <span> · {product.hindi}</span>}
+                        </p>
+
+                        {/* Price + MOQ row */}
+                        <div className="flex items-baseline justify-between mt-3">
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-xl sm:text-2xl font-bold tabular-nums" style={{ color: C.text1 }}>
+                                    Rs.{effectivePrice}
+                                </span>
+                                <span className="text-sm" style={{ color: C.text2 }}>/{product.unit}</span>
                             </div>
+                            {product.moqRequired !== false && (
+                                <span className="text-xs" style={{ color: C.muted }}>
+                                    MOQ: {product.moq} {product.unit}
+                                </span>
+                            )}
                         </div>
 
-                        {/* RIBBON TIERS — full-width colored tabs, rounded right end */}
+                        {/* ── Structured Tier Block ── */}
                         {tiers.length > 0 && (
-                            <div className="pb-2 space-y-1">
+                            <div className="mt-3 pt-3 flex flex-col gap-1" style={{ borderTop: `1px solid ${C.border}` }}>
                                 {tiers.map((tier, i) => {
                                     const isActive = i === activeIdx;
                                     const isPast = activeIdx >= 0 && i < activeIdx;
-                                    const color = RIBBON_COLORS[Math.min(i, RIBBON_COLORS.length - 1)];
-                                    const saving = basePrice - tier.price;
 
                                     return (
                                         <div
                                             key={i}
-                                            className={`flex items-center justify-between pl-3 pr-3 py-1.5 transition-all duration-300 ${
-                                                isActive
-                                                    ? `${color.activeBg} ${color.activeText} shadow-md scale-[1.02] origin-left`
-                                                    : isPast
-                                                        ? `${color.bg} ${color.text} opacity-40`
-                                                        : `${color.bg} ${color.text}`
-                                            }`}
+                                            className="flex items-center justify-between px-2.5 py-1.5 rounded-md transition-all duration-200"
                                             style={{
-                                                marginLeft: isActive ? 0 : "8px",
-                                                borderRadius: "0 20px 20px 0",
-                                                marginRight: isActive ? "8px" : "16px",
+                                                backgroundColor: isActive ? C.sageLight : "transparent",
+                                                borderLeft: isActive ? `2px solid ${C.sage}` : "2px solid transparent",
+                                                opacity: isPast ? 0.45 : 1,
+                                                paddingLeft: isActive ? "8px" : "10px",
                                             }}
                                         >
-                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                {isActive && (
-                                                    <span className="w-2 h-2 rounded-full bg-white/80 animate-pulse shrink-0" />
-                                                )}
-                                                <span className="text-[11px] font-semibold truncate">
-                                                    {tier.range} {product.unit}
+                                            <span className="text-sm" style={{ color: C.text2 }}>
+                                                {tier.range} {product.unit}
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm sm:text-base font-semibold tabular-nums" style={{ color: C.text1 }}>
+                                                    Rs.{tier.price}
                                                 </span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5 shrink-0">
-                                                <span className="text-xs font-bold tabular-nums">Rs.{tier.price}</span>
-                                                {saving > 0 && (
-                                                    <span className={`text-[9px] font-medium ${isActive ? "text-white/70" : "opacity-60"}`}>
-                                                        -Rs.{saving}
+                                                {isActive && (
+                                                    <span
+                                                        className="text-[10px] font-medium text-white px-1.5 py-0.5 rounded-full"
+                                                        style={{ backgroundColor: C.sage }}
+                                                    >
+                                                        ACTIVE
                                                     </span>
                                                 )}
                                             </div>
@@ -164,21 +174,23 @@ export const PremiumRibbonCard = memo(function PremiumRibbonCard({ product }: { 
                                     );
                                 })}
 
-                                {/* Nudge */}
+                                {/* Next-tier nudge */}
                                 {nudge && qty > 0 && (
-                                    <div className="mx-3 mt-1 flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 rounded-md px-2.5 py-1 border border-amber-200/50">
-                                        <TrendingDown className="w-3 h-3 shrink-0" />
-                                        <span className="font-medium">+{nudge.qtyNeeded} {product.unit}</span>
-                                        <span className="text-amber-400">=</span>
-                                        <span className="font-bold">Rs.{nudge.nextPrice}/{product.unit}</span>
-                                        <span className="text-emerald-600 font-bold ml-auto">save Rs.{nudge.savingsPerUnit}</span>
+                                    <div
+                                        className="flex items-center gap-1.5 px-2.5 py-2 rounded-md text-sm font-medium mt-0.5"
+                                        style={{ backgroundColor: C.sageLight, color: C.sage }}
+                                    >
+                                        <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+                                        <span>
+                                            Add {nudge.qtyNeeded} {product.unit} for <strong>Rs.{nudge.nextPrice}/{product.unit}</strong>
+                                        </span>
                                     </div>
                                 )}
                             </div>
                         )}
 
                         {/* Cart */}
-                        <div className="px-3 pb-2.5 mt-auto">
+                        <div className="mt-auto pt-3">
                             <CartControls product={product} />
                         </div>
                     </div>

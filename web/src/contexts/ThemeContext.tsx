@@ -143,7 +143,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             tierstep: "#f9fafb",
             trade: "#f5f7fa",
             harvest: "#fffbf0",
-            premiumribbon: "#f5f7ff",
+            premiumribbon: "#f8fbf9",
             premiumticket: "#fdfcf9",
             premiumshelf: "#f5faf8",
         };
