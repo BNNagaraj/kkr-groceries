@@ -8,6 +8,7 @@
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { getMessaging } = require("firebase-admin/messaging");
 const {
   db, FieldValue,
   haversineKm,
@@ -18,12 +19,26 @@ const {
 
 /**
  * sendDeliveryOTP — generates a 6-digit OTP, stores it in Firestore,
- * and emails it to the customer.
+ * and dispatches it via the requested channels (email and/or customer-app push).
+ *
+ * SMS is handled client-side via Firebase Phone Auth and is NOT routed here.
+ *
+ * Request data:
+ *   - orderId        : string (required)
+ *   - orderCollection: string (optional, defaults to mode-resolved "orders")
+ *   - channels       : { email?: boolean, app?: boolean }
+ *                      Default: { email: true } — preserves the legacy contract.
  */
 exports.sendDeliveryOTP = onCall(async (request) => {
   const caller = await requireAdmin(request);
-  const { orderId, orderCollection } = request.data;
+  const { orderId, orderCollection, channels } = request.data;
   if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId.");
+
+  const wantEmail = !channels || channels.email === true || channels.email === undefined;
+  const wantApp = !!(channels && channels.app);
+  if (!wantEmail && !wantApp) {
+    throw new HttpsError("invalid-argument", "At least one of email/app must be requested.");
+  }
 
   const mode = await getAppMode();
   const colName = orderCollection || resolveCol("orders", mode);
@@ -34,20 +49,28 @@ exports.sendDeliveryOTP = onCall(async (request) => {
 
   const buyerEmail = order.userEmail || null;
   const buyerPhone = order.phone || null;
-  if (!buyerEmail) {
+  const buyerUid = order.userId || null;
+  if (wantEmail && !buyerEmail) {
     throw new HttpsError("failed-precondition", "Customer has no email on file. Cannot send email OTP.");
   }
+  if (wantApp && !buyerUid) {
+    throw new HttpsError("failed-precondition", "Customer has no app account linked to this order. Cannot send via Customer App.");
+  }
 
-  // Generate 6-digit OTP
+  // Generate 6-digit OTP (shared across channels)
   const otp = String(Math.floor(100000 + Math.random() * 900000));
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-  // Store OTP in Firestore
+  // Store OTP in Firestore. The "app" channel reads this doc live to render
+  // the Active OTP banner on the buyer's order detail page.
   await db.collection("delivery_otps").doc(orderId).set({
     otp,
     orderId,
-    buyerEmail,
+    orderCollection: colName,
+    buyerEmail: buyerEmail || "",
     buyerPhone: buyerPhone || "",
+    buyerUid: buyerUid || "",
+    channels: { email: wantEmail, app: wantApp },
     expiresAt: expiresAt.toISOString(),
     createdAt: FieldValue.serverTimestamp(),
     createdBy: caller.uid,
@@ -55,41 +78,93 @@ exports.sendDeliveryOTP = onCall(async (request) => {
     attempts: 0,
   });
 
-  // Build OTP email
   const customerName = order.customerName || "Customer";
   const displayOrderId = order.orderId || orderId;
-  const otpEmailHtml = emailLayout(`
-    <div style="padding:32px 24px;text-align:center;">
-      <div style="width:64px;height:64px;background:#f0fdf4;border-radius:50%;line-height:64px;font-size:28px;margin:0 auto 16px;">\u{1F510}</div>
-      <h2 style="color:#1e293b;font-size:22px;font-weight:700;margin:0 0 8px;">Delivery Verification</h2>
-      <p style="color:#64748b;font-size:14px;line-height:1.6;margin:0 0 24px;">
-        Hi ${customerName}, please share this OTP with the delivery person to confirm receipt of your order.
-      </p>
-      <div style="background:#064e3b;border-radius:16px;padding:24px;margin:0 auto;max-width:280px;">
-        <div style="color:#a7f3d0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">Your OTP</div>
-        <div style="color:#ffffff;font-size:36px;font-weight:800;letter-spacing:8px;font-family:'Courier New',monospace;">${otp}</div>
-      </div>
-      <p style="color:#94a3b8;font-size:12px;margin:20px 0 0;">
-        Order: <strong>${displayOrderId}</strong> &bull; Valid for 10 minutes
-      </p>
-      <p style="color:#ef4444;font-size:12px;font-weight:600;margin:8px 0 0;">
-        Do not share this code with anyone other than the delivery person.
-      </p>
-    </div>
-  `, `Your delivery OTP for order ${displayOrderId}`);
+  const sentTo = [];
+  const errors = [];
 
-  // Queue email
-  await db.collection("mail").add({
-    to: [buyerEmail],
-    message: {
-      subject: `\u{1F510} Delivery OTP for Order ${displayOrderId}`,
-      html: otpEmailHtml,
-    },
-    createdAt: FieldValue.serverTimestamp(),
-  });
+  // ── Channel: Email ──
+  if (wantEmail) {
+    try {
+      const otpEmailHtml = emailLayout(`
+        <div style="padding:32px 24px;text-align:center;">
+          <div style="width:64px;height:64px;background:#f0fdf4;border-radius:50%;line-height:64px;font-size:28px;margin:0 auto 16px;">\u{1F510}</div>
+          <h2 style="color:#1e293b;font-size:22px;font-weight:700;margin:0 0 8px;">Delivery Verification</h2>
+          <p style="color:#64748b;font-size:14px;line-height:1.6;margin:0 0 24px;">
+            Hi ${customerName}, please share this OTP with the delivery person to confirm receipt of your order.
+          </p>
+          <div style="background:#064e3b;border-radius:16px;padding:24px;margin:0 auto;max-width:280px;">
+            <div style="color:#a7f3d0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">Your OTP</div>
+            <div style="color:#ffffff;font-size:36px;font-weight:800;letter-spacing:8px;font-family:'Courier New',monospace;">${otp}</div>
+          </div>
+          <p style="color:#94a3b8;font-size:12px;margin:20px 0 0;">
+            Order: <strong>${displayOrderId}</strong> &bull; Valid for 10 minutes
+          </p>
+          <p style="color:#ef4444;font-size:12px;font-weight:600;margin:8px 0 0;">
+            Do not share this code with anyone other than the delivery person.
+          </p>
+        </div>
+      `, `Your delivery OTP for order ${displayOrderId}`);
 
-  console.log(`Delivery OTP sent for ${orderId} to ${buyerEmail} by admin ${caller.uid}`);
-  return { success: true, message: `OTP sent to ${buyerEmail}` };
+      await db.collection("mail").add({
+        to: [buyerEmail],
+        message: {
+          subject: `\u{1F510} Delivery OTP for Order ${displayOrderId}`,
+          html: otpEmailHtml,
+        },
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      sentTo.push(`email:${buyerEmail}`);
+    } catch (e) {
+      errors.push(`email: ${e.message}`);
+    }
+  }
+
+  // ── Channel: Customer App ──
+  // Tries an FCM push if the buyer has a registered token. Even without a token,
+  // the buyer's open order page picks up the OTP via the Firestore listener.
+  if (wantApp) {
+    let pushed = false;
+    try {
+      const tokenSnap = await db
+        .collection("users")
+        .doc(buyerUid)
+        .collection("tokens")
+        .doc("fcm")
+        .get();
+
+      if (tokenSnap.exists && tokenSnap.data().active !== false && tokenSnap.data().token) {
+        await getMessaging().send({
+          token: tokenSnap.data().token,
+          notification: {
+            title: "Delivery OTP",
+            body: `Your code for order ${displayOrderId} is ${otp}. Valid for 10 minutes.`,
+          },
+          data: {
+            type: "delivery_otp",
+            orderId,
+            otp,
+          },
+        });
+        pushed = true;
+      }
+    } catch (e) {
+      errors.push(`app push: ${e.message}`);
+    }
+    sentTo.push(pushed ? "app:push+banner" : "app:banner");
+  }
+
+  console.log(
+    `Delivery OTP for ${orderId} dispatched via [${sentTo.join(", ")}] by admin ${caller.uid}` +
+      (errors.length ? ` — partial errors: ${errors.join("; ")}` : "")
+  );
+
+  return {
+    success: true,
+    sentTo,
+    errors,
+    message: `OTP dispatched via ${sentTo.join(" + ") || "no channels"}`,
+  };
 });
 
 /**

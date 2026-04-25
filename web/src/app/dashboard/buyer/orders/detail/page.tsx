@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, deleteField, addDoc, collection } from "firebase/firestore";
+import { doc, getDoc, updateDoc, deleteField, addDoc, collection, onSnapshot } from "firebase/firestore";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -16,6 +16,7 @@ import {
   User,
   Truck,
   AlertTriangle,
+  ShieldCheck,
 } from "lucide-react";
 import { useMode } from "@/contexts/ModeContext";
 import { Order, OrderCartItem } from "@/types/order";
@@ -62,6 +63,15 @@ export default function OrderDetailPage() {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Live "Active OTP" banner — admin asked for OTP delivery via the Customer App.
+  // Polls a 1-second timer to keep the countdown accurate.
+  const [activeOtp, setActiveOtp] = useState<{
+    code: string;
+    expiresAt: Date;
+    verified: boolean;
+  } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
   useEffect(() => {
     if (!currentUser || !orderId) return;
 
@@ -89,6 +99,51 @@ export default function OrderDetailPage() {
 
     fetchOrder();
   }, [currentUser, orderId, col]);
+
+  // Subscribe to active OTP for this order (Customer App channel)
+  useEffect(() => {
+    if (!currentUser || !orderId) return;
+    const unsub = onSnapshot(
+      doc(db, "delivery_otps", orderId),
+      (snap) => {
+        if (!snap.exists()) {
+          setActiveOtp(null);
+          return;
+        }
+        const data = snap.data();
+        // Only render the banner if the buyer was the intended app-channel target
+        if (data.buyerUid && data.buyerUid !== currentUser.uid) {
+          setActiveOtp(null);
+          return;
+        }
+        if (data.channels && data.channels.app !== true) {
+          // Admin didn't select the app channel — don't expose the code here
+          setActiveOtp(null);
+          return;
+        }
+        setActiveOtp({
+          code: String(data.otp),
+          expiresAt: new Date(data.expiresAt),
+          verified: !!data.verified,
+        });
+      },
+      (err) => console.warn("[OTP] Listener error:", err.message)
+    );
+    return unsub;
+  }, [currentUser, orderId]);
+
+  // 1-second tick so the countdown stays current
+  useEffect(() => {
+    if (!activeOtp || activeOtp.verified) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [activeOtp]);
+
+  const otpSecondsLeft = activeOtp
+    ? Math.max(0, Math.floor((activeOtp.expiresAt.getTime() - now) / 1000))
+    : 0;
+  const otpExpired = !!activeOtp && otpSecondsLeft <= 0;
+  const showOtpBanner = !!activeOtp && !activeOtp.verified && !otpExpired;
 
   const handleApproveModification = async () => {
     if (!order?.pendingModification) return;
@@ -239,6 +294,42 @@ export default function OrderDetailPage() {
 
           <StatusTimeline order={order} />
         </div>
+
+        {/* Active Delivery OTP Banner — shown when admin sends OTP via the Customer App channel */}
+        {showOtpBanner && activeOtp && (
+          <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl shadow-lg p-6 mb-4 text-white">
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldCheck className="w-5 h-5 text-emerald-100" />
+              <h2 className="text-lg font-bold">Delivery OTP</h2>
+            </div>
+            <p className="text-sm text-emerald-50 mb-4">
+              Show this code to the delivery person to confirm receipt of your order.
+            </p>
+            <div className="bg-emerald-900/40 rounded-xl px-4 py-5 text-center mb-3">
+              <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-200 mb-1">
+                Your Code
+              </div>
+              <div
+                className="text-4xl sm:text-5xl font-extrabold tracking-[0.4em] font-mono select-all"
+                aria-label={`Delivery OTP ${activeOtp.code.split("").join(" ")}`}
+              >
+                {activeOtp.code}
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-xs text-emerald-100">
+              <span>
+                Expires in{" "}
+                <span className="font-bold">
+                  {Math.floor(otpSecondsLeft / 60)}:
+                  {String(otpSecondsLeft % 60).padStart(2, "0")}
+                </span>
+              </span>
+              <span className="text-emerald-200/80">
+                Do not share with anyone other than the delivery person.
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Pending Modification Banner */}
         {hasPendingMod && mod && (

@@ -31,7 +31,8 @@ import { DEFAULT_DELIVERY } from "@/types/settings";
 import { parseTotal, exportOrdersToCSV } from "@/lib/helpers";
 import { normalizeIndianPhone } from "@/lib/validation";
 import { toast } from "sonner";
-import type { OtpChannel } from "@/types/settings";
+import type { OtpChannelFlags } from "@/types/settings";
+import { normalizeOtpChannels } from "@/types/settings";
 
 declare global {
   interface Window {
@@ -280,7 +281,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
 
   // ── OTP on Fulfill ──
   const [otpRequired, setOtpRequired] = useState(false);
-  const [otpChannels, setOtpChannels] = useState<OtpChannel>("email");
+  const [otpChannels, setOtpChannels] = useState<OtpChannelFlags>({ email: true, sms: false, app: false });
   const [otpDialogOrder, setOtpDialogOrder] = useState<Order | null>(null);
   const [otpCode, setOtpCode] = useState("");
   const [otpSending, setOtpSending] = useState(false);
@@ -291,6 +292,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
   const [smsConfirmation, setSmsConfirmation] = useState<ConfirmationResult | null>(null);
   const [smsSent, setSmsSent] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [appSent, setAppSent] = useState(false);
 
   // ── Assign Delivery Dialog ──
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
@@ -306,7 +308,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
         if (snap.exists()) {
           const data = snap.data();
           setOtpRequired(data.requireDeliveryOTP === true);
-          if (data.otpChannels) setOtpChannels(data.otpChannels as OtpChannel);
+          setOtpChannels(normalizeOtpChannels(data.otpChannels));
         }
       } catch (e) {
         console.warn("[C2] Failed to fetch OTP settings:", e);
@@ -604,12 +606,14 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
   // ── OTP Fulfill intercept ──
   const handleFulfillClick = useCallback(
     (order: Order) => {
-      if (otpRequired && (order.userEmail || order.phone)) {
+      const hasAnyContact = !!(order.userEmail || order.phone || order.userId);
+      if (otpRequired && hasAnyContact) {
         setOtpDialogOrder(order);
         setOtpCode("");
         setOtpSent(false);
         setSmsSent(false);
         setEmailSent(false);
+        setAppSent(false);
         setSmsConfirmation(null);
         setOtpError("");
       } else {
@@ -624,24 +628,36 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     setOtpSending(true);
     setOtpError("");
 
-    const wantEmail = otpChannels === "email" || otpChannels === "both";
-    const wantSms = otpChannels === "sms" || otpChannels === "both";
+    const wantEmail = otpChannels.email;
+    const wantSms = otpChannels.sms;
+    const wantApp = otpChannels.app;
     const hasEmail = !!otpDialogOrder.userEmail;
     const hasPhone = !!otpDialogOrder.phone;
+    const hasApp = !!otpDialogOrder.userId;
 
     let emailOk = false;
     let smsOk = false;
+    let appOk = false;
     const errors: string[] = [];
 
-    // 1. Send Email OTP via Cloud Function
-    if (wantEmail && hasEmail) {
+    // 1. Email + App share one Cloud Function call (single OTP code).
+    if ((wantEmail && hasEmail) || (wantApp && hasApp)) {
       try {
         const sendFn = httpsCallable(functions, "sendDeliveryOTP");
-        await sendFn({ orderId: otpDialogOrder.id, orderCollection: col("orders") });
-        emailOk = true;
+        await sendFn({
+          orderId: otpDialogOrder.id,
+          orderCollection: col("orders"),
+          channels: {
+            email: wantEmail && hasEmail,
+            app: wantApp && hasApp,
+          },
+        });
+        if (wantEmail && hasEmail) emailOk = true;
+        if (wantApp && hasApp) appOk = true;
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Email OTP failed";
-        errors.push(`Email: ${msg}`);
+        const msg = e instanceof Error ? e.message : "OTP dispatch failed";
+        if (wantEmail && hasEmail) errors.push(`Email: ${msg}`);
+        if (wantApp && hasApp) errors.push(`App: ${msg}`);
       }
     }
 
@@ -715,16 +731,18 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     // Update state based on results
     setSmsSent(smsOk);
     setEmailSent(emailOk);
-    setOtpSent(emailOk || smsOk);
+    setAppSent(appOk);
+    setOtpSent(emailOk || smsOk || appOk);
 
-    if (emailOk || smsOk) {
+    if (emailOk || smsOk || appOk) {
       const channels: string[] = [];
       if (smsOk) channels.push("SMS");
       if (emailOk) channels.push("Email");
+      if (appOk) channels.push("App");
       toast.success(`OTP sent via ${channels.join(" & ")}`);
     }
 
-    if (errors.length > 0 && !emailOk && !smsOk) {
+    if (errors.length > 0 && !emailOk && !smsOk && !appOk) {
       setOtpError(errors.join("\n"));
       toast.error("Failed to send OTP");
     } else if (errors.length > 0) {
@@ -754,8 +772,8 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
       }
     }
 
-    // Try 2: Email OTP verification via Cloud Function (if email was sent)
-    if (!verified && emailSent) {
+    // Try 2: Email/App OTP verification via Cloud Function (shared OTP doc)
+    if (!verified && (emailSent || appSent)) {
       try {
         const verifyFn = httpsCallable(functions, "verifyDeliveryOTP");
         await verifyFn({ orderId: otpDialogOrder.id, otp: otpCode });
@@ -782,7 +800,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     }
 
     setOtpVerifying(false);
-  }, [otpDialogOrder, otpCode, doStatusChange, smsConfirmation, emailSent, otpError]);
+  }, [otpDialogOrder, otpCode, doStatusChange, smsConfirmation, emailSent, appSent, otpError]);
 
   // ── Fullscreen toggle ──
   const toggleFullscreen = () => {
@@ -1352,20 +1370,28 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
               {otpDialogOrder.phone && <p className="text-xs text-slate-500">📱 {otpDialogOrder.phone}</p>}
               {otpDialogOrder.userEmail && <p className="text-xs text-slate-500">📧 {otpDialogOrder.userEmail}</p>}
               <p className="text-xs text-slate-400 pt-1 border-t border-slate-200">
-                Channel: <span className="font-semibold uppercase tracking-wider">{otpChannels === "both" ? "SMS & Email" : otpChannels === "sms" ? "SMS" : "Email"}</span>
+                Channel: <span className="font-semibold uppercase tracking-wider">
+                  {[otpChannels.email && "Email", otpChannels.sms && "SMS", otpChannels.app && "App"]
+                    .filter(Boolean)
+                    .join(" · ") || "—"}
+                </span>
               </p>
             </div>
 
             {(() => {
-              const wantEmail = otpChannels === "email" || otpChannels === "both";
-              const wantSms = otpChannels === "sms" || otpChannels === "both";
+              const wantEmail = otpChannels.email;
+              const wantSms = otpChannels.sms;
+              const wantApp = otpChannels.app;
               const hasEmail = !!otpDialogOrder.userEmail;
               const hasPhone = !!otpDialogOrder.phone;
-              const canSend = (wantEmail && hasEmail) || (wantSms && hasPhone);
+              const hasApp = !!otpDialogOrder.userId;
+              const canSend = (wantEmail && hasEmail) || (wantSms && hasPhone) || (wantApp && hasApp);
+              const enabledCount = (wantEmail ? 1 : 0) + (wantSms ? 1 : 0) + (wantApp ? 1 : 0);
 
               const channelParts: string[] = [];
               if (wantSms && hasPhone) channelParts.push("SMS");
               if (wantEmail && hasEmail) channelParts.push("Email");
+              if (wantApp && hasApp) channelParts.push("App");
               const channelLabel = channelParts.length > 0 ? channelParts.join(" & ") : "N/A";
 
               return !otpSent ? (
@@ -1379,9 +1405,10 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
                   </button>
                   {!canSend && (
                     <div className="text-sm text-amber-600 bg-amber-50 rounded-lg p-2">
-                      No contact info for selected channel{otpChannels === "both" ? "s" : ""}.
+                      No contact info for selected channel{enabledCount > 1 ? "s" : ""}.
                       {!hasPhone && wantSms && <span className="block text-xs mt-0.5">Phone number missing.</span>}
                       {!hasEmail && wantEmail && <span className="block text-xs mt-0.5">Email missing.</span>}
+                      {!hasApp && wantApp && <span className="block text-xs mt-0.5">Buyer not signed in (no app account on this order).</span>}
                       <button
                         className="mt-2 w-full py-1.5 text-xs border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors"
                         onClick={() => {
@@ -1403,6 +1430,9 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
                     )}
                     {emailSent && (
                       <p className="text-sm text-emerald-600 font-medium">✓ Email sent to {otpDialogOrder.userEmail}</p>
+                    )}
+                    {appSent && (
+                      <p className="text-sm text-emerald-600 font-medium">✓ App banner active for buyer</p>
                     )}
                   </div>
                   <input

@@ -26,6 +26,7 @@ import {
   DEFAULT_BUSINESS,
   DEFAULT_CHECKOUT,
   DEFAULT_SMS_GATEWAY,
+  normalizeOtpChannels,
 } from "@/types/settings";
 
 interface SmtpSettings {
@@ -143,7 +144,14 @@ export default function SettingsTab() {
         ]);
         if (dSnap.exists()) setDelivery({ ...DEFAULT_DELIVERY, ...dSnap.data() });
         if (bSnap.exists()) setBusiness({ ...DEFAULT_BUSINESS, ...bSnap.data() });
-        if (cSnap.exists()) setCheckout({ ...DEFAULT_CHECKOUT, ...cSnap.data() });
+        if (cSnap.exists()) {
+          const raw = cSnap.data();
+          setCheckout({
+            ...DEFAULT_CHECKOUT,
+            ...raw,
+            otpChannels: normalizeOtpChannels(raw.otpChannels),
+          });
+        }
         if (sSnap.exists()) setSmtp({ ...DEFAULT_SMTP, ...sSnap.data() });
         if (sgSnap.exists()) setSmsGateway({ ...DEFAULT_SMS_GATEWAY, ...sgSnap.data() });
         if (aSnap.exists()) {
@@ -860,33 +868,62 @@ export default function SettingsTab() {
               </div>
             </label>
 
-            {/* OTP Channel Selector — visible when OTP is enabled */}
-            {checkout.requireDeliveryOTP && (
-              <div className="sm:col-span-3 p-3 rounded-xl border border-amber-100 bg-amber-50/30 space-y-2">
-                <label className="text-sm font-medium text-slate-700 block">OTP Delivery Channel</label>
-                <select
-                  value={checkout.otpChannels || "email"}
-                  onChange={(e) =>
-                    setCheckout((p) => ({
-                      ...p,
-                      otpChannels: e.target.value as "email" | "sms" | "both",
-                    }))
-                  }
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                >
-                  <option value="email">Email Only</option>
-                  <option value="sms">SMS Only (Firebase Phone Auth)</option>
-                  <option value="both">Both SMS &amp; Email</option>
-                </select>
-                <p className="text-[11px] text-slate-400">
-                  {checkout.otpChannels === "sms"
-                    ? "SMS OTP via Firebase Phone Auth (second project). Buyer receives Firebase's auto-generated code."
-                    : checkout.otpChannels === "both"
-                    ? "Email sends a custom OTP code. SMS sends a separate Firebase-generated code. Either code verifies delivery."
-                    : "Custom OTP code sent to customer's email address."}
-                </p>
-              </div>
-            )}
+            {/* OTP Channel Selector — visible when OTP is enabled. Admin picks any combo. */}
+            {checkout.requireDeliveryOTP && (() => {
+              const ch = checkout.otpChannels;
+              const enabledCount = (ch.email ? 1 : 0) + (ch.sms ? 1 : 0) + (ch.app ? 1 : 0);
+              const toggle = (key: "email" | "sms" | "app", value: boolean) => {
+                setCheckout((p) => {
+                  const next = { ...p.otpChannels, [key]: value };
+                  // Guarantee at least one channel stays on
+                  if (!next.email && !next.sms && !next.app) next.email = true;
+                  return { ...p, otpChannels: next };
+                });
+              };
+              return (
+                <div className="sm:col-span-3 p-3 rounded-xl border border-amber-100 bg-amber-50/30 space-y-2">
+                  <label className="text-sm font-medium text-slate-700 block">OTP Delivery Channels</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer hover:border-amber-300">
+                      <input
+                        type="checkbox"
+                        checked={ch.email}
+                        onChange={(e) => toggle("email", e.target.checked)}
+                        className="rounded text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-sm font-medium text-slate-700">Email</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer hover:border-amber-300">
+                      <input
+                        type="checkbox"
+                        checked={ch.sms}
+                        onChange={(e) => toggle("sms", e.target.checked)}
+                        className="rounded text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-sm font-medium text-slate-700">SMS</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer hover:border-amber-300">
+                      <input
+                        type="checkbox"
+                        checked={ch.app}
+                        onChange={(e) => toggle("app", e.target.checked)}
+                        className="rounded text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-sm font-medium text-slate-700">Customer App</span>
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    {enabledCount > 1
+                      ? "Multiple channels active. Each sends the OTP via its own delivery path; any matching code verifies the order."
+                      : ch.sms
+                      ? "SMS OTP via Firebase Phone Auth (second project). Buyer receives Firebase's auto-generated code."
+                      : ch.app
+                      ? "Buyer sees a live OTP banner on their order page in the Customer App; an FCM push is sent if a token is registered."
+                      : "Custom OTP code sent to customer's email address."}
+                  </p>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Custom Fields */}

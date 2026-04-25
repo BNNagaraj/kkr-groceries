@@ -51,7 +51,8 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import { Order, OrderStatus, STATUS_TIMESTAMP_FIELDS, OrderCartItem } from "@/types/order";
-import type { OtpChannel } from "@/types/settings";
+import type { OtpChannelFlags } from "@/types/settings";
+import { normalizeOtpChannels } from "@/types/settings";
 // jsPDF lazy-loaded on click (~200KB kept out of initial bundle)
 const lazyDownloadInvoice = async (order: Order) => {
   const { downloadInvoice } = await import("@/lib/invoice");
@@ -158,7 +159,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
 
   // OTP on Fulfill
   const [otpRequired, setOtpRequired] = useState(false);
-  const [otpChannels, setOtpChannels] = useState<OtpChannel>("email");
+  const [otpChannels, setOtpChannels] = useState<OtpChannelFlags>({ email: true, sms: false, app: false });
   const [otpDialogOrder, setOtpDialogOrder] = useState<Order | null>(null);
   const [otpCode, setOtpCode] = useState("");
   const [otpSending, setOtpSending] = useState(false);
@@ -169,6 +170,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
   const [smsConfirmation, setSmsConfirmation] = useState<ConfirmationResult | null>(null);
   const [smsSent, setSmsSent] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [appSent, setAppSent] = useState(false);
 
   // Fetch requireDeliveryOTP + otpChannels setting
   useEffect(() => {
@@ -178,7 +180,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
         if (snap.exists()) {
           const data = snap.data();
           setOtpRequired(data.requireDeliveryOTP === true);
-          if (data.otpChannels) setOtpChannels(data.otpChannels as OtpChannel);
+          setOtpChannels(normalizeOtpChannels(data.otpChannels));
         }
       } catch (e) {
         console.warn("Failed to fetch OTP setting:", e);
@@ -423,13 +425,15 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
   };
 
   const handleFulfillClick = (order: Order) => {
-    // Open OTP dialog if OTP is required AND buyer has phone or email
-    if (otpRequired && (order.userEmail || order.phone)) {
+    // Open OTP dialog if OTP is required AND buyer has any reachable channel
+    const hasAnyContact = !!(order.userEmail || order.phone || order.userId);
+    if (otpRequired && hasAnyContact) {
       setOtpDialogOrder(order);
       setOtpCode("");
       setOtpSent(false);
       setSmsSent(false);
       setEmailSent(false);
+      setAppSent(false);
       setSmsConfirmation(null);
       setOtpError("");
     } else {
@@ -442,24 +446,37 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
     setOtpSending(true);
     setOtpError("");
 
-    const wantEmail = otpChannels === "email" || otpChannels === "both";
-    const wantSms = otpChannels === "sms" || otpChannels === "both";
+    const wantEmail = otpChannels.email;
+    const wantSms = otpChannels.sms;
+    const wantApp = otpChannels.app;
     const hasEmail = !!otpDialogOrder.userEmail;
     const hasPhone = !!otpDialogOrder.phone;
+    const hasApp = !!otpDialogOrder.userId;
 
     let emailOk = false;
     let smsOk = false;
+    let appOk = false;
     const errors: string[] = [];
 
-    // 1. Send Email OTP (existing Cloud Function)
-    if (wantEmail && hasEmail) {
+    // 1. Send Email + App OTP via the unified Cloud Function (single shared code).
+    //    Email and App share the same OTP doc, so we batch them in one call.
+    if ((wantEmail && hasEmail) || (wantApp && hasApp)) {
       try {
         const sendFn = httpsCallable(functions, "sendDeliveryOTP");
-        await sendFn({ orderId: otpDialogOrder.id, orderCollection: col("orders") });
-        emailOk = true;
+        await sendFn({
+          orderId: otpDialogOrder.id,
+          orderCollection: col("orders"),
+          channels: {
+            email: wantEmail && hasEmail,
+            app: wantApp && hasApp,
+          },
+        });
+        if (wantEmail && hasEmail) emailOk = true;
+        if (wantApp && hasApp) appOk = true;
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Email OTP failed";
-        errors.push(`Email: ${msg}`);
+        const msg = e instanceof Error ? e.message : "OTP dispatch failed";
+        if (wantEmail && hasEmail) errors.push(`Email: ${msg}`);
+        if (wantApp && hasApp) errors.push(`App: ${msg}`);
       }
     }
 
@@ -531,16 +548,18 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
     // Update state based on results
     setSmsSent(smsOk);
     setEmailSent(emailOk);
-    setOtpSent(emailOk || smsOk);
+    setAppSent(appOk);
+    setOtpSent(emailOk || smsOk || appOk);
 
-    if (emailOk || smsOk) {
+    if (emailOk || smsOk || appOk) {
       const channels: string[] = [];
       if (smsOk) channels.push("SMS");
       if (emailOk) channels.push("Email");
+      if (appOk) channels.push("App");
       toast.success(`OTP sent via ${channels.join(" & ")}`);
     }
 
-    if (errors.length > 0 && !emailOk && !smsOk) {
+    if (errors.length > 0 && !emailOk && !smsOk && !appOk) {
       setOtpError(errors.join("\n"));
       toast.error("Failed to send OTP.");
     } else if (errors.length > 0) {
@@ -570,8 +589,8 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
       }
     }
 
-    // Try 2: Email OTP verification via Cloud Function (if email was sent)
-    if (!verified && emailSent) {
+    // Try 2: Email/App OTP verification via Cloud Function (shared OTP doc)
+    if (!verified && (emailSent || appSent)) {
       try {
         const verifyFn = httpsCallable(functions, "verifyDeliveryOTP");
         await verifyFn({ orderId: otpDialogOrder.id, otp: otpCode });
@@ -579,7 +598,6 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "Invalid OTP";
         if (!smsConfirmation) {
-          // Only email was available, show email-specific error
           setOtpError(msg);
         }
       }
@@ -987,22 +1005,28 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
                 <MessageSquare className="w-3 h-3 text-slate-400" />
                 <span className="text-slate-400">Channel:</span>
                 <span className="font-medium text-xs uppercase tracking-wider">
-                  {otpChannels === "both" ? "SMS & Email" : otpChannels === "sms" ? "SMS" : "Email"}
+                  {[otpChannels.email && "Email", otpChannels.sms && "SMS", otpChannels.app && "App"]
+                    .filter(Boolean)
+                    .join(" · ") || "—"}
                 </span>
               </div>
             </div>
 
             {(() => {
-              const wantEmail = otpChannels === "email" || otpChannels === "both";
-              const wantSms = otpChannels === "sms" || otpChannels === "both";
+              const wantEmail = otpChannels.email;
+              const wantSms = otpChannels.sms;
+              const wantApp = otpChannels.app;
               const hasEmail = !!otpDialogOrder?.userEmail;
               const hasPhone = !!otpDialogOrder?.phone;
-              const canSend = (wantEmail && hasEmail) || (wantSms && hasPhone);
+              const hasApp = !!otpDialogOrder?.userId;
+              const canSend = (wantEmail && hasEmail) || (wantSms && hasPhone) || (wantApp && hasApp);
+              const enabledCount = (wantEmail ? 1 : 0) + (wantSms ? 1 : 0) + (wantApp ? 1 : 0);
 
               // Build dynamic button label
               const channelParts: string[] = [];
               if (wantSms && hasPhone) channelParts.push("SMS");
               if (wantEmail && hasEmail) channelParts.push("Email");
+              if (wantApp && hasApp) channelParts.push("App");
               const channelLabel = channelParts.length > 0 ? channelParts.join(" & ") : "N/A";
 
               return !otpSent ? (
@@ -1021,9 +1045,10 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
                   </Button>
                   {!canSend && (
                     <div className="text-sm text-amber-600 bg-amber-50 rounded-lg p-2">
-                      No contact info available for the selected channel{otpChannels === "both" ? "s" : ""}.
+                      No contact info available for the selected channel{enabledCount > 1 ? "s" : ""}.
                       {!hasPhone && wantSms && <span className="block text-xs mt-0.5">Phone number missing.</span>}
                       {!hasEmail && wantEmail && <span className="block text-xs mt-0.5">Email missing.</span>}
+                      {!hasApp && wantApp && <span className="block text-xs mt-0.5">Buyer not signed in (no app account on this order).</span>}
                       <Button
                         size="sm"
                         variant="outline"
@@ -1053,9 +1078,14 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
                         <CheckCircle2 className="w-3.5 h-3.5" /> Email sent to {otpDialogOrder?.userEmail}
                       </div>
                     )}
-                    {smsSent && emailSent && (
+                    {appSent && (
+                      <div className="text-sm text-emerald-600 font-medium flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> App banner active for buyer
+                      </div>
+                    )}
+                    {smsSent && (emailSent || appSent) && (
                       <p className="text-[11px] text-slate-400 mt-1">
-                        SMS and Email have different codes. Enter either one to verify.
+                        SMS uses a separate code. Enter either the SMS code or the Email/App code to verify.
                       </p>
                     )}
                   </div>

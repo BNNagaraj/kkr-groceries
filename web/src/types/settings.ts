@@ -15,14 +15,39 @@ export interface BusinessSettings {
   address: string;
 }
 
-export type OtpChannel = "email" | "sms" | "both";
+/** Legacy single-string form. Kept only so old Firestore docs still parse. */
+export type LegacyOtpChannel = "email" | "sms" | "both";
+
+/** New any-combo form: each channel is an independent toggle. */
+export interface OtpChannelFlags {
+  email: boolean;
+  sms: boolean;
+  app: boolean;
+}
+
+/** Read-time normalizer — accepts legacy strings or new flags object. */
+export function normalizeOtpChannels(
+  raw: LegacyOtpChannel | OtpChannelFlags | undefined | null
+): OtpChannelFlags {
+  if (!raw) return { email: true, sms: false, app: false };
+  if (typeof raw === "string") {
+    if (raw === "sms") return { email: false, sms: true, app: false };
+    if (raw === "both") return { email: true, sms: true, app: false };
+    return { email: true, sms: false, app: false };
+  }
+  return {
+    email: !!raw.email,
+    sms: !!raw.sms,
+    app: !!raw.app,
+  };
+}
 
 export interface CheckoutFormSettings {
   requireShopName: boolean;
   requirePincode: boolean;
   showMapPicker: boolean;
   requireDeliveryOTP: boolean;
-  otpChannels: OtpChannel;
+  otpChannels: OtpChannelFlags;
   customFields: CustomField[];
 }
 
@@ -74,7 +99,7 @@ export const DEFAULT_CHECKOUT: CheckoutFormSettings = {
   requirePincode: true,
   showMapPicker: true,
   requireDeliveryOTP: false,
-  otpChannels: "email",
+  otpChannels: { email: true, sms: false, app: false },
   customFields: [],
 };
 
@@ -100,7 +125,7 @@ export interface Store {
 
 /* ─── Theme System ─── */
 
-export type ThemeId = "classic" | "premium" | "catalog" | "elegant" | "storefront" | "magazine" | "listpro" | "metro" | "polaroid" | "glass" | "darkluxe" | "editorial" | "neonpop" | "mandi" | "slab" | "tierstep" | "trade" | "harvest" | "premiumcompact" | "premiummini" | "premiumdense" | "premiumribbon" | "premiumticket" | "premiumshelf";
+export type ThemeId = "classic" | "premium" | "catalog" | "elegant" | "storefront" | "magazine" | "listpro" | "metro" | "polaroid" | "glass" | "darkluxe" | "editorial" | "neonpop" | "mandi" | "slab" | "tierstep" | "trade" | "harvest" | "premiumcompact" | "premiummini" | "premiumdense" | "premiumribbon" | "premiumticket" | "premiumshelf" | "zen" | "aurora" | "terracotta" | "sapphire" | "sakura";
 
 export interface GridConfig {
   mobile: number;
