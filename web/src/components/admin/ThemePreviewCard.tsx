@@ -472,31 +472,265 @@ export function ThemePreviewCard({
                                 className="relative h-[56px] flex flex-col overflow-hidden rounded-md"
                                 style={{ background: p.tint }}
                             >
-                                {/* Full-bleed image area (top 65%) */}
-                                <div
-                                    className="absolute inset-0"
-                                    style={{
-                                        background: p.image,
-                                        height: "65%",
-                                    }}
-                                />
-                                {/* Tiny save pill top-left */}
-                                <div
-                                    className="absolute top-0.5 left-0.5 w-3 h-1 rounded-full"
-                                    style={{
-                                        background: "rgba(0,0,0,0.32)",
-                                        border: "1px solid rgba(255,255,255,0.18)",
-                                    }}
-                                />
-                                {/* Vignette + content band */}
-                                <div className="absolute bottom-0 left-0 right-0 px-1 pb-0.5 pt-2" style={{
-                                    background: `linear-gradient(180deg, transparent, ${p.tint}cc 60%, ${p.tint})`,
-                                }}>
+                                <div className="absolute inset-0" style={{ background: p.image, height: "65%" }} />
+                                <div className="absolute top-0.5 left-0.5 w-3 h-1 rounded-full" style={{ background: "rgba(0,0,0,0.32)", border: "1px solid rgba(255,255,255,0.18)" }} />
+                                <div className="absolute bottom-0 left-0 right-0 px-1 pb-0.5 pt-2" style={{ background: `linear-gradient(180deg, transparent, ${p.tint}cc 60%, ${p.tint})` }}>
                                     <div className="flex items-baseline justify-between gap-1 mb-0.5">
                                         <div className="h-1 w-1/2 rounded-full" style={{ background: "#f1ede5" }} />
-                                        <div className="h-1 w-1/4 rounded-full italic" style={{ background: "#f1ede5", fontStyle: "italic" }} />
+                                        <div className="h-1 w-1/4 rounded-full italic" style={{ background: "#f1ede5" }} />
                                     </div>
                                     <div className="h-1.5 w-full rounded-full" style={{ background: "#f1ede5" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Chalkboard: black slate, chalked price circle, drawn arrow, yellow CTA */}
+                {id === "chalkboard" && (
+                    <div className="grid grid-cols-2 gap-1 w-full">
+                        {[1, 2].map(i => (
+                            <div key={i} className="relative h-[56px] flex flex-col p-1" style={{ background: "#1c1f1c", border: "2px solid #5e3a1f" }}>
+                                <div className="text-[5px] uppercase tracking-widest font-bold mb-0.5" style={{ color: "#ffd166" }}>Today</div>
+                                <div className="flex items-center gap-1 mb-0.5">
+                                    <div className="w-3 h-3 rounded-full border" style={{ borderColor: "#f5f1e8", borderStyle: "dashed" }} />
+                                    <div className="h-1 flex-1 rounded-full" style={{ background: "#f5f1e8" }} />
+                                </div>
+                                <div className="space-y-[1px]">
+                                    <div className="h-[1px] w-full" style={{ borderTop: "1px dashed rgba(245,241,232,0.4)" }} />
+                                    <div className="h-[1px] w-full" style={{ borderTop: "1px dashed rgba(245,241,232,0.4)" }} />
+                                </div>
+                                <div className="mt-auto h-2 w-full rounded-sm" style={{ background: "#ffd166", border: "1px solid #f5f1e8" }} />
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Risograph: 2-color overprint with halftone, blocky split header */}
+                {id === "risograph" && (
+                    <div className="grid grid-cols-2 gap-1 w-full">
+                        {[1, 2].map(i => (
+                            <div key={i} className="relative h-[56px] flex flex-col" style={{ background: "#f5efe0", border: "2px solid #1d4e89", boxShadow: "2px 2px 0 #ff48b0" }}>
+                                <div className="flex h-2 border-b-2" style={{ borderColor: "#1d4e89" }}>
+                                    <div className="w-1/3" style={{ background: "#1d4e89" }} />
+                                    <div className="flex-1" />
+                                </div>
+                                <div className="flex gap-1 px-1 pt-1 flex-1">
+                                    <div className="w-3 h-3 rounded-sm" style={{ background: "#ff48b0", border: "1px solid #1d4e89" }} />
+                                    <div className="flex-1 space-y-[1.5px]">
+                                        <div className="h-1 w-3/4 rounded-sm" style={{ background: "#1d4e89" }} />
+                                        <div className="h-1 w-1/2 rounded-sm" style={{ background: "#ff48b0" }} />
+                                    </div>
+                                </div>
+                                <div className="px-1 pb-0.5">
+                                    <div className="h-1.5 w-2/3" style={{ background: "#1d4e89" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Trading Card: holographic conic border, dark stat block */}
+                {id === "tradingcard" && (
+                    <div className="grid grid-cols-2 gap-1 w-full">
+                        {[1, 2].map(i => (
+                            <div key={i} className="relative h-[56px] p-[1.5px] rounded"
+                                style={{ background: "conic-gradient(from 0deg, #ff48b0, #06b6d4, #facc15, #22c55e, #ff48b0)" }}>
+                                <div className="h-full flex flex-col rounded-[2px] overflow-hidden" style={{ background: "linear-gradient(160deg, #0f172a, #1e293b)" }}>
+                                    <div className="h-[8px]" style={{ background: "linear-gradient(90deg, #22c55e, #22c55e99)" }} />
+                                    <div className="flex-1 grid grid-cols-2">
+                                        <div style={{ background: "#1e293b" }} />
+                                        <div className="p-0.5 flex flex-col justify-center space-y-[1.5px]">
+                                            <div className="h-[2px] w-3/4 rounded-full" style={{ background: "#22c55e" }} />
+                                            <div className="h-[1px] w-1/2 rounded-full" style={{ background: "#cbd5e1" }} />
+                                        </div>
+                                    </div>
+                                    <div className="h-2 mx-1 mb-0.5 rounded-sm" style={{ background: "#22c55e" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* BrutalistSlab: concrete grey, monolith with massive bottom black slab */}
+                {id === "brutalistslab" && (
+                    <div className="grid grid-cols-2 gap-1 w-full">
+                        {[1, 2].map(i => (
+                            <div key={i} className="relative h-[56px] flex flex-col" style={{ background: "#c8c2b6" }}>
+                                <div className="h-2 px-1 flex items-center" style={{ background: "#0a0a0a" }}>
+                                    <div className="h-[1px] w-2/3 rounded-full" style={{ background: "#c8c2b6" }} />
+                                </div>
+                                <div className="flex flex-1 px-1 pt-1 gap-1">
+                                    <div className="w-4" style={{ background: "#0a0a0a" }} />
+                                    <div className="flex-1 flex flex-col justify-end space-y-[1.5px] pb-0.5">
+                                        <div className="h-2 w-full" style={{ background: "#0a0a0a" }} />
+                                        <div className="h-1 w-2/3" style={{ background: "#3a3a3a" }} />
+                                    </div>
+                                </div>
+                                <div style={{ height: 2, background: "#0a0a0a" }} />
+                                <div className="h-3 px-1 flex items-center justify-between" style={{ background: "#0a0a0a" }}>
+                                    <div className="h-2 w-1/3" style={{ background: "#c8c2b6" }} />
+                                    <div className="h-1 w-1/4" style={{ background: "#c8c2b6", opacity: 0.5 }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* BazaarPoster: saturated yellow with red scalloped banner + circular photo */}
+                {id === "bazaarposter" && (
+                    <div className="grid grid-cols-2 gap-1 w-full">
+                        {[1, 2].map(i => (
+                            <div key={i} className="relative h-[56px] flex flex-col p-1" style={{ background: "#fef3c7", border: "2px solid #7f1d1d", boxShadow: "2px 2px 0 #dc2626" }}>
+                                <div className="h-2 -mx-1 -mt-1 mb-0.5 px-1 flex items-center justify-center"
+                                    style={{ background: "#dc2626", color: "#fef3c7", fontSize: "5px", fontWeight: 700, letterSpacing: "0.15em" }}>
+                                    ★ FRESH ★
+                                </div>
+                                <div className="flex gap-1 items-center mt-0.5">
+                                    <div className="w-4 h-4 rounded-full" style={{ background: "#dc2626", border: "1px solid #7f1d1d" }} />
+                                    <div className="flex-1 h-2 italic rounded-sm" style={{ background: "#7f1d1d" }} />
+                                </div>
+                                <div className="mt-auto self-center px-1 py-0.5 mb-0.5"
+                                    style={{ background: "#fef3c7", border: "1px dashed #7f1d1d", transform: "rotate(-2deg)" }}>
+                                    <div className="h-1.5 w-6 italic rounded-sm" style={{ background: "#dc2626" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Apothecary: cream linen with ornate frame, italic Latin name */}
+                {id === "apothecary" && (
+                    <div className="grid grid-cols-2 gap-1 w-full">
+                        {[1, 2].map(i => (
+                            <div key={i} className="relative h-[56px] flex flex-col p-1" style={{
+                                background: "#f5ecd6",
+                                border: "1px solid #c9a978",
+                                boxShadow: "inset 0 0 0 2px #f5ecd6, inset 0 0 0 3px #8b6f3a, inset 0 0 0 5px #f5ecd6",
+                            }}>
+                                <div className="text-center text-[5px] uppercase tracking-widest font-bold mt-0.5" style={{ color: "#8b6f3a" }}>
+                                    ❦ Dispensary ❦
+                                </div>
+                                <div className="my-0.5 mx-1 h-px relative" style={{ background: "#8b6f3a" }}>
+                                    <span className="absolute left-1/2 -translate-x-1/2 -translate-y-[2px] text-[4px]" style={{ color: "#8b6f3a" }}>◆</span>
+                                </div>
+                                <div className="flex-1 px-1 italic" style={{ color: "#3a2818", fontFamily: "serif" }}>
+                                    <div className="h-1.5 w-3/4 rounded-sm" style={{ background: "#3a2818" }} />
+                                    <div className="h-[3px] w-1/2 rounded-sm mt-0.5" style={{ background: "#5a3e22" }} />
+                                </div>
+                                <div className="px-1 pb-0.5 flex items-baseline justify-between">
+                                    <div className="text-[4px] uppercase tracking-widest" style={{ color: "#8b6f3a" }}>℞</div>
+                                    <div className="h-1.5 w-1/3 italic rounded-sm" style={{ background: "#3a2818" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* PostalStamp: perforated edge, denomination block, postmark */}
+                {id === "postalstamp" && (
+                    <div className="grid grid-cols-3 gap-1 w-full">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="relative h-[56px] flex flex-col p-1.5" style={{
+                                background: "#f3ead4",
+                                border: "1px dashed #3d281733",
+                                outline: "1px solid #3d2817",
+                                outlineOffset: "-3px",
+                            }}>
+                                <div className="text-[5px] uppercase tracking-widest font-bold mb-0.5" style={{ color: "#3d2817" }}>
+                                    BHARAT · POST
+                                </div>
+                                <div className="absolute top-1 right-1 px-1 py-0.5 text-[5px] font-bold" style={{ background: "#3d2817", color: "#f3ead4" }}>
+                                    ₹20
+                                </div>
+                                <div className="flex-1 relative" style={{ background: "#ddd0aa", border: "1px solid #3d2817" }}>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="w-5 h-5 rounded-full opacity-60"
+                                            style={{ border: "1.5px solid #7a3015", transform: "rotate(-22deg)" }} />
+                                    </div>
+                                </div>
+                                <div className="text-center mt-0.5">
+                                    <div className="h-1 w-3/4 mx-auto rounded-sm" style={{ background: "#3d2817" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* MemoSticky: yellow sticky note, tilted, with curl shadow corner */}
+                {id === "memosticky" && (
+                    <div className="grid grid-cols-3 gap-2 w-full">
+                        {[-1, 0.5, -0.5].map((tilt, i) => (
+                            <div key={i} className="relative h-[56px] flex flex-col p-1" style={{
+                                background: "#fff48d",
+                                color: "#0b3a7a",
+                                transform: `rotate(${tilt}deg)`,
+                                boxShadow: "1px 2px 4px rgba(60,40,0,0.18)",
+                                clipPath: "polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%)",
+                            }}>
+                                <div className="absolute bottom-0 right-0 w-2.5 h-2.5"
+                                    style={{ background: "linear-gradient(135deg, transparent 50%, rgba(60,40,0,0.18) 50%)" }} />
+                                <div className="text-[5px] mb-0.5 italic" style={{ color: "#0b3a7a", borderBottom: "1px solid #0b3a7a55" }}>
+                                    for cart →
+                                </div>
+                                <div className="flex gap-1 mt-0.5">
+                                    <div className="w-3 h-3 rounded-sm" style={{ background: "rgba(11,58,122,0.08)", border: "1.5px solid #0b3a7a" }} />
+                                    <div className="flex-1 h-1.5 rounded-sm" style={{ background: "#0b3a7a" }} />
+                                </div>
+                                <div className="mt-auto self-start relative">
+                                    <div className="absolute -inset-x-0.5 -inset-y-0.5 rounded-sm" style={{ background: "#ffe356" }} />
+                                    <div className="relative h-1.5 w-5 rounded-sm" style={{ background: "#0b3a7a" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* PeriodicElement: atomic cell with big symbol, gridded sub-cells */}
+                {id === "periodicelement" && (
+                    <div className="grid grid-cols-3 gap-1 w-full">
+                        {[
+                            { tint: "#16a34a", sym: "Lf" },
+                            { tint: "#dc2626", sym: "Fr" },
+                            { tint: "#a16207", sym: "Rt" },
+                        ].map((p, i) => (
+                            <div key={i} className="relative h-[56px] flex flex-col p-1" style={{
+                                background: "#fafaf7",
+                                border: `1.5px solid ${p.tint}`,
+                                fontFamily: "monospace",
+                            }}>
+                                <div className="flex items-start justify-between text-[5px]">
+                                    <span style={{ color: "#0a0a0a", opacity: 0.5 }}>0{i + 1}</span>
+                                    <span className="px-0.5" style={{ background: p.tint, color: "#fafaf7", fontWeight: 700 }}>{p.sym}</span>
+                                </div>
+                                <div className="text-center text-[18px] leading-none font-bold tabular-nums mt-0.5"
+                                    style={{ color: p.tint, fontFamily: "monospace" }}>
+                                    {p.sym}
+                                </div>
+                                <div className="text-center text-[5px] uppercase tracking-widest font-bold mt-0.5" style={{ color: "#0a0a0a" }}>
+                                    Item
+                                </div>
+                                <div className="mt-auto grid grid-cols-2 gap-px" style={{ background: `${p.tint}33`, padding: 0.5 }}>
+                                    <div className="h-1.5" style={{ background: p.tint }} />
+                                    <div className="h-1.5" style={{ background: "#fafaf7" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* HairlineModern: pure white, 1px border, generous whitespace, restraint */}
+                {id === "hairlinemodern" && (
+                    <div className="grid grid-cols-3 gap-1.5 w-full">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="relative h-[56px] flex flex-col" style={{ background: "#ffffff", border: "1px solid #e2e8f0" }}>
+                                <div style={{ height: "55%", background: "#f8fafc" }} />
+                                <div className="flex-1 px-1.5 pt-1 flex flex-col justify-between">
+                                    <div className="h-[2px] w-2/3 rounded-full" style={{ background: "#0f172a" }} />
+                                    <div className="flex items-baseline gap-0.5">
+                                        <div className="h-2 w-1/3 rounded-sm" style={{ background: "#0f172a" }} />
+                                        <div className="h-[2px] w-1/4 rounded-full" style={{ background: "#94a3b8" }} />
+                                    </div>
                                 </div>
                             </div>
                         ))}

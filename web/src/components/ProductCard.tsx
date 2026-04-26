@@ -35,6 +35,16 @@ import { SakuraCard } from "./cards/SakuraCard";
 import { MandiChitCard } from "./cards/MandiChitCard";
 import { BulletinCard } from "./cards/BulletinCard";
 import { ProduceForwardCard } from "./cards/ProduceForwardCard";
+import { ChalkboardCard } from "./cards/ChalkboardCard";
+import { RisographCard } from "./cards/RisographCard";
+import { TradingCardCard } from "./cards/TradingCardCard";
+import { BrutalistSlabCard } from "./cards/BrutalistSlabCard";
+import { BazaarPosterCard } from "./cards/BazaarPosterCard";
+import { ApothecaryCard } from "./cards/ApothecaryCard";
+import { PostalStampCard } from "./cards/PostalStampCard";
+import { MemoStickyCard } from "./cards/MemoStickyCard";
+import { PeriodicElementCard } from "./cards/PeriodicElementCard";
+import { HairlineModernCard } from "./cards/HairlineModernCard";
 
 export const ProductCard = memo(function ProductCard({ product }: { product: Product }) {
     const { theme } = useTheme();
@@ -102,8 +112,27 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
             return <BulletinCard product={product} />;
         case "produceforward":
             return <ProduceForwardCard product={product} />;
+        case "chalkboard":
+            return <ChalkboardCard product={product} />;
+        case "risograph":
+            return <RisographCard product={product} />;
+        case "tradingcard":
+            return <TradingCardCard product={product} />;
+        case "brutalistslab":
+            return <BrutalistSlabCard product={product} />;
+        case "bazaarposter":
+            return <BazaarPosterCard product={product} />;
+        case "apothecary":
+            return <ApothecaryCard product={product} />;
+        case "postalstamp":
+            return <PostalStampCard product={product} />;
+        case "memosticky":
+            return <MemoStickyCard product={product} />;
+        case "periodicelement":
+            return <PeriodicElementCard product={product} />;
+        case "hairlinemodern":
+            return <HairlineModernCard product={product} />;
         case "classic":
-            return <MandiChitCard product={product} />;
         default:
             return <ClassicCard product={product} />;
     }

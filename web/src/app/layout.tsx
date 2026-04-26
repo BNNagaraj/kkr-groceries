@@ -6,6 +6,13 @@ import {
   Fraunces,
   Cormorant_Garamond,
   JetBrains_Mono,
+  Caveat,
+  Bebas_Neue,
+  EB_Garamond,
+  Kalam,
+  IBM_Plex_Sans,
+  Space_Grotesk,
+  DM_Serif_Display,
 } from "next/font/google";
 import "./globals.css";
 
@@ -51,6 +58,64 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains",
   weight: ["400", "500", "700"],
+  display: "swap",
+});
+
+// Hand-lettered chalk for the Chalkboard card
+const caveat = Caveat({
+  subsets: ["latin"],
+  variable: "--font-caveat",
+  weight: ["400", "600", "700"],
+  display: "swap",
+});
+
+// Indian-script-friendly handwriting for MemoSticky (also covers Devanagari)
+const kalam = Kalam({
+  subsets: ["latin", "devanagari"],
+  variable: "--font-kalam",
+  weight: ["400", "700"],
+  display: "swap",
+});
+
+// Condensed slab for the BrutalistSlab headline
+const bebas = Bebas_Neue({
+  subsets: ["latin"],
+  variable: "--font-bebas",
+  weight: ["400"],
+  display: "swap",
+});
+
+// Old-pharmacy serif for the Apothecary label
+const ebGaramond = EB_Garamond({
+  subsets: ["latin"],
+  variable: "--font-eb-garamond",
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
+// Disciplined modern sans for the HairlineModern card
+const ibmPlex = IBM_Plex_Sans({
+  subsets: ["latin"],
+  variable: "--font-ibm-plex",
+  weight: ["300", "400", "500", "600"],
+  display: "swap",
+});
+
+// Geometric grotesk for Risograph (works well at heavy weights with overprint feel)
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
+  weight: ["500", "700"],
+  display: "swap",
+});
+
+// Display serif for the BazaarPoster headline
+const dmSerifDisplay = DM_Serif_Display({
+  subsets: ["latin"],
+  variable: "--font-dm-serif",
+  weight: ["400"],
+  style: ["normal", "italic"],
   display: "swap",
 });
 
@@ -143,7 +208,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${outfit.variable} ${notoSansTelugu.variable} ${specialElite.variable} ${fraunces.variable} ${cormorant.variable} ${jetbrainsMono.variable} font-sans antialiased bg-gray-50 text-slate-800`}
+        className={`${outfit.variable} ${notoSansTelugu.variable} ${specialElite.variable} ${fraunces.variable} ${cormorant.variable} ${jetbrainsMono.variable} ${caveat.variable} ${kalam.variable} ${bebas.variable} ${ebGaramond.variable} ${ibmPlex.variable} ${spaceGrotesk.variable} ${dmSerifDisplay.variable} font-sans antialiased bg-gray-50 text-slate-800`}
       >
         <a
           href="#main-content"
