@@ -587,4 +587,32 @@ export const THEME_PRESETS: ThemePreset[] = [
             cardLayout: { imageWidth: 100, imagePosition: "top" },
         },
     },
+    {
+        id: "truckarttailgate",
+        name: "TruckArt Tailgate",
+        description: "Indian lorry-back panel — saturated marigold, tomato and cobalt palette, scalloped frame, Horn-OK-Please chevron header, mirror-medallion price hub, tri-script names and a tailgate-striped CTA. Locally rooted, deliberately maximalist.",
+        featured: true,
+        defaults: {
+            activeTheme: "truckarttailgate",
+            primaryColor: "#7f1d1d",
+            accentColor: "#fbbf24",
+            grid: { mobile: 1, tablet: 2, desktop: 3, wide: 3 },
+            cardStyle: { borderRadius: "none" },
+            cardLayout: { imageWidth: 35, imagePosition: "left" },
+        },
+    },
+    {
+        id: "thermalreceipt",
+        name: "Thermal Receipt",
+        description: "58mm POS roll mimicry — off-white thermal paper with edge fade, JetBrains Mono throughout, dashed cut lines, dot-leader rate rows, CSS barcode footer and a red RETAIN-FOR-DISPATCH stamp. Brutally legible for 80-SKU 6am orders.",
+        featured: true,
+        defaults: {
+            activeTheme: "thermalreceipt",
+            primaryColor: "#1a1a1a",
+            accentColor: "#b91c1c",
+            grid: { mobile: 1, tablet: 2, desktop: 3, wide: 4 },
+            cardStyle: { borderRadius: "none" },
+            cardLayout: { imageWidth: 30, imagePosition: "left" },
+        },
+    },
 ];

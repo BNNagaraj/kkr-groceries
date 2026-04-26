@@ -56,6 +56,8 @@ const cardLoaders: Record<Exclude<ThemeId, "classic">, () => Promise<{ default: 
     periodicelement: () => import("./cards/PeriodicElementCard").then((m) => ({ default: m.PeriodicElementCard })),
     hairlinemodern: () => import("./cards/HairlineModernCard").then((m) => ({ default: m.HairlineModernCard })),
     freightmanifest: () => import("./cards/FreightManifestCard").then((m) => ({ default: m.FreightManifestCard })),
+    truckarttailgate: () => import("./cards/TruckArtTailgateCard").then((m) => ({ default: m.TruckArtTailgateCard })),
+    thermalreceipt: () => import("./cards/ThermalReceiptCard").then((m) => ({ default: m.ThermalReceiptCard })),
 };
 
 const cardCache = new Map<ThemeId, CardComponent>();

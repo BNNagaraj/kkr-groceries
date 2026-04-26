@@ -737,6 +737,117 @@ export function ThemePreviewCard({
                     </div>
                 )}
 
+                {/* TruckArt Tailgate: marigold panel with red+blue+yellow chevron header, mirror medallion */}
+                {id === "truckarttailgate" && (
+                    <div className="grid grid-cols-2 gap-1 w-full">
+                        {[1, 2].map(i => (
+                            <div
+                                key={i}
+                                className="relative h-[56px] flex flex-col overflow-hidden"
+                                style={{
+                                    background: "#fbbf24",
+                                    border: "2px solid #7f1d1d",
+                                    boxShadow: "inset 0 0 0 1px #fbbf24, inset 0 0 0 2px #1e40af",
+                                }}
+                            >
+                                {/* Chevron header */}
+                                <div
+                                    className="h-2 w-full"
+                                    style={{
+                                        backgroundImage: `repeating-linear-gradient(90deg, #dc2626 0 4px, #fbbf24 4px 8px, #1e40af 8px 12px, #fbbf24 12px 16px)`,
+                                    }}
+                                />
+                                <div className="flex flex-1 px-1 pt-1 gap-1">
+                                    <div className="relative w-4 h-full" style={{ background: "#1e40af", border: "1px solid #7f1d1d" }}>
+                                        {/* Mirror medallion */}
+                                        <div
+                                            className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full"
+                                            style={{
+                                                background: "radial-gradient(circle at 30% 30%, #fef3c7, #fbbf24 60%, #b45309)",
+                                                border: "1px solid #7f1d1d",
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="flex-1 flex flex-col justify-center gap-0.5">
+                                        <div className="h-1 w-3/4 italic rounded-sm" style={{ background: "#7f1d1d" }} />
+                                        <div className="h-[1px] w-1/2" style={{ background: "#1e40af" }} />
+                                    </div>
+                                </div>
+                                {/* Tier ledger panel */}
+                                <div className="mx-1 mb-0.5 px-0.5 py-0.5" style={{ background: "#fef3c7", border: "1px dashed #7f1d1d" }}>
+                                    <div className="h-[1px] w-full" style={{ background: "#7f1d1d" }} />
+                                </div>
+                                {/* Striped CTA */}
+                                <div
+                                    className="h-2 w-full"
+                                    style={{
+                                        backgroundImage: `repeating-linear-gradient(90deg, #1e40af 0 4px, #15803d 4px 8px)`,
+                                    }}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Thermal Receipt: off-white roll, dashed cut lines, barcode strip, red stamp */}
+                {id === "thermalreceipt" && (
+                    <div className="grid grid-cols-3 gap-1 w-full">
+                        {[1, 2, 3].map(i => (
+                            <div
+                                key={i}
+                                className="relative h-[56px] flex flex-col px-1 pt-0.5 pb-0.5 overflow-hidden"
+                                style={{
+                                    background: "#fafaf6",
+                                    backgroundImage: "linear-gradient(180deg, #f3f0e8 0%, #fafaf6 12%, #fafaf6 88%, #f3f0e8 100%)",
+                                    boxShadow: "0 1px 2px rgba(60,40,20,0.12)",
+                                    fontFamily: "monospace",
+                                }}
+                            >
+                                {/* Header */}
+                                <div className="h-[1px] w-full mt-0.5" style={{ background: "#1a1a1a" }} />
+                                <div className="text-[4px] tracking-[0.3em] text-center font-bold mt-0.5" style={{ color: "#1a1a1a" }}>
+                                    KKR · WHOLESALE
+                                </div>
+                                {/* Dashed cut */}
+                                <div className="h-[1px] my-0.5" style={{ borderTop: "1px dashed #5a554c" }} />
+                                {/* Photo with stamp */}
+                                <div className="relative h-3 w-full mb-0.5" style={{ background: "#e8e4dc", border: "1px solid #1a1a1a" }}>
+                                    <div
+                                        className="absolute inset-0 flex items-center justify-center"
+                                    >
+                                        <span
+                                            className="text-[4px] font-bold"
+                                            style={{
+                                                color: "#b91c1c",
+                                                border: "1px solid #b91c1c",
+                                                padding: "0 1px",
+                                                transform: "rotate(-12deg)",
+                                                background: "rgba(250,250,246,0.6)",
+                                            }}
+                                        >
+                                            DISPATCH
+                                        </span>
+                                    </div>
+                                </div>
+                                {/* Rate rows */}
+                                <div className="space-y-[1px]">
+                                    <div className="h-[1px] w-full" style={{ background: "#3a3a3a" }} />
+                                    <div className="h-[1px] w-full" style={{ background: "#3a3a3a" }} />
+                                    <div className="h-[2px] w-full" style={{ background: "#1a1a1a" }} />
+                                </div>
+                                {/* Barcode strip */}
+                                <div className="mt-auto flex items-end gap-px h-2">
+                                    {Array.from({ length: 22 }).map((_, j) => {
+                                        const w = ((i * 11 + j * 5) % 4) === 0 ? 1.5 : 1;
+                                        const black = ((i + j) % 4) !== 0;
+                                        return <span key={j} style={{ width: w, height: "100%", background: black ? "#1a1a1a" : "transparent", flexShrink: 0 }} />;
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 {/* FreightManifest: paperboard with ink-bar manifest, corner brackets, barcode strip, burnt-orange CTA */}
                 {id === "freightmanifest" && (
                     <div className="grid grid-cols-2 gap-1 w-full">
