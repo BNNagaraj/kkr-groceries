@@ -27,6 +27,14 @@ import { PremiumDenseCard } from "./cards/PremiumDenseCard";
 import { PremiumRibbonCard } from "./cards/PremiumRibbonCard";
 import { PremiumTicketCard } from "./cards/PremiumTicketCard";
 import { PremiumShelfCard } from "./cards/PremiumShelfCard";
+import { ZenCard } from "./cards/ZenCard";
+import { AuroraCard } from "./cards/AuroraCard";
+import { TerracottaCard } from "./cards/TerracottaCard";
+import { SapphireCard } from "./cards/SapphireCard";
+import { SakuraCard } from "./cards/SakuraCard";
+import { MandiChitCard } from "./cards/MandiChitCard";
+import { BulletinCard } from "./cards/BulletinCard";
+import { ProduceForwardCard } from "./cards/ProduceForwardCard";
 
 export const ProductCard = memo(function ProductCard({ product }: { product: Product }) {
     const { theme } = useTheme();
@@ -78,7 +86,24 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
             return <PremiumTicketCard product={product} />;
         case "premiumshelf":
             return <PremiumShelfCard product={product} />;
+        case "zen":
+            return <ZenCard product={product} />;
+        case "aurora":
+            return <AuroraCard product={product} />;
+        case "terracotta":
+            return <TerracottaCard product={product} />;
+        case "sapphire":
+            return <SapphireCard product={product} />;
+        case "sakura":
+            return <SakuraCard product={product} />;
+        case "mandichit":
+            return <MandiChitCard product={product} />;
+        case "bulletin":
+            return <BulletinCard product={product} />;
+        case "produceforward":
+            return <ProduceForwardCard product={product} />;
         case "classic":
+            return <MandiChitCard product={product} />;
         default:
             return <ClassicCard product={product} />;
     }

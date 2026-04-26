@@ -1,5 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Outfit, Noto_Sans_Telugu } from "next/font/google";
+import {
+  Outfit,
+  Noto_Sans_Telugu,
+  Special_Elite,
+  Fraunces,
+  Cormorant_Garamond,
+  JetBrains_Mono,
+} from "next/font/google";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -12,6 +19,39 @@ const notoSansTelugu = Noto_Sans_Telugu({
   subsets: ["telugu"],
   variable: "--font-noto-telugu",
   weight: ["400", "700"],
+});
+
+// Typewriter face for the Mandi Chit aesthetic — feels like an auction-yard slip
+const specialElite = Special_Elite({
+  subsets: ["latin"],
+  variable: "--font-special-elite",
+  weight: ["400"],
+  display: "swap",
+});
+
+// Editorial serif for the Bulletin card — broadsheet headlines.
+// Use variable axes so the headline gets opsz=144 large-size optical sizing.
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-fraunces",
+  axes: ["opsz", "SOFT"],
+  display: "swap",
+});
+
+// Refined display serif for the Produce Forward card
+const cormorant = Cormorant_Garamond({
+  subsets: ["latin"],
+  variable: "--font-cormorant",
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+// Monospace numerals — ledger pricing across all three new cards
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains",
+  weight: ["400", "500", "700"],
+  display: "swap",
 });
 
 export const viewport: Viewport = {
@@ -103,7 +143,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${outfit.variable} ${notoSansTelugu.variable} font-sans antialiased bg-gray-50 text-slate-800`}
+        className={`${outfit.variable} ${notoSansTelugu.variable} ${specialElite.variable} ${fraunces.variable} ${cormorant.variable} ${jetbrainsMono.variable} font-sans antialiased bg-gray-50 text-slate-800`}
       >
         <a
           href="#main-content"
