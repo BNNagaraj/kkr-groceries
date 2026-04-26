@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Trash2, ChevronUp, ChevronDown, Check } from "lucide-react";
 import { formatTiersForDisplay, getActiveTierIndex, resolveSlabPrice } from "@/lib/pricing";
+import { useCardOrientation } from "./shared";
 
 /**
  * Produce Forward — the food is the design.
@@ -61,10 +62,11 @@ export const ProduceForwardCard = memo(function ProduceForwardCard({ product }: 
 
     const lowestPrice = tiers.length > 0 ? Math.min(...tiers.map((t) => t.price)) : product.price;
     const maxSavings = product.price > 0 ? Math.round(((product.price - lowestPrice) / product.price) * 100) : 0;
+    const orient = useCardOrientation();
 
     return (
         <article
-            className="relative flex flex-col h-full overflow-hidden rounded-[20px] group/card transition-all duration-300 ease-out"
+            className={`relative flex h-full overflow-hidden rounded-[20px] group/card transition-all duration-300 ease-out ${orient.flexClass}`}
             style={{
                 background: accent.deep,
                 color: accent.ink,
@@ -76,7 +78,7 @@ export const ProduceForwardCard = memo(function ProduceForwardCard({ product }: 
             {/* Full-bleed image — fills upper 65% */}
             <div
                 className="relative w-full overflow-hidden"
-                style={{ aspectRatio: "4 / 3", background: accent.tint }}
+                style={{ aspectRatio: orient.isHorizontal ? undefined : "4 / 3", background: accent.tint, ...(orient.imageWrapStyle || {}) }}
             >
                 {hasImage ? (
                     <>
@@ -129,7 +131,7 @@ export const ProduceForwardCard = memo(function ProduceForwardCard({ product }: 
             </div>
 
             {/* Content band */}
-            <div className="px-4 pt-3 pb-4 flex-1 flex flex-col">
+            <div className="px-4 pt-3 pb-4 flex-1 flex flex-col" style={orient.contentWrapStyle}>
                 {/* Name + price as a typographic pair */}
                 <div className="flex items-baseline gap-3">
                     <h3

@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Trash2, Check } from "lucide-react";
 import { formatTiersForDisplay, getActiveTierIndex, resolveSlabPrice } from "@/lib/pricing";
-import { ImageLightbox } from "./shared";
+import { ImageLightbox, useCardOrientation } from "./shared";
 
 /**
  * HairlineModern — refined sans, single hairline border, generous whitespace.
@@ -30,11 +30,12 @@ export const HairlineModernCard = memo(function HairlineModernCard({ product }: 
         ? resolveSlabPrice(qty, product.price, product.priceTiers)
         : product.price;
     const moq = (product.moqRequired !== false && product.moq > 0) ? product.moq : 1;
+    const orient = useCardOrientation();
 
     return (
         <>
             <article
-                className="relative flex flex-col h-full transition-colors duration-200 hover:border-slate-300"
+                className={`relative flex h-full transition-colors duration-200 hover:border-slate-300 ${orient.flexClass}`}
                 style={{
                     background: "#ffffff",
                     border: "1px solid #e2e8f0",
@@ -47,7 +48,7 @@ export const HairlineModernCard = memo(function HairlineModernCard({ product }: 
                     type="button"
                     onClick={() => hasImage && setLightboxOpen(true)}
                     className="relative w-full overflow-hidden focus:outline-none focus-visible:ring-1 focus-visible:ring-slate-400"
-                    style={{ aspectRatio: "5 / 4", background: "#f8fafc" }}
+                    style={{ aspectRatio: orient.isHorizontal ? undefined : "5 / 4", background: "#f8fafc", ...(orient.imageWrapStyle || {}) }}
                 >
                     {hasImage ? (
                         <Image
@@ -68,7 +69,7 @@ export const HairlineModernCard = memo(function HairlineModernCard({ product }: 
                 </button>
 
                 {/* Content — generous spacing, single column */}
-                <div className="flex flex-col flex-1 px-5 pt-4 pb-5">
+                <div className="flex flex-col flex-1 px-5 pt-4 pb-5" style={orient.contentWrapStyle}>
                     <h3
                         className="text-[18px] leading-[1.15] tracking-tight line-clamp-2 break-words"
                         style={{

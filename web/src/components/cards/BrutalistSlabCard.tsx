@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
 import { Trash2, Check } from "lucide-react";
 import { formatTiersForDisplay, getActiveTierIndex, resolveSlabPrice } from "@/lib/pricing";
-import { ImageLightbox } from "./shared";
+import { ImageLightbox, useCardOrientation } from "./shared";
 
 /**
  * BrutalistSlab — concrete monolith. Severe, monumental, zero decoration.
@@ -30,6 +30,7 @@ export const BrutalistSlabCard = memo(function BrutalistSlabCard({ product }: { 
         ? resolveSlabPrice(qty, product.price, product.priceTiers)
         : product.price;
     const moq = (product.moqRequired !== false && product.moq > 0) ? product.moq : 1;
+    const orient = useCardOrientation();
 
     return (
         <>
@@ -56,13 +57,17 @@ export const BrutalistSlabCard = memo(function BrutalistSlabCard({ product }: { 
                     </span>
                 </div>
 
-                {/* Body — image left, headline right */}
-                <div className="flex">
+                {/* Body — image left, headline right (orientation-aware) */}
+                <div className={`flex ${orient.isHorizontal ? (orient.isReversed ? "flex-row-reverse" : "flex-row") : "flex-col"}`}>
                     <button
                         type="button"
                         onClick={() => hasImage && setLightboxOpen(true)}
-                        className="relative w-[35%] shrink-0 overflow-hidden focus:outline-none"
-                        style={{ aspectRatio: "1 / 1", background: "#0a0a0a" }}
+                        className="relative shrink-0 overflow-hidden focus:outline-none"
+                        style={{
+                            width: orient.isHorizontal ? `${orient.imageWidth}%` : "100%",
+                            aspectRatio: orient.isHorizontal ? "1 / 1" : "16 / 9",
+                            background: "#0a0a0a",
+                        }}
                     >
                         {hasImage ? (
                             <Image

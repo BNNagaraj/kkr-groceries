@@ -8,6 +8,24 @@ import { Trash2, ZoomIn, X, Check } from "lucide-react";
 import { resolveSlabPrice } from "@/lib/pricing";
 import { useTheme } from "@/contexts/ThemeContext";
 
+/* ─── Card Orientation Hook (for distinctive cards that own their internal styling) ─── */
+
+export function useCardOrientation() {
+    const { theme } = useTheme();
+    const pos = theme.cardLayout?.imagePosition || "top";
+    const w = theme.cardLayout?.imageWidth || 35;
+    const isHorizontal = pos === "left" || pos === "right";
+    const isReversed = pos === "right";
+    return {
+        isHorizontal,
+        isReversed,
+        imageWidth: w,
+        flexClass: isHorizontal ? (isReversed ? "flex-row-reverse" : "flex-row") : "flex-col",
+        imageWrapStyle: (isHorizontal ? { width: `${w}%`, flexShrink: 0 } : undefined) as React.CSSProperties | undefined,
+        contentWrapStyle: (isHorizontal ? { flex: 1, minWidth: 0 } : undefined) as React.CSSProperties | undefined,
+    };
+}
+
 /* ─── Theme-aware Image Layout Hook ─── */
 
 export function useImageLayout() {
