@@ -1,12 +1,13 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import {
   Database,
   Download,
   FlaskConical,
-  LayoutGrid,
   Maximize2,
   Minimize2,
+  MoreHorizontal,
   Moon,
   Search,
   Sun,
@@ -18,8 +19,6 @@ import StoreFilter from "./StoreFilter";
 import type { Store } from "@/types/settings";
 import type { C2Theme, C2DateRange } from "../CommandCenter";
 
-type C2LayoutKey = "balanced" | "map-focus" | "pipeline-focus" | "analytics-focus";
-
 interface C2HeaderProps {
   mode: string;
   stores: Store[];
@@ -29,10 +28,6 @@ interface C2HeaderProps {
   dateRange: C2DateRange;
   setDateRange: (r: C2DateRange) => void;
   dateRanges: { key: C2DateRange; label: string; shortLabel: string }[];
-
-  layoutKey: C2LayoutKey;
-  layouts: Record<C2LayoutKey, { label: string }>;
-  changeLayout: (k: C2LayoutKey) => void;
 
   c2Theme: C2Theme;
   toggleTheme: () => void;
@@ -55,9 +50,6 @@ export function C2Header({
   dateRange,
   setDateRange,
   dateRanges,
-  layoutKey,
-  layouts,
-  changeLayout,
   c2Theme,
   toggleTheme,
   isMuted,
@@ -67,62 +59,57 @@ export function C2Header({
   onSearch,
   onExport,
 }: C2HeaderProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [menuOpen]);
+
+  const isTest = mode === "test";
+
   return (
     <div
-      className="c2-header flex items-center justify-between px-3 sm:px-5 py-2 sm:py-2.5 shrink-0"
+      className="c2-header flex items-center justify-between px-3 sm:px-5 py-2 shrink-0 gap-2"
       style={{ borderBottom: "1px solid var(--c2-border)" }}
     >
-      {/* ── Left: Identity + Status ── */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <div
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}
-          >
-            <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-          </div>
-          <div className="hidden sm:block">
-            <h2
-              className="text-xs sm:text-sm font-bold tracking-wider leading-none"
-              style={{ color: "var(--c2-text)", letterSpacing: "0.08em" }}
-            >
-              COMMAND CENTER
-            </h2>
-            <span className="text-[9px] font-medium leading-none" style={{ color: "var(--c2-text-muted)" }}>
-              KKR Groceries
-            </span>
-          </div>
-          <h2
-            className="sm:hidden text-xs font-bold tracking-wider"
-            style={{ color: "var(--c2-text)", letterSpacing: "0.06em" }}
-          >
-            C2
-          </h2>
+      {/* ── Left: compact identity ── */}
+      <div className="flex items-center gap-2 min-w-0">
+        <div
+          className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+          style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}
+        >
+          <Zap className="w-3.5 h-3.5 text-white" />
         </div>
-
         <span
-          className="text-[9px] font-bold px-2 py-0.5 rounded-md hidden sm:inline-flex items-center gap-1"
+          className="text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1 shrink-0"
           style={{
-            background: mode === "test" ? "rgba(245,158,11,0.1)" : "rgba(16,185,129,0.08)",
-            color: mode === "test" ? "#d97706" : "#059669",
-            border: `1px solid ${mode === "test" ? "rgba(245,158,11,0.2)" : "rgba(16,185,129,0.2)"}`,
+            background: isTest ? "rgba(245,158,11,0.1)" : "rgba(16,185,129,0.08)",
+            color: isTest ? "#d97706" : "#059669",
+            border: `1px solid ${isTest ? "rgba(245,158,11,0.2)" : "rgba(16,185,129,0.2)"}`,
           }}
         >
-          {mode === "test" ? <FlaskConical className="w-3 h-3" /> : <Database className="w-3 h-3" />}
-          {mode === "test" ? "TEST" : "LIVE"}
+          {isTest ? <FlaskConical className="w-3 h-3" /> : <Database className="w-3 h-3" />}
+          {isTest ? "TEST" : "LIVE"}
         </span>
-
-        <div className="flex items-center gap-1.5">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-          </span>
-          <span className="text-[10px] font-bold text-emerald-500 hidden sm:inline tracking-wider">LIVE</span>
-        </div>
       </div>
 
-      {/* ── Right: Controls ── */}
-      <div className="flex items-center gap-0.5 sm:gap-1">
+      {/* ── Right: controls ── */}
+      <div className="flex items-center gap-1 sm:gap-1.5">
         {stores.length > 0 && (
           <StoreFilter
             stores={stores}
@@ -131,6 +118,7 @@ export function C2Header({
           />
         )}
 
+        {/* Date range — pill group on md+, native select on mobile */}
         <div
           className="hidden md:flex items-center rounded-lg p-0.5"
           style={{ background: "var(--c2-bg-secondary)", border: "1px solid var(--c2-border-subtle)" }}
@@ -168,8 +156,6 @@ export function C2Header({
           ))}
         </select>
 
-        <div className="c2-divider-v hidden sm:block" />
-
         <button onClick={onSearch} className="c2-ctrl-btn flex items-center gap-1" title="Search orders (Ctrl+K)">
           <Search className="w-4 h-4" />
           <kbd
@@ -184,57 +170,93 @@ export function C2Header({
           </kbd>
         </button>
 
-        <button onClick={onExport} className="c2-ctrl-btn" title="Export orders to CSV">
-          <Download className="w-4 h-4" />
-        </button>
-
-        <button
-          onClick={toggleMute}
-          className="c2-ctrl-btn"
-          style={{ color: isMuted ? "var(--c2-text-muted)" : "#059669" }}
-          title={isMuted ? "Unmute notifications (M)" : "Mute notifications (M)"}
-        >
-          {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-        </button>
-
-        <div className="c2-divider-v hidden md:block" />
-
-        <div className="hidden md:flex items-center gap-0.5">
-          <LayoutGrid className="w-3.5 h-3.5 ml-0.5" style={{ color: "var(--c2-text-muted)" }} />
-          <select
-            value={layoutKey}
-            onChange={(e) => changeLayout(e.target.value as C2LayoutKey)}
-            className="text-[10px] font-medium rounded-md px-1.5 py-1 outline-none cursor-pointer"
-            style={{
-              background: "transparent",
-              color: "var(--c2-text-secondary)",
-              border: "none",
-            }}
+        {/* Overflow menu — secondary controls */}
+        <div ref={menuRef} className="relative">
+          <button
+            onClick={() => setMenuOpen((p) => !p)}
+            className="c2-ctrl-btn"
+            title="More"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
           >
-            {Object.entries(layouts).map(([key, cfg]) => (
-              <option key={key} value={key}>
-                {cfg.label}
-              </option>
-            ))}
-          </select>
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full mt-1 w-44 rounded-lg overflow-hidden z-50"
+              style={{
+                background: "var(--c2-bg-card)",
+                border: "1px solid var(--c2-border)",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.18)",
+              }}
+            >
+              <MenuItem
+                icon={isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                label={isMuted ? "Unmute alerts" : "Mute alerts"}
+                shortcut="M"
+                onClick={() => { toggleMute(); setMenuOpen(false); }}
+                accent={isMuted ? undefined : "#059669"}
+              />
+              <MenuItem
+                icon={<Download className="w-3.5 h-3.5" />}
+                label="Export CSV"
+                onClick={() => { onExport(); setMenuOpen(false); }}
+              />
+              <MenuItem
+                icon={c2Theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+                label={c2Theme === "dark" ? "Light mode" : "Dark mode"}
+                onClick={() => { toggleTheme(); setMenuOpen(false); }}
+              />
+              <MenuItem
+                icon={isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                onClick={() => { toggleFullscreen(); setMenuOpen(false); }}
+              />
+            </div>
+          )}
         </div>
-
-        <button
-          onClick={toggleTheme}
-          className="c2-ctrl-btn"
-          title={c2Theme === "dark" ? "Light mode" : "Dark mode"}
-        >
-          {c2Theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
-
-        <button
-          onClick={toggleFullscreen}
-          className="c2-ctrl-btn"
-          title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-        >
-          {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-        </button>
       </div>
     </div>
+  );
+}
+
+function MenuItem({
+  icon,
+  label,
+  shortcut,
+  onClick,
+  accent,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  shortcut?: string;
+  onClick: () => void;
+  accent?: string;
+}) {
+  return (
+    <button
+      role="menuitem"
+      onClick={onClick}
+      className="w-full flex items-center justify-between gap-2 px-3 py-2 text-[12px] font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+      style={{ color: accent || "var(--c2-text)" }}
+    >
+      <span className="flex items-center gap-2">
+        <span style={{ color: accent || "var(--c2-text-muted)" }}>{icon}</span>
+        {label}
+      </span>
+      {shortcut && (
+        <kbd
+          className="text-[9px] px-1 py-0.5 rounded font-mono"
+          style={{
+            background: "var(--c2-bg-secondary)",
+            border: "1px solid var(--c2-border-subtle)",
+            color: "var(--c2-text-muted)",
+          }}
+        >
+          {shortcut}
+        </kbd>
+      )}
+    </button>
   );
 }

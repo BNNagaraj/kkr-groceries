@@ -3,13 +3,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { C2Theme } from "../CommandCenter";
 import {
+  ChevronDown,
+  ChevronUp,
   DollarSign,
-  ShoppingCart,
-  Users,
-  Target,
-  TrendingUp,
-  TrendingDown,
   Hourglass,
+  ShoppingCart,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  Users,
 } from "lucide-react";
 
 interface MetricCardProps {
@@ -175,72 +177,92 @@ export default function LiveMetrics({
   revenueLabel,
   onCardClick,
 }: LiveMetricsProps) {
+  const [expanded, setExpanded] = useState(false);
+
   const revenueTrend =
     yesterdayRevenue && yesterdayRevenue > 0
       ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100)
       : undefined;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2">
-      <MetricCard
-        label={revenueLabel || "Today's Revenue"}
-        value={todayRevenue}
-        prefix={"\u20B9"}
-        icon={<DollarSign className="w-4 h-4" />}
-        accentColor="#10b981"
-        glowColor="#10b981"
-        format="currency"
-        trend={revenueTrend}
-        onClick={() => onCardClick?.("revenue")}
-      />
-      <MetricCard
-        label="Active Orders"
-        value={activeOrders}
-        icon={<ShoppingCart className="w-4 h-4" />}
-        accentColor="#f59e0b"
-        glowColor="#f59e0b"
-        pulse={activeOrders > 0}
-        onClick={() => onCardClick?.("active")}
-      />
-      <MetricCard
-        label="Online Users"
-        value={onlineUsers}
-        icon={<Users className="w-4 h-4" />}
-        accentColor="#22c55e"
-        glowColor="#22c55e"
-        onClick={() => onCardClick?.("users")}
-      />
-      <MetricCard
-        label="Fulfillment Rate"
-        value={fulfillmentRate}
-        suffix="%"
-        icon={<Target className="w-4 h-4" />}
-        accentColor="#3b82f6"
-        glowColor="#3b82f6"
-        format="percent"
-        onClick={() => onCardClick?.("fulfillment")}
-      />
-      <MetricCard
-        label="Avg Order Value"
-        value={avgOrderValue}
-        prefix={"\u20B9"}
-        icon={<TrendingUp className="w-4 h-4" />}
-        accentColor="#8b5cf6"
-        glowColor="#8b5cf6"
-        format="currency"
-        onClick={() => onCardClick?.("aov")}
-      />
-      <MetricCard
-        label="Pending Revenue"
-        value={pendingRevenue}
-        prefix={"\u20B9"}
-        icon={<Hourglass className="w-4 h-4" />}
-        accentColor="#f97316"
-        glowColor="#f97316"
-        format="currency"
-        pulse={pendingRevenue > 0}
-        onClick={() => onCardClick?.("pending")}
-      />
+    <div>
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+        <MetricCard
+          label={revenueLabel || "Today's Revenue"}
+          value={todayRevenue}
+          prefix={"\u20B9"}
+          icon={<DollarSign className="w-4 h-4" />}
+          accentColor="#10b981"
+          glowColor="#10b981"
+          format="currency"
+          trend={revenueTrend}
+          onClick={() => onCardClick?.("revenue")}
+        />
+        <MetricCard
+          label="Active Orders"
+          value={activeOrders}
+          icon={<ShoppingCart className="w-4 h-4" />}
+          accentColor="#f59e0b"
+          glowColor="#f59e0b"
+          pulse={activeOrders > 0}
+          onClick={() => onCardClick?.("active")}
+        />
+        <MetricCard
+          label="Online Users"
+          value={onlineUsers}
+          icon={<Users className="w-4 h-4" />}
+          accentColor="#22c55e"
+          glowColor="#22c55e"
+          onClick={() => onCardClick?.("users")}
+        />
+      </div>
+
+      {expanded && (
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-1.5 sm:mt-2">
+          <MetricCard
+            label="Fulfillment Rate"
+            value={fulfillmentRate}
+            suffix="%"
+            icon={<Target className="w-4 h-4" />}
+            accentColor="#3b82f6"
+            glowColor="#3b82f6"
+            format="percent"
+            onClick={() => onCardClick?.("fulfillment")}
+          />
+          <MetricCard
+            label="Avg Order Value"
+            value={avgOrderValue}
+            prefix={"\u20B9"}
+            icon={<TrendingUp className="w-4 h-4" />}
+            accentColor="#8b5cf6"
+            glowColor="#8b5cf6"
+            format="currency"
+            onClick={() => onCardClick?.("aov")}
+          />
+          <MetricCard
+            label="Pending Revenue"
+            value={pendingRevenue}
+            prefix={"\u20B9"}
+            icon={<Hourglass className="w-4 h-4" />}
+            accentColor="#f97316"
+            glowColor="#f97316"
+            format="currency"
+            pulse={pendingRevenue > 0}
+            onClick={() => onCardClick?.("pending")}
+          />
+        </div>
+      )}
+
+      <div className="flex justify-center mt-1">
+        <button
+          onClick={() => setExpanded((p) => !p)}
+          className="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wider uppercase px-2.5 py-0.5 rounded-md transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+          style={{ color: "var(--c2-text-muted)" }}
+        >
+          {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          {expanded ? "Hide details" : "More metrics"}
+        </button>
+      </div>
     </div>
   );
 }

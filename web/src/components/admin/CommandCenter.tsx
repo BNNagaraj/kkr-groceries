@@ -54,17 +54,6 @@ import { Zap } from "lucide-react";
 export type C2Theme = "light" | "dark";
 export type C2DateRange = "today" | "yesterday" | "7days" | "all";
 
-type C2LayoutKey = "balanced" | "map-focus" | "pipeline-focus" | "analytics-focus";
-
-interface C2LayoutConfig {
-  label: string;
-  mapCols: number;
-  pipeCols: number;
-  feedCols: number;
-  chartCols: number;
-  bottomHeight: number;
-}
-
 // PresenceDoc is imported from @/contexts/PresenceContext
 
 // ─── Date Range Options ──────────────────────────────────────────────────────
@@ -75,13 +64,9 @@ const C2_DATE_RANGES: { key: C2DateRange; label: string; shortLabel: string }[] 
   { key: "all", label: "All Time", shortLabel: "All" },
 ];
 
-// ─── Layout Presets ──────────────────────────────────────────────────────────
-const C2_LAYOUTS: Record<C2LayoutKey, C2LayoutConfig> = {
-  balanced: { label: "Balanced", mapCols: 7, pipeCols: 5, feedCols: 7, chartCols: 5, bottomHeight: 320 },
-  "map-focus": { label: "Map Focus", mapCols: 9, pipeCols: 3, feedCols: 8, chartCols: 4, bottomHeight: 240 },
-  "pipeline-focus": { label: "Pipeline Focus", mapCols: 4, pipeCols: 8, feedCols: 5, chartCols: 7, bottomHeight: 300 },
-  "analytics-focus": { label: "Analytics Focus", mapCols: 6, pipeCols: 6, feedCols: 4, chartCols: 8, bottomHeight: 420 },
-};
+// ─── Fixed Layout (was C2_LAYOUTS.balanced) ──────────────────────────────────
+const C2_LAYOUT = { mapCols: 7, pipeCols: 5, feedCols: 7, chartCols: 5, bottomHeight: 320 };
+const DEFAULT_BOTTOM_H = C2_LAYOUT.bottomHeight;
 
 // ─── localStorage Helpers (SSR-safe) ─────────────────────────────────────────
 function readStorage<T>(key: string, fallback: T): T {
@@ -220,15 +205,9 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     readStorage<C2Theme>("kkr-c2-theme", "light")
   );
 
-  // ── Layout state ──
-  const [layoutKey, setLayoutKey] = useState<C2LayoutKey>(() =>
-    readStorage<C2LayoutKey>("kkr-c2-layout", "balanced")
-  );
-  const layout = C2_LAYOUTS[layoutKey] || C2_LAYOUTS.balanced;
-
   // ── Bottom panel height ──
   const [bottomHeight, setBottomHeight] = useState<number>(() =>
-    readStorage<number>("kkr-c2-bottom-h", layout.bottomHeight)
+    readStorage<number>("kkr-c2-bottom-h", DEFAULT_BOTTOM_H)
   );
   const isDraggingRef = useRef(false);
   const dragStartY = useRef(0);
@@ -269,12 +248,6 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
   const [assignDialogOrder, setAssignDialogOrder] = useState<Order | null>(null);
   // After assignment (or skip), call this to proceed with the original status change
   const pendingAssignCallbackRef = useRef<(() => void) | null>(null);
-
-  // Sync bottom height when layout preset changes
-  useEffect(() => {
-    setBottomHeight(layout.bottomHeight);
-    writeStorage("kkr-c2-bottom-h", layout.bottomHeight);
-  }, [layout.bottomHeight]);
 
   // ── Real-time order listener (last 30 days) ──
   useEffect(() => {
@@ -615,12 +588,6 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     writeStorage("kkr-c2-theme", next);
   };
 
-  // ── Layout change ──
-  const changeLayout = (key: C2LayoutKey) => {
-    setLayoutKey(key);
-    writeStorage("kkr-c2-layout", key);
-  };
-
   // ── Feature 2: Mute toggle ──
   const toggleMute = () => {
     setIsMuted((prev) => {
@@ -719,9 +686,6 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
         dateRange={dateRange}
         setDateRange={setDateRange}
         dateRanges={C2_DATE_RANGES}
-        layoutKey={layoutKey}
-        layouts={C2_LAYOUTS}
-        changeLayout={changeLayout}
         c2Theme={c2Theme}
         toggleTheme={toggleTheme}
         isMuted={isMuted}
@@ -783,7 +747,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
             <div
               className="overflow-hidden min-h-[300px] lg:min-h-0 lg:border-r"
               style={{
-                gridColumn: `span ${layout.mapCols}`,
+                gridColumn: `span ${C2_LAYOUT.mapCols}`,
                 borderColor: "var(--c2-border-subtle)",
               }}
             >
@@ -802,7 +766,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
             </div>
 
             {/* Right: Pipeline */}
-            <div className="overflow-hidden min-h-[300px] lg:min-h-0" style={{ gridColumn: `span ${layout.pipeCols}` }}>
+            <div className="overflow-hidden min-h-[300px] lg:min-h-0" style={{ gridColumn: `span ${C2_LAYOUT.pipeCols}` }}>
               <OrderPipeline
                 orders={filteredOrders}
                 onStatusChange={handleStatusChange}
@@ -831,7 +795,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
             <div
               className="overflow-hidden lg:border-r"
               style={{
-                gridColumn: `span ${layout.feedCols}`,
+                gridColumn: `span ${C2_LAYOUT.feedCols}`,
                 borderColor: "var(--c2-border-subtle)",
               }}
             >
@@ -839,7 +803,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
             </div>
 
             {/* Mini Charts + Store Analytics */}
-            <div className="overflow-hidden flex flex-col lg:flex-row" style={{ gridColumn: `span ${layout.chartCols}` }}>
+            <div className="overflow-hidden flex flex-col lg:flex-row" style={{ gridColumn: `span ${C2_LAYOUT.chartCols}` }}>
               <div className={`overflow-hidden ${stores.length > 0 ? "lg:w-1/2 lg:border-r" : "w-full"}`} style={{ borderColor: "var(--c2-border-subtle)" }}>
                 <MiniCharts orders={filteredOrders} allOrders={orders} theme={c2Theme} dateRange={dateRange} />
               </div>
