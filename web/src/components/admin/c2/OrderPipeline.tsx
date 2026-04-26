@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import type { C2Theme } from "../CommandCenter";
 import { Order, OrderStatus } from "@/types/order";
 import { parseTotal, formatCurrency } from "@/lib/helpers";
+import { toMillis } from "@/lib/timestamps";
 import {
   Clock,
   CheckCircle2,
@@ -89,11 +90,7 @@ const PIPELINE_STAGES: {
 // ─── Aging helper ───────────────────────────────────────────────────────────
 function getAgingClass(order: Order): string {
   if (order.status === "Fulfilled" || order.status === "Rejected") return "";
-  const ts = order.createdAt
-    ? typeof order.createdAt === "object" && "toDate" in order.createdAt
-      ? (order.createdAt as any).toDate().getTime()
-      : new Date(order.timestamp || "").getTime()
-    : Date.now();
+  const ts = toMillis(order.createdAt) || toMillis(order.timestamp) || Date.now();
   const elapsed = (Date.now() - ts) / 60000;
   if (elapsed > 30) return "c2-aging-critical";
   if (elapsed > 15) return "c2-aging-warning";
@@ -101,11 +98,7 @@ function getAgingClass(order: Order): string {
 }
 
 function getElapsedText(order: Order): string {
-  const ts = order.createdAt
-    ? typeof order.createdAt === "object" && "toDate" in order.createdAt
-      ? (order.createdAt as any).toDate().getTime()
-      : new Date(order.timestamp || "").getTime()
-    : Date.now();
+  const ts = toMillis(order.createdAt) || toMillis(order.timestamp) || Date.now();
   const elapsed = Math.floor((Date.now() - ts) / 60000);
   if (elapsed < 1) return "just now";
   if (elapsed < 60) return `${elapsed}m ago`;
@@ -386,10 +379,8 @@ export default function OrderPipeline({ orders, onStatusChange, onBulkStatusChan
     });
     Object.values(map).forEach((arr) =>
       arr.sort((a, b) => {
-        const ta = a.createdAt && typeof a.createdAt === "object" && "toDate" in a.createdAt
-          ? (a.createdAt as any).toDate().getTime() : new Date(a.timestamp || 0).getTime();
-        const tb = b.createdAt && typeof b.createdAt === "object" && "toDate" in b.createdAt
-          ? (b.createdAt as any).toDate().getTime() : new Date(b.timestamp || 0).getTime();
+        const ta = toMillis(a.createdAt) || toMillis(a.timestamp);
+        const tb = toMillis(b.createdAt) || toMillis(b.timestamp);
         return tb - ta;
       })
     );

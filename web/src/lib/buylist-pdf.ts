@@ -236,8 +236,8 @@ export function downloadBuyListPdf(
       },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    y = (doc as any).lastAutoTable?.finalY ?? y + 20;
+    // `lastAutoTable` typed via the jsPDF module augmentation in @/types/jspdf-augment.d.ts
+    y = doc.lastAutoTable?.finalY ?? y + 20;
 
     /* Category subtotal row */
     doc.setFillColor(...hex(C.greenBg));

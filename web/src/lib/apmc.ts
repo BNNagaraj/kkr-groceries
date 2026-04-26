@@ -218,9 +218,12 @@ export async function fetchRealAPMCPrices(): Promise<{
   total: number;
 } | null> {
   try {
-    const fn = httpsCallable(functionsAsia, "fetchAPMCPrices");
+    const fn = httpsCallable<
+      { state: string },
+      { records: APMCApiRecord[]; fromCache: boolean; fetchedAt: string; total: number }
+    >(functionsAsia, "fetchAPMCPrices");
     const result = await fn({ state: "Telangana" });
-    return result.data as any;
+    return result.data;
   } catch (e) {
     console.warn("[APMC] Cloud Function failed, falling back to simulated:", e);
     return null;
@@ -321,9 +324,18 @@ export async function fetchMultiStateAPMCPrices(): Promise<{
   stateBreakdown: Record<string, number>;
 } | null> {
   try {
-    const fn = httpsCallable(functionsAsia, "fetchMultiStateAPMCPrices");
+    const fn = httpsCallable<
+      Record<string, never>,
+      {
+        records: APMCApiRecord[];
+        fromCache: boolean;
+        fetchedAt: string;
+        total: number;
+        stateBreakdown: Record<string, number>;
+      }
+    >(functionsAsia, "fetchMultiStateAPMCPrices");
     const result = await fn({});
-    return result.data as any;
+    return result.data;
   } catch (e) {
     console.warn("[APMC] Multi-state fetch failed:", e);
     return null;

@@ -16,7 +16,8 @@ import {
 
 interface Props {
   apiRecords: APMCApiRecord[] | null;
-  markets: string[];
+  /** Accept either a mutable list (from the API) or the readonly tuple from constants. */
+  markets: readonly string[];
   products: Array<{ name: string; image: string; telugu?: string; hindi?: string }>;
 }
 

@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { Order } from "@/types/order";
 import { MapPin, Loader2, Filter, Calendar, TrendingUp } from "lucide-react";
 import MapStyleSettings, { buildMapStyles, loadMapSettings } from "../MapStyleSettings";
+import { toMillis } from "@/lib/timestamps";
 
 declare global {
   interface Window {
@@ -68,13 +69,8 @@ export default function OrderLocationMap({ orders }: Props) {
     const days = dateRange === "7d" ? 7 : 30;
     const cutoff = now - days * 24 * 60 * 60 * 1000;
     return orders.filter(o => {
-      const raw = o.timestamp || o.createdAt;
-      if (!raw) return false;
-      let ts = 0;
-      if (typeof raw === "string") ts = new Date(raw).getTime();
-      else if (typeof raw === "object" && "toDate" in raw) ts = (raw as any).toDate().getTime();
-      else if (typeof raw === "number") ts = raw;
-      return ts >= cutoff;
+      const ts = toMillis(o.timestamp ?? o.createdAt);
+      return ts > 0 && ts >= cutoff;
     });
   }, [orders, dateRange]);
 

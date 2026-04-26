@@ -472,8 +472,8 @@ export function downloadInvoice(order: Order): void {
     },
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  y = (doc as any).lastAutoTable.finalY + 2;
+  // `lastAutoTable` typed via the jsPDF module augmentation in @/types/jspdf-augment.d.ts
+  y = (doc.lastAutoTable?.finalY ?? y) + 2;
 
   /* ═══════════════════ TAX SUMMARY ═══════════════════ */
   const sumX = M + CW * 0.52;

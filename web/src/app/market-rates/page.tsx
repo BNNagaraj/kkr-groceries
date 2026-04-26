@@ -199,9 +199,7 @@ export default function MarketRatesPage() {
     );
   }, [supplySignals]);
 
-  const marketOptions = isRealData
-    ? apiMarkets
-    : (APMC_MARKETS as unknown as string[]);
+  const marketOptions: readonly string[] = isRealData ? apiMarkets : APMC_MARKETS;
 
   const date = prices[0]?.date || new Date().toISOString().split("T")[0];
 

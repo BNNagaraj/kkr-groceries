@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, Timestamp } from "firebase/firestore";
+import { toMillis } from "@/lib/timestamps";
 import {
   Package,
   CheckCircle2,
@@ -148,16 +149,11 @@ export default function TrackPage() {
         const data = snap.data() as TrackingDoc;
 
         // Check expiry
-        const expiresAt = data.expiresAt;
-        if (expiresAt) {
-          const expiryMs = expiresAt instanceof Timestamp
-            ? expiresAt.toMillis()
-            : new Date(expiresAt as unknown as string).getTime();
-          if (Date.now() > expiryMs) {
-            setError("This tracking link has expired (24h limit).");
-            setLoading(false);
-            return;
-          }
+        const expiryMs = toMillis(data.expiresAt);
+        if (expiryMs > 0 && Date.now() > expiryMs) {
+          setError("This tracking link has expired (24h limit).");
+          setLoading(false);
+          return;
         }
 
         setTracking(data);

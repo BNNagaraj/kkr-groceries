@@ -172,7 +172,9 @@ function isWithin7Days(order: Order): boolean {
 function playNewOrderChime(audioCtxRef: React.MutableRefObject<AudioContext | null>) {
   try {
     if (!audioCtxRef.current) {
-      audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const Ctor = window.AudioContext ?? window.webkitAudioContext;
+      if (!Ctor) return;
+      audioCtxRef.current = new Ctor();
     }
     const ctx = audioCtxRef.current;
     const now = ctx.currentTime;
