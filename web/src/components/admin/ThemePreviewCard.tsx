@@ -256,6 +256,236 @@ export function ThemePreviewCard({
                         ))}
                     </div>
                 )}
+
+                {/* Zen Garden: 3-col warm stone minimal cards */}
+                {id === "zen" && (
+                    <div className="grid grid-cols-3 gap-1.5 w-full" style={{ background: "#f7f5f0" }}>
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="h-[56px] flex flex-col overflow-hidden rounded" style={{ background: "#faf8f5", border: "1px solid #e8e4de" }}>
+                                <div className="h-[40%]" style={{ background: "#e8e4dc", filter: "saturate(0.5)" }} />
+                                <div className="flex-1 p-1 space-y-1">
+                                    <div className="h-1 rounded-full w-3/4" style={{ background: "#d4cfc7" }} />
+                                    <div className="h-1.5 rounded-full w-full" style={{ background: "#7c8c6e" }} />
+                                    <div className="h-1.5 rounded-full w-4/5" style={{ background: "#c7c1b5" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Aurora: 3-col dark cards with aurora gradient glow */}
+                {id === "aurora" && (
+                    <div className="grid grid-cols-3 gap-1 w-full p-1 rounded" style={{ background: "#16162a" }}>
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="h-[52px] flex flex-col overflow-hidden rounded" style={{ background: "#1e1e36", border: "1px solid #2a2a4a" }}>
+                                <div className="h-[2px] w-full" style={{ background: "linear-gradient(90deg, #7c3aed, #06b6d4, #10b981)" }} />
+                                <div className="h-[40%]" style={{ background: "#2a2a4a" }} />
+                                <div className="flex-1 p-0.5 space-y-0.5">
+                                    <div className="h-1 rounded-full w-3/4" style={{ background: "#3a3a5a" }} />
+                                    <div className="h-1 rounded-full w-1/2" style={{ background: "linear-gradient(90deg, #7c3aed, #06b6d4)" }} />
+                                    <div className="h-1.5 rounded-sm w-full" style={{ background: "#10b981" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Terracotta: 3-col warm clay cards with arch */}
+                {id === "terracotta" && (
+                    <div className="grid grid-cols-3 gap-1 w-full">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="h-[56px] flex flex-col overflow-hidden rounded-lg" style={{ background: "#fdf6ee", border: "1px solid #e8d5c0" }}>
+                                <div className="h-[45%] relative" style={{ background: "#e8d5c0" }}>
+                                    <div className="absolute bottom-0 left-0 right-0 h-2" style={{ background: "#fdf6ee", borderRadius: "50% 50% 0 0" }} />
+                                </div>
+                                <div className="flex-1 p-0.5 space-y-0.5 flex flex-col items-center">
+                                    <div className="h-1 rounded-full w-3/4" style={{ background: "#d5b396" }} />
+                                    <div className="h-1.5 rounded w-full" style={{ background: "#c2703e" }} />
+                                    <div className="h-1.5 rounded w-4/5" style={{ background: "#e5cdb6" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Sapphire Night: 2-col deep navy cards with silver */}
+                {id === "sapphire" && (
+                    <div className="grid grid-cols-2 gap-1.5 w-full p-1 rounded" style={{ background: "#0c1220" }}>
+                        {[1, 2].map(i => (
+                            <div key={i} className="h-[56px] flex p-1 gap-1 rounded" style={{ background: "#0f172a", border: "1px solid #1e293b" }}>
+                                <div className="w-[35%] rounded-sm shrink-0" style={{ background: "#1e293b" }} />
+                                <div className="flex-1 flex flex-col gap-0.5 justify-between">
+                                    <div className="h-1 rounded-full w-full" style={{ background: "#334155" }} />
+                                    <div className="h-1 rounded-full w-2/3" style={{ background: "linear-gradient(90deg, #f1f5f9, #94a3b8)" }} />
+                                    <div className="space-y-0.5">
+                                        <div className="h-1.5 rounded-sm w-full" style={{ background: "#1e293b" }} />
+                                        <div className="h-1.5 rounded-sm w-full" style={{ background: "#1e40af", boxShadow: "0 0 4px rgba(30,64,175,0.4)" }} />
+                                    </div>
+                                    <div className="h-2 rounded-sm w-full" style={{ background: "#1e40af" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Sakura Bloom: 3-col soft pink petal cards */}
+                {id === "sakura" && (
+                    <div className="grid grid-cols-3 gap-1 w-full" style={{ background: "#fff5f8" }}>
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="h-[56px] flex flex-col overflow-hidden rounded-lg" style={{ background: "linear-gradient(180deg, #fff5f8, #ffffff)", border: "1px solid #fce7f3" }}>
+                                <div className="h-[40%]" style={{ background: "linear-gradient(135deg, #fce7f3, #fdf2f8)" }} />
+                                <div className="flex-1 p-0.5 space-y-0.5">
+                                    <div className="h-1 rounded-full w-3/4" style={{ background: "#fbcfe8" }} />
+                                    <div className="h-1.5 w-full" style={{ background: "#ec4899", borderRadius: "8px 8px 8px 3px" }} />
+                                    <div className="h-1.5 w-4/5" style={{ background: "#fce7f3", borderRadius: "8px 8px 8px 3px" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Mandi Chit: cream paper, ink stamp, ledger lines, perforated bottom */}
+                {id === "mandichit" && (
+                    <div className="grid grid-cols-3 gap-1 w-full">
+                        {[1, 2, 3].map(i => (
+                            <div
+                                key={i}
+                                className="relative h-[56px] flex flex-col overflow-hidden p-1"
+                                style={{
+                                    background: "#f7f1e3",
+                                    boxShadow: "inset 0 0 0 1px rgba(120,90,40,0.2)",
+                                    clipPath:
+                                        "polygon(0 0, 100% 0, 100% 88%, 92% 100%, 84% 88%, 76% 100%, 68% 88%, 60% 100%, 52% 88%, 44% 100%, 36% 88%, 28% 100%, 20% 88%, 12% 100%, 4% 88%, 0 100%)",
+                                }}
+                            >
+                                {/* Tiny rotated ink stamp */}
+                                <div
+                                    className="absolute top-0.5 right-0.5 px-0.5 text-[5px] font-bold leading-none"
+                                    style={{
+                                        border: "1px solid #a83b1a",
+                                        color: "#a83b1a",
+                                        transform: "rotate(-7deg)",
+                                        opacity: 0.7,
+                                    }}
+                                >
+                                    LEAFY
+                                </div>
+                                {/* Header rule */}
+                                <div className="h-[1px] w-3/5" style={{ background: "#7a5a20" }} />
+                                {/* Big price */}
+                                <div className="mt-1 h-2 w-1/2 rounded-sm" style={{ background: "#1a1612" }} />
+                                {/* Dotted ledger lines */}
+                                <div className="mt-1 space-y-[1px]">
+                                    <div className="h-[1px] w-full" style={{ borderTop: "1px dotted #b8a060" }} />
+                                    <div className="h-[1px] w-full" style={{ borderTop: "1px dotted #b8a060" }} />
+                                </div>
+                                {/* Black button with red shadow */}
+                                <div
+                                    className="mt-auto h-2 w-full"
+                                    style={{
+                                        background: "#1a1612",
+                                        boxShadow: "1px 1px 0 #a83b1a",
+                                    }}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Daily Bulletin: serif headlines, double rules, italic prices, save stamp */}
+                {id === "bulletin" && (
+                    <div className="grid grid-cols-3 gap-1 w-full">
+                        {[1, 2, 3].map(i => (
+                            <div
+                                key={i}
+                                className="relative h-[56px] flex flex-col overflow-hidden px-1 pt-0.5"
+                                style={{
+                                    background: "#fbfaf6",
+                                    borderTop: "2px solid #1c1a17",
+                                    borderBottom: "1px solid #d8d2c2",
+                                    borderLeft: "1px solid #d8d2c2",
+                                    borderRight: "1px solid #d8d2c2",
+                                }}
+                            >
+                                {/* Masthead */}
+                                <div className="h-[2px] w-full mb-0.5" />
+                                {/* Headline (serif feel — slab bar) */}
+                                <div className="h-1.5 w-3/4 rounded-sm" style={{ background: "#1c1a17", fontFamily: "serif" }} />
+                                {/* Hairline */}
+                                <div className="mt-0.5 h-[1px] w-full" style={{ background: "#d8d2c2" }} />
+                                {/* Two-column body */}
+                                <div className="mt-0.5 flex-1 flex gap-0.5 relative">
+                                    <div className="absolute top-0 bottom-0 w-px" style={{ left: "calc(50% - 0.5px)", background: "#d8d2c2" }} />
+                                    <div className="flex-1 flex items-center">
+                                        <div className="h-1.5 w-2/3 italic rounded-sm" style={{ background: "#1c1a17" }} />
+                                    </div>
+                                    <div className="flex-1 space-y-[2px] flex flex-col justify-center">
+                                        <div className="h-[1px] w-full" style={{ background: "#5a564c" }} />
+                                        <div className="h-[1px] w-full" style={{ background: "#5a564c" }} />
+                                    </div>
+                                </div>
+                                {/* Footer hairline */}
+                                <div className="h-[1px] w-full mt-0.5" style={{ background: "#d8d2c2" }} />
+                                {/* Circular save stamp */}
+                                <div
+                                    className="absolute bottom-1 right-1 w-3 h-3 rounded-full flex items-center justify-center text-[5px] font-bold leading-none"
+                                    style={{
+                                        border: "1px solid #b22222",
+                                        color: "#b22222",
+                                        background: "rgba(251,250,246,0.85)",
+                                        transform: "rotate(-12deg)",
+                                    }}
+                                >
+                                    ₹
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Produce Forward: full-bleed image, dark vignette, serif overlay */}
+                {id === "produceforward" && (
+                    <div className="grid grid-cols-3 gap-1 w-full">
+                        {[
+                            { tint: "#3a1414", image: "linear-gradient(135deg, #c2382f, #8c1d18)" },
+                            { tint: "#3a2614", image: "linear-gradient(135deg, #b8814a, #6b4520)" },
+                            { tint: "#0f3a2c", image: "linear-gradient(135deg, #4a8c5a, #1f5c34)" },
+                        ].map((p, i) => (
+                            <div
+                                key={i}
+                                className="relative h-[56px] flex flex-col overflow-hidden rounded-md"
+                                style={{ background: p.tint }}
+                            >
+                                {/* Full-bleed image area (top 65%) */}
+                                <div
+                                    className="absolute inset-0"
+                                    style={{
+                                        background: p.image,
+                                        height: "65%",
+                                    }}
+                                />
+                                {/* Tiny save pill top-left */}
+                                <div
+                                    className="absolute top-0.5 left-0.5 w-3 h-1 rounded-full"
+                                    style={{
+                                        background: "rgba(0,0,0,0.32)",
+                                        border: "1px solid rgba(255,255,255,0.18)",
+                                    }}
+                                />
+                                {/* Vignette + content band */}
+                                <div className="absolute bottom-0 left-0 right-0 px-1 pb-0.5 pt-2" style={{
+                                    background: `linear-gradient(180deg, transparent, ${p.tint}cc 60%, ${p.tint})`,
+                                }}>
+                                    <div className="flex items-baseline justify-between gap-1 mb-0.5">
+                                        <div className="h-1 w-1/2 rounded-full" style={{ background: "#f1ede5" }} />
+                                        <div className="h-1 w-1/4 rounded-full italic" style={{ background: "#f1ede5", fontStyle: "italic" }} />
+                                    </div>
+                                    <div className="h-1.5 w-full rounded-full" style={{ background: "#f1ede5" }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Name & Description */}
