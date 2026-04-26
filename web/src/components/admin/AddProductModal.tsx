@@ -5,7 +5,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
 import { Product } from "@/contexts/AppContext";
-import { PRODUCT_CATEGORIES, UNIT_OPTIONS } from "@/lib/constants";
+import { CATEGORY_GROUPS, UNIT_OPTIONS } from "@/lib/constants";
 import { toast } from "sonner";
 import Image from "next/image";
 import { Upload, Loader2 } from "lucide-react";
@@ -223,8 +223,12 @@ export default function AddProductModal({ open, onClose, existingIds, onProductA
                             className="w-full h-10 px-3 border border-slate-200 rounded-md text-sm bg-white focus:ring-1 focus:ring-emerald-500 outline-none"
                         >
                             <option value="">Select category...</option>
-                            {PRODUCT_CATEGORIES.map((c) => (
-                                <option key={c.id} value={c.id}>{c.label}</option>
+                            {CATEGORY_GROUPS.map((g) => (
+                                <optgroup key={g.id} label={g.label}>
+                                    {g.categories.map((c) => (
+                                        <option key={c.id} value={c.id}>{c.label}</option>
+                                    ))}
+                                </optgroup>
                             ))}
                         </select>
                     </div>

@@ -11,7 +11,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Settings, PackageSearch, Activity, ArrowLeft, LogOut, Save, Upload, Loader2, Search, Cog, Users, ShoppingBasket, BookOpen, FlaskConical, Plus, Zap, Trash2, Warehouse, Package } from "lucide-react";
 import { formatTiersForDisplay } from "@/lib/pricing";
-import { PRODUCT_CATEGORIES } from "@/lib/constants";
+import { CATEGORY_GROUPS, UNIT_OPTIONS } from "@/lib/constants";
 import { useMode } from "@/contexts/ModeContext";
 import { ModeToggle } from "@/components/admin/ModeToggle";
 import { useRouter } from "next/navigation";
@@ -542,8 +542,12 @@ export default function AdminDashboard() {
                                                             className="px-2 py-1 border border-slate-200 rounded text-xs bg-white focus:ring-1 focus:ring-emerald-500 w-full max-w-[140px]"
                                                         >
                                                             <option value="">—</option>
-                                                            {PRODUCT_CATEGORIES.map((c) => (
-                                                                <option key={c.id} value={c.id}>{c.label}</option>
+                                                            {CATEGORY_GROUPS.map((g) => (
+                                                                <optgroup key={g.id} label={g.label}>
+                                                                    {g.categories.map((c) => (
+                                                                        <option key={c.id} value={c.id}>{c.label}</option>
+                                                                    ))}
+                                                                </optgroup>
                                                             ))}
                                                         </select>
                                                     </td>
@@ -562,7 +566,15 @@ export default function AdminDashboard() {
                                                             onChange={(e) => handleProductChange(p.id, 'price', Number(e.target.value))}
                                                             className="w-20 px-2 py-1 border border-slate-200 rounded text-right focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100"
                                                         />
-                                                        <span className="text-slate-400 ml-1">/{p.unit}</span>
+                                                        <select
+                                                            value={p.unit}
+                                                            onChange={(e) => handleProductChange(p.id, 'unit', e.target.value)}
+                                                            className="text-slate-400 ml-1 text-sm bg-transparent border-none cursor-pointer focus:ring-1 focus:ring-emerald-500 rounded"
+                                                        >
+                                                            {UNIT_OPTIONS.map((u) => (
+                                                                <option key={u} value={u}>/{u}</option>
+                                                            ))}
+                                                        </select>
                                                         {p.priceTiers && p.priceTiers.length > 0 && (() => {
                                                             const tiers = formatTiersForDisplay(p.priceTiers);
                                                             return (
