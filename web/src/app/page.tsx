@@ -91,7 +91,7 @@ export default function Home() {
 
             {/* Top-level group tabs */}
             <div
-              className="flex gap-2 overflow-x-auto w-full pb-1 no-scrollbar scroll-smooth"
+              className="flex gap-2 overflow-x-auto w-full pb-1 no-scrollbar scroll-smooth scroll-fade-right"
               role="tablist"
               aria-label="Product groups"
             >
@@ -116,7 +116,7 @@ export default function Home() {
           {/* Sub-category chips — only when a specific group is active */}
           {activeGroup !== "all" && subCategories.length > 1 && (
             <div
-              className="flex gap-2 overflow-x-auto w-full pb-1 no-scrollbar scroll-smooth"
+              className="flex gap-2 overflow-x-auto w-full pb-1 no-scrollbar scroll-smooth scroll-fade-right"
               role="tablist"
               aria-label="Sub-categories"
             >
@@ -141,9 +141,33 @@ export default function Home() {
 
         {/* Product Grid */}
         {loadingProducts ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#064e3b] mb-4"></div>
-            Loading APMC Prices...
+          <div
+            className="theme-grid"
+            style={{
+              "--grid-cols": theme.grid.mobile,
+              "--grid-cols-sm": theme.grid.tablet,
+              "--grid-cols-lg": theme.grid.desktop,
+              "--grid-cols-xl": theme.grid.wide,
+            } as React.CSSProperties}
+            aria-busy="true"
+            aria-label="Loading products"
+          >
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm"
+              >
+                <div className="flex">
+                  <div className="w-32 h-32 bg-slate-100 animate-pulse shrink-0" />
+                  <div className="flex-1 p-3 space-y-2">
+                    <div className="h-4 bg-slate-100 rounded animate-pulse w-3/4" />
+                    <div className="h-3 bg-slate-100 rounded animate-pulse w-1/2" />
+                    <div className="h-8 bg-slate-100 rounded animate-pulse mt-3" />
+                    <div className="h-9 bg-slate-100 rounded-xl animate-pulse mt-3" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredProducts.length > 0 ? (
           <div

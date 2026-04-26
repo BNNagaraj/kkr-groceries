@@ -8,11 +8,33 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      // Check custom claim OR admin email list (fallback)
+      // Three-tier admin check, cheapest first:
+      //   1. Custom claim `admin: true` (set via setAdminClaim Cloud Function)
+      //   2. Hardcoded legacy fallback (founders) — kept as a safety net
+      //   3. Email present in /settings/admins doc (manageable from the UI without rules deploy)
       return isAuthenticated() && (
         request.auth.token.admin == true ||
-        request.auth.token.email.lower() in ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com']
+        isLegacyAdmin() ||
+        isFirestoreAdmin()
       );
+    }
+
+    function isLegacyAdmin() {
+      return request.auth.token.email != null &&
+        request.auth.token.email.lower() in ['raju2uraju@gmail.com', 'kanthati.chakri@gmail.com'];
+    }
+
+    function isFirestoreAdmin() {
+      // Reads /settings/admins. Field is `notificationEmails` (canonical) or `emails` (legacy).
+      // settings/* is publicly readable, so no recursive auth issue.
+      return request.auth.token.email != null &&
+        exists(/databases/$(database)/documents/settings/admins) &&
+        (
+          request.auth.token.email.lower() in
+            get(/databases/$(database)/documents/settings/admins).data.get('notificationEmails', []) ||
+          request.auth.token.email.lower() in
+            get(/databases/$(database)/documents/settings/admins).data.get('emails', [])
+        );
     }
     
     function isOwner(userId) {

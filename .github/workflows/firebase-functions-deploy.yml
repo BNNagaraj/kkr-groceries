@@ -1,0 +1,68 @@
+# Auto-deploy backend on main push:
+#   - Cloud Functions when functions/** changes
+#   - Firestore rules/indexes when those files change
+# Hosting is handled separately by firebase-hosting-merge.yml.
+
+name: Deploy backend on merge
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "functions/**"
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - "storage.rules"
+      - ".github/workflows/firebase-functions-deploy.yml"
+
+jobs:
+  deploy_backend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      # Local codebase scan takes ~6-8s; default 10s deploy-timeout is borderline.
+      FUNCTIONS_DISCOVERY_TIMEOUT: "60"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install function dependencies
+        working-directory: functions
+        run: npm ci
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KKR_GROCERIES_02 }}
+
+      # Detect what changed so we only deploy what's necessary
+      - name: Detect changed paths
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            functions:
+              - 'functions/**'
+            firestore:
+              - 'firestore.rules'
+              - 'firestore.indexes.json'
+            storage:
+              - 'storage.rules'
+
+      - name: Deploy functions
+        if: steps.changes.outputs.functions == 'true'
+        run: npx firebase-tools deploy --only functions --project kkr-groceries-02 --force --non-interactive
+
+      - name: Deploy Firestore rules + indexes
+        if: steps.changes.outputs.firestore == 'true'
+        run: npx firebase-tools deploy --only firestore --project kkr-groceries-02 --force --non-interactive
+
+      - name: Deploy Storage rules
+        if: steps.changes.outputs.storage == 'true'
+        run: npx firebase-tools deploy --only storage --project kkr-groceries-02 --force --non-interactive

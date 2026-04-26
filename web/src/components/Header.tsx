@@ -10,6 +10,7 @@ import { markOffline } from "@/hooks/usePresence";
 import { EnquiryModal } from "./EnquiryModal";
 import { NotificationBell } from "./NotificationBell";
 import { OtpPopup } from "./OtpPopup";
+import { OtpConfigWarning } from "./admin/OtpConfigWarning";
 import { AuthModal } from "./AuthModal";
 
 export function Header({ onOpenCart }: { onOpenCart: () => void }) {
@@ -157,6 +158,7 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
             <EnquiryModal isOpen={enquiryOpen} onClose={() => setEnquiryOpen(false)} />
             <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
             {currentUser && <OtpPopup />}
+            <OtpConfigWarning />
         </>
     );
 }

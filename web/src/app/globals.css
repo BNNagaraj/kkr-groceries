@@ -75,6 +75,12 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Right-edge fade so horizontally-scrollable tab rows don't look "cut off" on mobile */
+  .scroll-fade-right {
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
+            mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
+  }
 }
 
 /* ─── Theme-driven responsive grid ─── */
