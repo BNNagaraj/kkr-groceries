@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { db, functions } from "@/lib/firebase";
-import { getOtpAuth, isOtpConfigValid } from "@/lib/firebase-otp";
 import {
   collection,
   onSnapshot,
@@ -16,12 +15,6 @@ import {
   where,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import {
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  signOut,
-  type ConfirmationResult,
-} from "firebase/auth";
 import { useMode } from "@/contexts/ModeContext";
 import { usePresenceData } from "@/contexts/PresenceContext";
 import type { PresenceDoc } from "@/contexts/PresenceContext";
@@ -31,14 +24,7 @@ import { DEFAULT_DELIVERY } from "@/types/settings";
 import { parseTotal, exportOrdersToCSV } from "@/lib/helpers";
 import { normalizeIndianPhone } from "@/lib/validation";
 import { toast } from "sonner";
-import type { OtpChannelFlags } from "@/types/settings";
-import { normalizeOtpChannels } from "@/types/settings";
-
-declare global {
-  interface Window {
-    otpRecaptchaVerifier?: RecaptchaVerifier;
-  }
-}
+import { useDeliveryOTP } from "@/hooks/useDeliveryOTP";
 import type { OnlineUserMarker } from "./c2/OrderMap";
 
 import LiveMetrics from "./c2/LiveMetrics";
@@ -279,52 +265,21 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [metricDetail, setMetricDetail] = useState<string | null>(null);
 
-  // ── OTP on Fulfill ──
-  const [otpRequired, setOtpRequired] = useState(false);
-  const [otpChannels, setOtpChannels] = useState<OtpChannelFlags>({ email: true, sms: false, app: false });
-  const [otpDialogOrder, setOtpDialogOrder] = useState<Order | null>(null);
-  const [otpCode, setOtpCode] = useState("");
-  const [otpSending, setOtpSending] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpVerifying, setOtpVerifying] = useState(false);
-  const [otpError, setOtpError] = useState("");
-  // SMS via Firebase Phone Auth (second project)
-  const [smsConfirmation, setSmsConfirmation] = useState<ConfirmationResult | null>(null);
-  const [smsSent, setSmsSent] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
-  const [appSent, setAppSent] = useState(false);
+  // ── OTP on Fulfill ── owned by useDeliveryOTP hook (settings, send, verify, recaptcha lifecycle).
+  const otpFulfillRef = useRef<((orderId: string) => Promise<void>) | null>(null);
+  const otp = useDeliveryOTP({
+    recaptchaContainerId: "c2-otp-recaptcha-container",
+    onVerified: async (orderId) => {
+      await otpFulfillRef.current?.(orderId);
+    },
+    logPrefix: "[C2 OTP]",
+  });
 
   // ── Assign Delivery Dialog ──
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignDialogOrder, setAssignDialogOrder] = useState<Order | null>(null);
   // After assignment (or skip), call this to proceed with the original status change
   const pendingAssignCallbackRef = useRef<(() => void) | null>(null);
-
-  // ── Load OTP settings ──
-  useEffect(() => {
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, "settings", "checkout"));
-        if (snap.exists()) {
-          const data = snap.data();
-          setOtpRequired(data.requireDeliveryOTP === true);
-          setOtpChannels(normalizeOtpChannels(data.otpChannels));
-        }
-      } catch (e) {
-        console.warn("[C2] Failed to fetch OTP settings:", e);
-      }
-    })();
-  }, []);
-
-  // Cleanup reCAPTCHA on unmount
-  useEffect(() => {
-    return () => {
-      if (window.otpRecaptchaVerifier) {
-        window.otpRecaptchaVerifier.clear();
-        window.otpRecaptchaVerifier = undefined;
-      }
-    };
-  }, []);
 
   // Sync bottom height when layout preset changes
   useEffect(() => {
@@ -555,6 +510,10 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     [col]
   );
 
+  // Wire OTP hook's onVerified callback to doStatusChange. Re-binds each render
+  // so the hook always sees the freshest closure without re-initializing.
+  otpFulfillRef.current = (orderId: string) => doStatusChange(orderId, "Fulfilled");
+
   // ── Status change handler (intercepts Accepted/Shipped for delivery assignment) ──
   const handleStatusChange = useCallback(
     async (orderId: string, newStatus: OrderStatus) => {
@@ -607,200 +566,14 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
   const handleFulfillClick = useCallback(
     (order: Order) => {
       const hasAnyContact = !!(order.userEmail || order.phone || order.userId);
-      if (otpRequired && hasAnyContact) {
-        setOtpDialogOrder(order);
-        setOtpCode("");
-        setOtpSent(false);
-        setSmsSent(false);
-        setEmailSent(false);
-        setAppSent(false);
-        setSmsConfirmation(null);
-        setOtpError("");
+      if (otp.required && hasAnyContact) {
+        otp.openDialog(order);
       } else {
         doStatusChange(order.id, "Fulfilled");
       }
     },
-    [otpRequired, doStatusChange]
+    [otp, doStatusChange]
   );
-
-  const handleC2SendOtp = useCallback(async () => {
-    if (!otpDialogOrder) return;
-    setOtpSending(true);
-    setOtpError("");
-
-    const wantEmail = otpChannels.email;
-    const wantSms = otpChannels.sms;
-    const wantApp = otpChannels.app;
-    const hasEmail = !!otpDialogOrder.userEmail;
-    const hasPhone = !!otpDialogOrder.phone;
-    const hasApp = !!otpDialogOrder.userId;
-
-    let emailOk = false;
-    let smsOk = false;
-    let appOk = false;
-    const errors: string[] = [];
-
-    // 1. Email + App share one Cloud Function call (single OTP code).
-    if ((wantEmail && hasEmail) || (wantApp && hasApp)) {
-      try {
-        const sendFn = httpsCallable(functions, "sendDeliveryOTP");
-        await sendFn({
-          orderId: otpDialogOrder.id,
-          orderCollection: col("orders"),
-          channels: {
-            email: wantEmail && hasEmail,
-            app: wantApp && hasApp,
-          },
-        });
-        if (wantEmail && hasEmail) emailOk = true;
-        if (wantApp && hasApp) appOk = true;
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "OTP dispatch failed";
-        if (wantEmail && hasEmail) errors.push(`Email: ${msg}`);
-        if (wantApp && hasApp) errors.push(`App: ${msg}`);
-      }
-    }
-
-    // 2. Send SMS OTP via Firebase Phone Auth (second project)
-    if (wantSms && hasPhone) {
-      try {
-        if (!isOtpConfigValid()) {
-          throw Object.assign(new Error("OTP Firebase config missing. Rebuild with NEXT_PUBLIC_OTP_FIREBASE_* env vars."), { code: "config/missing" });
-        }
-
-        const cleanPhone = `+91${normalizeIndianPhone(otpDialogOrder.phone)}`;
-
-        console.log("[C2 OTP SMS] Step 1: Getting OTP Auth instance...");
-        const otpAuthInstance = getOtpAuth();
-
-        // Always clear & recreate RecaptchaVerifier
-        if (window.otpRecaptchaVerifier) {
-          try { window.otpRecaptchaVerifier.clear(); } catch { /* ignore */ }
-          window.otpRecaptchaVerifier = undefined;
-        }
-
-        const containerId = "c2-otp-recaptcha-container";
-        const containerEl = document.getElementById(containerId);
-        if (!containerEl) {
-          throw Object.assign(new Error("reCAPTCHA container not found in DOM"), { code: "recaptcha/no-container" });
-        }
-
-        console.log("[C2 OTP SMS] Step 2: Creating RecaptchaVerifier...");
-        window.otpRecaptchaVerifier = new RecaptchaVerifier(otpAuthInstance, containerId, {
-          size: "invisible",
-        });
-
-        if (window.location.hostname !== "localhost") {
-          console.log("[C2 OTP SMS] Step 2b: Rendering reCAPTCHA (production)...");
-          await window.otpRecaptchaVerifier.render();
-        }
-
-        console.log("[C2 OTP SMS] Step 3: Calling signInWithPhoneNumber for", cleanPhone);
-        const confirmation = await signInWithPhoneNumber(otpAuthInstance, cleanPhone, window.otpRecaptchaVerifier);
-        console.log("[C2 OTP SMS] Step 3 OK. SMS sent successfully.");
-        setSmsConfirmation(confirmation);
-        smsOk = true;
-      } catch (err: unknown) {
-        const error = err as { code?: string; message?: string };
-        console.error("[C2 OTP SMS] Firebase Phone Auth error:", error.code, error.message, err);
-
-        // Cleanup reCAPTCHA on error
-        if (window.otpRecaptchaVerifier) {
-          try { window.otpRecaptchaVerifier.clear(); } catch { /* ignore */ }
-          window.otpRecaptchaVerifier = undefined;
-        }
-
-        if (error.code === "auth/too-many-requests") {
-          errors.push("SMS: Too many attempts. Wait a few minutes.");
-        } else if (error.code === "auth/invalid-phone-number") {
-          errors.push("SMS: Invalid phone number format.");
-        } else if (error.code === "auth/invalid-api-key") {
-          errors.push("SMS: API key issue. Check OTP project API key restrictions.");
-        } else if (error.code === "auth/unauthorized-domain" || error.code === "auth/operation-not-allowed") {
-          errors.push(`SMS: Domain not authorized. Add "${window.location.hostname}" to OTP project's Authorized Domains.`);
-        } else if (error.code === "auth/internal-error" || error.code === "auth/captcha-check-failed") {
-          errors.push(`SMS: reCAPTCHA failed. Ensure "${window.location.hostname}" is in OTP project's Authorized Domains.`);
-        } else if (error.code === "config/missing") {
-          errors.push(`SMS: ${error.message}`);
-        } else {
-          errors.push(`SMS: ${error.message || "Failed to send"} (${error.code || "unknown"})`);
-        }
-      }
-    }
-
-    // Update state based on results
-    setSmsSent(smsOk);
-    setEmailSent(emailOk);
-    setAppSent(appOk);
-    setOtpSent(emailOk || smsOk || appOk);
-
-    if (emailOk || smsOk || appOk) {
-      const channels: string[] = [];
-      if (smsOk) channels.push("SMS");
-      if (emailOk) channels.push("Email");
-      if (appOk) channels.push("App");
-      toast.success(`OTP sent via ${channels.join(" & ")}`);
-    }
-
-    if (errors.length > 0 && !emailOk && !smsOk && !appOk) {
-      setOtpError(errors.join("\n"));
-      toast.error("Failed to send OTP");
-    } else if (errors.length > 0) {
-      // Partial success — show warning
-      setOtpError(errors.join("\n"));
-    }
-
-    setOtpSending(false);
-  }, [otpDialogOrder, otpChannels, col]);
-
-  const handleC2VerifyOtp = useCallback(async () => {
-    if (!otpDialogOrder || !otpCode) return;
-    setOtpVerifying(true);
-    setOtpError("");
-
-    let verified = false;
-
-    // Try 1: SMS verification via Firebase Phone Auth (if SMS was sent)
-    if (smsConfirmation) {
-      try {
-        await smsConfirmation.confirm(otpCode);
-        // Clean up ghost auth session on second project
-        try { await signOut(getOtpAuth()); } catch { /* ignore */ }
-        verified = true;
-      } catch {
-        // SMS code didn't match — try email next
-      }
-    }
-
-    // Try 2: Email/App OTP verification via Cloud Function (shared OTP doc)
-    if (!verified && (emailSent || appSent)) {
-      try {
-        const verifyFn = httpsCallable(functions, "verifyDeliveryOTP");
-        await verifyFn({ orderId: otpDialogOrder.id, otp: otpCode });
-        verified = true;
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Invalid OTP";
-        if (!smsConfirmation) {
-          setOtpError(msg);
-        }
-      }
-    }
-
-    if (verified) {
-      // Clean up RecaptchaVerifier
-      if (window.otpRecaptchaVerifier) {
-        window.otpRecaptchaVerifier.clear();
-        window.otpRecaptchaVerifier = undefined;
-      }
-      toast.success("OTP verified — order fulfilled!");
-      await doStatusChange(otpDialogOrder.id, "Fulfilled");
-      setOtpDialogOrder(null);
-    } else if (!otpError) {
-      setOtpError("Incorrect OTP. Please check the code and try again.");
-    }
-
-    setOtpVerifying(false);
-  }, [otpDialogOrder, otpCode, doStatusChange, smsConfirmation, emailSent, appSent, otpError]);
 
   // ── Fullscreen toggle ──
   const toggleFullscreen = () => {
@@ -1341,7 +1114,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
       />
 
       {/* ─── OTP Fulfill Dialog ─────────────────────────────── */}
-      {otpDialogOrder && (
+      {otp.dialogOrder && (
         <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease-out]">
           <div
             className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4 animate-[scaleIn_0.25s_cubic-bezier(0.34,1.56,0.64,1)]"
@@ -1350,14 +1123,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-800">Delivery OTP Verification</h3>
               <button
-                onClick={() => {
-                  setOtpDialogOrder(null);
-                  // Cleanup reCAPTCHA when closing dialog
-                  if (window.otpRecaptchaVerifier) {
-                    window.otpRecaptchaVerifier.clear();
-                    window.otpRecaptchaVerifier = undefined;
-                  }
-                }}
+                onClick={otp.closeDialog}
                 className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400"
               >
                 ✕
@@ -1366,12 +1132,12 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
 
             {/* Customer info with channel display */}
             <div className="rounded-lg bg-slate-50 p-3 text-sm space-y-1.5">
-              <p><strong>{otpDialogOrder.customerName}</strong></p>
-              {otpDialogOrder.phone && <p className="text-xs text-slate-500">📱 {otpDialogOrder.phone}</p>}
-              {otpDialogOrder.userEmail && <p className="text-xs text-slate-500">📧 {otpDialogOrder.userEmail}</p>}
+              <p><strong>{otp.dialogOrder.customerName}</strong></p>
+              {otp.dialogOrder.phone && <p className="text-xs text-slate-500">📱 {otp.dialogOrder.phone}</p>}
+              {otp.dialogOrder.userEmail && <p className="text-xs text-slate-500">📧 {otp.dialogOrder.userEmail}</p>}
               <p className="text-xs text-slate-400 pt-1 border-t border-slate-200">
                 Channel: <span className="font-semibold uppercase tracking-wider">
-                  {[otpChannels.email && "Email", otpChannels.sms && "SMS", otpChannels.app && "App"]
+                  {[otp.channels.email && "Email", otp.channels.sms && "SMS", otp.channels.app && "App"]
                     .filter(Boolean)
                     .join(" · ") || "—"}
                 </span>
@@ -1379,12 +1145,12 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
             </div>
 
             {(() => {
-              const wantEmail = otpChannels.email;
-              const wantSms = otpChannels.sms;
-              const wantApp = otpChannels.app;
-              const hasEmail = !!otpDialogOrder.userEmail;
-              const hasPhone = !!otpDialogOrder.phone;
-              const hasApp = !!otpDialogOrder.userId;
+              const wantEmail = otp.channels.email;
+              const wantSms = otp.channels.sms;
+              const wantApp = otp.channels.app;
+              const hasEmail = !!otp.dialogOrder!.userEmail;
+              const hasPhone = !!otp.dialogOrder!.phone;
+              const hasApp = !!otp.dialogOrder!.userId;
               const canSend = (wantEmail && hasEmail) || (wantSms && hasPhone) || (wantApp && hasApp);
               const enabledCount = (wantEmail ? 1 : 0) + (wantSms ? 1 : 0) + (wantApp ? 1 : 0);
 
@@ -1394,14 +1160,14 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
               if (wantApp && hasApp) channelParts.push("App");
               const channelLabel = channelParts.length > 0 ? channelParts.join(" & ") : "N/A";
 
-              return !otpSent ? (
+              return !otp.sent ? (
                 <div className="space-y-3">
                   <button
-                    onClick={handleC2SendOtp}
-                    disabled={otpSending || !canSend}
+                    onClick={otp.send}
+                    disabled={otp.sending || !canSend}
                     className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
                   >
-                    {otpSending ? "Sending OTP..." : `Send OTP via ${channelLabel}`}
+                    {otp.sending ? "Sending OTP..." : `Send OTP via ${channelLabel}`}
                   </button>
                   {!canSend && (
                     <div className="text-sm text-amber-600 bg-amber-50 rounded-lg p-2">
@@ -1412,8 +1178,8 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
                       <button
                         className="mt-2 w-full py-1.5 text-xs border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors"
                         onClick={() => {
-                          doStatusChange(otpDialogOrder.id, "Fulfilled");
-                          setOtpDialogOrder(null);
+                          doStatusChange(otp.dialogOrder!.id, "Fulfilled");
+                          otp.closeDialog();
                         }}
                       >
                         Fulfill Without OTP
@@ -1423,36 +1189,35 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {/* Show which channels succeeded */}
                   <div className="space-y-1">
-                    {smsSent && (
-                      <p className="text-sm text-emerald-600 font-medium">✓ SMS sent to {otpDialogOrder.phone}</p>
+                    {otp.smsSent && (
+                      <p className="text-sm text-emerald-600 font-medium">✓ SMS sent to {otp.dialogOrder!.phone}</p>
                     )}
-                    {emailSent && (
-                      <p className="text-sm text-emerald-600 font-medium">✓ Email sent to {otpDialogOrder.userEmail}</p>
+                    {otp.emailSent && (
+                      <p className="text-sm text-emerald-600 font-medium">✓ Email sent to {otp.dialogOrder!.userEmail}</p>
                     )}
-                    {appSent && (
+                    {otp.appSent && (
                       <p className="text-sm text-emerald-600 font-medium">✓ App banner active for buyer</p>
                     )}
                   </div>
                   <input
                     type="text"
                     maxLength={6}
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                    value={otp.code}
+                    onChange={(e) => otp.setCode(e.target.value.replace(/\D/g, ""))}
                     placeholder="Enter 6-digit OTP"
                     className="w-full text-center text-2xl tracking-[0.5em] font-mono border-2 border-slate-200 rounded-xl py-3 focus:border-emerald-500 focus:outline-none"
                   />
                   <button
-                    onClick={handleC2VerifyOtp}
-                    disabled={otpVerifying || otpCode.length < 4}
+                    onClick={otp.verify}
+                    disabled={otp.verifying || otp.code.length < 4}
                     className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
                   >
-                    {otpVerifying ? "Verifying..." : "Verify & Fulfill"}
+                    {otp.verifying ? "Verifying..." : "Verify & Fulfill"}
                   </button>
                   <button
-                    onClick={handleC2SendOtp}
-                    disabled={otpSending}
+                    onClick={otp.send}
+                    disabled={otp.sending}
                     className="w-full py-2 text-sm text-slate-500 hover:text-slate-700"
                   >
                     Resend OTP
@@ -1461,8 +1226,8 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
               );
             })()}
 
-            {otpError && (
-              <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2 whitespace-pre-line">{otpError}</div>
+            {otp.error && (
+              <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2 whitespace-pre-line">{otp.error}</div>
             )}
           </div>
         </div>
