@@ -40,6 +40,17 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
       { id: "sugar_salt", label: "Sugar, Salt & Sweeteners" },
     ],
   },
+  {
+    id: "dairy",
+    label: "Dairy",
+    categories: [
+      { id: "milk", label: "Milk" },
+      { id: "curd", label: "Curd & Yogurt" },
+      { id: "butter_cream", label: "Butter & Cream" },
+      { id: "paneer_cheese", label: "Paneer & Cheese" },
+      { id: "buttermilk", label: "Buttermilk & Lassi" },
+    ],
+  },
 ];
 
 /** Flat list of every leaf category — used by admin product forms and search. */
