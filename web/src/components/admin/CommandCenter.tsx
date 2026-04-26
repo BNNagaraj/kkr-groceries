@@ -29,7 +29,9 @@ import type { OnlineUserMarker } from "./c2/OrderMap";
 
 import LiveMetrics from "./c2/LiveMetrics";
 import OrderSearch from "./c2/OrderSearch";
-import StoreFilter from "./c2/StoreFilter";
+import { C2Header } from "./c2/C2Header";
+import { MetricDetailPanel, type MetricKey } from "./c2/MetricDetailPanel";
+import { DeliveryOtpDialog } from "./DeliveryOtpDialog";
 
 // Heavy components — lazy-loaded to reduce initial compile/bundle
 const OrderPipeline = dynamic(() => import("./c2/OrderPipeline"), { ssr: false });
@@ -46,22 +48,7 @@ const MiniCharts = dynamic(() => import("./c2/MiniCharts"), { ssr: false });
 const StoreAnalytics = dynamic(() => import("./c2/StoreAnalytics"), { ssr: false });
 const AssignDeliveryDialog = dynamic(() => import("./AssignDeliveryDialog"), { ssr: false });
 
-import {
-  Zap,
-  Maximize2,
-  Minimize2,
-  Sun,
-  Moon,
-  LayoutGrid,
-  FlaskConical,
-  Database,
-  Volume2,
-  VolumeX,
-  Search,
-  Download,
-  X,
-  Warehouse,
-} from "lucide-react";
+import { Zap } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type C2Theme = "light" | "dark";
@@ -265,7 +252,7 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
   // ── Feature 6: Search ──
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [metricDetail, setMetricDetail] = useState<string | null>(null);
+  const [metricDetail, setMetricDetail] = useState<MetricKey | null>(null);
 
   // ── OTP on Fulfill ── owned by useDeliveryOTP hook (settings, send, verify, recaptcha lifecycle).
   const otpFulfillRef = useRef<((orderId: string) => Promise<void>) | null>(null);
@@ -724,165 +711,26 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
       ref={containerRef}
       className={`c2-root ${c2Theme === "dark" ? "c2-dark" : ""} min-h-[calc(100vh-120px)] flex flex-col`}
     >
-      {/* ─── C2 Header ───────────────────────────────────────── */}
-      <div
-        className="c2-header flex items-center justify-between px-3 sm:px-5 py-2 sm:py-2.5 shrink-0"
-        style={{ borderBottom: "1px solid var(--c2-border)" }}
-      >
-        {/* ── Left: Identity + Status ── */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}>
-              <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-            </div>
-            <div className="hidden sm:block">
-              <h2 className="text-xs sm:text-sm font-bold tracking-wider leading-none" style={{ color: "var(--c2-text)", letterSpacing: "0.08em" }}>
-                COMMAND CENTER
-              </h2>
-              <span className="text-[9px] font-medium leading-none" style={{ color: "var(--c2-text-muted)" }}>
-                KKR Groceries
-              </span>
-            </div>
-            <h2 className="sm:hidden text-xs font-bold tracking-wider" style={{ color: "var(--c2-text)", letterSpacing: "0.06em" }}>
-              C2
-            </h2>
-          </div>
-
-          {/* Database mode badge */}
-          <span
-            className="text-[9px] font-bold px-2 py-0.5 rounded-md hidden sm:inline-flex items-center gap-1"
-            style={{
-              background: mode === "test" ? "rgba(245,158,11,0.1)" : "rgba(16,185,129,0.08)",
-              color: mode === "test" ? "#d97706" : "#059669",
-              border: `1px solid ${mode === "test" ? "rgba(245,158,11,0.2)" : "rgba(16,185,129,0.2)"}`,
-            }}
-          >
-            {mode === "test" ? <FlaskConical className="w-3 h-3" /> : <Database className="w-3 h-3" />}
-            {mode === "test" ? "TEST" : "LIVE"}
-          </span>
-
-          {/* LIVE pulse indicator */}
-          <div className="flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            <span className="text-[10px] font-bold text-emerald-500 hidden sm:inline tracking-wider">LIVE</span>
-          </div>
-        </div>
-
-        {/* ── Right: Controls ── */}
-        <div className="flex items-center gap-0.5 sm:gap-1">
-          {/* ── Control Group 1: Data Filters ── */}
-          {stores.length > 0 && (
-            <StoreFilter
-              stores={stores}
-              selectedStoreIds={selectedStoreIds}
-              onSelectionChange={setSelectedStoreIds}
-            />
-          )}
-
-          {/* Date range — segmented control on md+ */}
-          <div className="hidden md:flex items-center rounded-lg p-0.5" style={{ background: "var(--c2-bg-secondary)", border: "1px solid var(--c2-border-subtle)" }}>
-            {C2_DATE_RANGES.map((range, i) => (
-              <button
-                key={range.key}
-                onClick={() => setDateRange(range.key)}
-                className="text-[10px] font-semibold px-2.5 py-1 rounded-md transition-all"
-                style={{
-                  background: dateRange === range.key ? "var(--c2-bg-card)" : "transparent",
-                  color: dateRange === range.key ? "var(--c2-text)" : "var(--c2-text-muted)",
-                  boxShadow: dateRange === range.key ? "var(--c2-card-shadow)" : "none",
-                }}
-                title={`${range.label} (${i + 1})`}
-              >
-                {range.label}
-              </button>
-            ))}
-          </div>
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value as C2DateRange)}
-            className="md:hidden text-[10px] font-medium rounded-md px-2 py-1 outline-none cursor-pointer"
-            style={{
-              background: "var(--c2-bg-secondary)",
-              color: "var(--c2-text-secondary)",
-              border: "1px solid var(--c2-border)",
-            }}
-          >
-            {C2_DATE_RANGES.map((range) => (
-              <option key={range.key} value={range.key}>
-                {range.shortLabel}
-              </option>
-            ))}
-          </select>
-
-          <div className="c2-divider-v hidden sm:block" />
-
-          {/* ── Control Group 2: Actions ── */}
-          <button
-            onClick={() => setSearchOpen(true)}
-            className="c2-ctrl-btn flex items-center gap-1"
-            title="Search orders (Ctrl+K)"
-          >
-            <Search className="w-4 h-4" />
-            <kbd
-              className="hidden lg:inline text-[9px] px-1 py-0.5 rounded font-mono"
-              style={{
-                background: "var(--c2-bg-secondary)",
-                border: "1px solid var(--c2-border-subtle)",
-                color: "var(--c2-text-muted)",
-              }}
-            >
-              {"\u2318"}K
-            </kbd>
-          </button>
-
-          <button onClick={handleExport} className="c2-ctrl-btn" title="Export orders to CSV">
-            <Download className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={toggleMute}
-            className="c2-ctrl-btn"
-            style={{ color: isMuted ? "var(--c2-text-muted)" : "#059669" }}
-            title={isMuted ? "Unmute notifications (M)" : "Mute notifications (M)"}
-          >
-            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          </button>
-
-          <div className="c2-divider-v hidden md:block" />
-
-          {/* ── Control Group 3: View Settings ── */}
-          <div className="hidden md:flex items-center gap-0.5">
-            <LayoutGrid className="w-3.5 h-3.5 ml-0.5" style={{ color: "var(--c2-text-muted)" }} />
-            <select
-              value={layoutKey}
-              onChange={(e) => changeLayout(e.target.value as C2LayoutKey)}
-              className="text-[10px] font-medium rounded-md px-1.5 py-1 outline-none cursor-pointer"
-              style={{
-                background: "transparent",
-                color: "var(--c2-text-secondary)",
-                border: "none",
-              }}
-            >
-              {Object.entries(C2_LAYOUTS).map(([key, cfg]) => (
-                <option key={key} value={key}>
-                  {cfg.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button onClick={toggleTheme} className="c2-ctrl-btn" title={c2Theme === "dark" ? "Light mode" : "Dark mode"}>
-            {c2Theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
-
-          <button onClick={toggleFullscreen} className="c2-ctrl-btn" title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-        </div>
-      </div>
+      <C2Header
+        mode={mode}
+        stores={stores}
+        selectedStoreIds={selectedStoreIds}
+        setSelectedStoreIds={setSelectedStoreIds}
+        dateRange={dateRange}
+        setDateRange={setDateRange}
+        dateRanges={C2_DATE_RANGES}
+        layoutKey={layoutKey}
+        layouts={C2_LAYOUTS}
+        changeLayout={changeLayout}
+        c2Theme={c2Theme}
+        toggleTheme={toggleTheme}
+        isMuted={isMuted}
+        toggleMute={toggleMute}
+        isFullscreen={isFullscreen}
+        toggleFullscreen={toggleFullscreen}
+        onSearch={() => setSearchOpen(true)}
+        onExport={handleExport}
+      />
 
       {/* ─── KPI Metrics Strip ─────────────────────────────── */}
       <div className="px-2.5 sm:px-4 py-2 sm:py-2.5 shrink-0" style={{ borderBottom: "1px solid var(--c2-border-subtle)", background: "var(--c2-bg)" }}>
@@ -896,121 +744,19 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
           yesterdayRevenue={dateRange === "today" ? yesterdayRevenue : undefined}
           revenueLabel={revenueLabel}
           theme={c2Theme}
-          onCardClick={(metric) => setMetricDetail(metricDetail === metric ? null : metric)}
+          onCardClick={(metric) => setMetricDetail((prev) => (prev === metric ? null : (metric as MetricKey)))}
         />
       </div>
 
-      {/* ─── Metric Detail Panel ─────────────────────────────── */}
       {metricDetail && (
-        <div className="px-4 py-2.5 shrink-0 overflow-hidden" style={{ borderBottom: "1px solid var(--c2-border)", background: "var(--c2-bg-secondary)", maxHeight: 200 }}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--c2-text-muted)" }}>
-              {metricDetail === "revenue" && "Fulfilled Orders (Revenue)"}
-              {metricDetail === "active" && "Active Orders"}
-              {metricDetail === "users" && "Online Users"}
-              {metricDetail === "fulfillment" && "Fulfillment Breakdown"}
-              {metricDetail === "aov" && "Fulfilled Order Values"}
-              {metricDetail === "pending" && "Pending Revenue Orders"}
-            </span>
-            <button onClick={() => setMetricDetail(null)} className="p-0.5 rounded hover:opacity-70">
-              <X className="w-3.5 h-3.5" style={{ color: "var(--c2-text-muted)" }} />
-            </button>
-          </div>
-          <div className="overflow-y-auto max-h-[140px] no-scrollbar">
-            {(metricDetail === "revenue" || metricDetail === "aov") && (() => {
-              const fulfilled = filteredOrders.filter((o) => o.status === "Fulfilled");
-              return fulfilled.length === 0 ? (
-                <div className="text-[10px] py-2" style={{ color: "var(--c2-text-muted)" }}>No fulfilled orders</div>
-              ) : (
-                <table className="w-full text-[10px]">
-                  <thead><tr style={{ color: "var(--c2-text-muted)" }}><th className="text-left py-1 font-semibold">Customer</th><th className="text-left py-1 font-semibold">Items</th><th className="text-right py-1 font-semibold">Value</th></tr></thead>
-                  <tbody>{fulfilled.sort((a, b) => parseTotal(b.totalValue) - parseTotal(a.totalValue)).map((o) => (
-                    <tr key={o.id} className="cursor-pointer hover:brightness-110" style={{ borderTop: "1px solid var(--c2-border-subtle)" }}
-                      onClick={() => { setSelectedOrderId(o.id); onNavigateToOrder?.(o.id); }}>
-                      <td className="py-1" style={{ color: "var(--c2-text)" }}>{o.customerName || "Customer"}</td>
-                      <td className="py-1" style={{ color: "var(--c2-text-muted)" }}>{o.cart?.length || 0}</td>
-                      <td className="py-1 text-right font-semibold" style={{ color: "#10b981" }}>₹{parseTotal(o.totalValue).toLocaleString("en-IN")}</td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              );
-            })()}
-            {metricDetail === "active" && (() => {
-              const active = filteredOrders.filter((o) => o.status !== "Fulfilled" && o.status !== "Rejected");
-              return active.length === 0 ? (
-                <div className="text-[10px] py-2" style={{ color: "var(--c2-text-muted)" }}>No active orders</div>
-              ) : (
-                <table className="w-full text-[10px]">
-                  <thead><tr style={{ color: "var(--c2-text-muted)" }}><th className="text-left py-1 font-semibold">Customer</th><th className="text-left py-1 font-semibold">Status</th><th className="text-right py-1 font-semibold">Value</th></tr></thead>
-                  <tbody>{active.map((o) => (
-                    <tr key={o.id} className="cursor-pointer hover:brightness-110" style={{ borderTop: "1px solid var(--c2-border-subtle)" }}
-                      onClick={() => setSelectedOrderId(o.id)}>
-                      <td className="py-1" style={{ color: "var(--c2-text)" }}>{o.customerName || "Customer"}</td>
-                      <td className="py-1"><span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ background: `${o.status === "Pending" ? "#f59e0b" : o.status === "Accepted" ? "#3b82f6" : "#8b5cf6"}20`, color: o.status === "Pending" ? "#f59e0b" : o.status === "Accepted" ? "#3b82f6" : "#8b5cf6" }}>{o.status}</span></td>
-                      <td className="py-1 text-right font-semibold" style={{ color: "var(--c2-text)" }}>₹{parseTotal(o.totalValue).toLocaleString("en-IN")}</td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              );
-            })()}
-            {metricDetail === "users" && (
-              onlineUsers.length === 0 ? (
-                <div className="text-[10px] py-2" style={{ color: "var(--c2-text-muted)" }}>No users online</div>
-              ) : (
-                <div className="space-y-1">
-                  {onlineUsers.map((u) => (
-                    <div key={u.uid} className="flex items-center gap-2 py-1" style={{ borderTop: "1px solid var(--c2-border-subtle)" }}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
-                      <span className="text-[10px] font-medium truncate" style={{ color: "var(--c2-text)" }}>{u.displayName || u.email || "User"}</span>
-                    </div>
-                  ))}
-                </div>
-              )
-            )}
-            {metricDetail === "fulfillment" && (() => {
-              const total = filteredOrders.length;
-              const statuses = [
-                { label: "Fulfilled", count: filteredOrders.filter((o) => o.status === "Fulfilled").length, color: "#10b981" },
-                { label: "Shipped", count: filteredOrders.filter((o) => o.status === "Shipped").length, color: "#8b5cf6" },
-                { label: "Accepted", count: filteredOrders.filter((o) => o.status === "Accepted").length, color: "#3b82f6" },
-                { label: "Pending", count: filteredOrders.filter((o) => o.status === "Pending").length, color: "#f59e0b" },
-                { label: "Rejected", count: filteredOrders.filter((o) => o.status === "Rejected").length, color: "#ef4444" },
-              ];
-              return (
-                <div className="space-y-1.5">
-                  {statuses.map((s) => (
-                    <div key={s.label} className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
-                      <span className="text-[10px] flex-1" style={{ color: "var(--c2-text-secondary)" }}>{s.label}</span>
-                      <span className="text-[10px] font-bold" style={{ color: "var(--c2-text)" }}>{s.count}</span>
-                      <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--c2-bg-secondary)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${total > 0 ? (s.count / total) * 100 : 0}%`, background: s.color }} />
-                      </div>
-                      <span className="text-[9px] w-8 text-right" style={{ color: "var(--c2-text-muted)" }}>{total > 0 ? Math.round((s.count / total) * 100) : 0}%</span>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-            {metricDetail === "pending" && (() => {
-              const pending = filteredOrders.filter((o) => o.status !== "Fulfilled" && o.status !== "Rejected");
-              return pending.length === 0 ? (
-                <div className="text-[10px] py-2" style={{ color: "var(--c2-text-muted)" }}>No pending revenue</div>
-              ) : (
-                <table className="w-full text-[10px]">
-                  <thead><tr style={{ color: "var(--c2-text-muted)" }}><th className="text-left py-1 font-semibold">Customer</th><th className="text-left py-1 font-semibold">Status</th><th className="text-right py-1 font-semibold">Value</th></tr></thead>
-                  <tbody>{pending.map((o) => (
-                    <tr key={o.id} style={{ borderTop: "1px solid var(--c2-border-subtle)" }}>
-                      <td className="py-1" style={{ color: "var(--c2-text)" }}>{o.customerName || "Customer"}</td>
-                      <td className="py-1"><span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ background: `${o.status === "Pending" ? "#f59e0b" : o.status === "Accepted" ? "#3b82f6" : "#8b5cf6"}20`, color: o.status === "Pending" ? "#f59e0b" : o.status === "Accepted" ? "#3b82f6" : "#8b5cf6" }}>{o.status}</span></td>
-                      <td className="py-1 text-right font-semibold" style={{ color: "#f97316" }}>₹{parseTotal(o.totalValue).toLocaleString("en-IN")}</td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              );
-            })()}
-          </div>
-        </div>
+        <MetricDetailPanel
+          metric={metricDetail}
+          filteredOrders={filteredOrders}
+          onlineUsers={onlineUsers}
+          onClose={() => setMetricDetail(null)}
+          onSelectOrder={(id) => setSelectedOrderId(id)}
+          onNavigateToOrder={onNavigateToOrder}
+        />
       )}
 
       {/* ─── Map Expanded Mode ─────────────────────────────── */}
@@ -1115,125 +861,10 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
         onSelectOrder={onNavigateToOrder}
       />
 
-      {/* ─── OTP Fulfill Dialog ─────────────────────────────── */}
-      {otp.dialogOrder && (
-        <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease-out]">
-          <div
-            className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4 animate-[scaleIn_0.25s_cubic-bezier(0.34,1.56,0.64,1)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-800">Delivery OTP Verification</h3>
-              <button
-                onClick={otp.closeDialog}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Customer info with channel display */}
-            <div className="rounded-lg bg-slate-50 p-3 text-sm space-y-1.5">
-              <p><strong>{otp.dialogOrder.customerName}</strong></p>
-              {otp.dialogOrder.phone && <p className="text-xs text-slate-500">📱 {otp.dialogOrder.phone}</p>}
-              {otp.dialogOrder.userEmail && <p className="text-xs text-slate-500">📧 {otp.dialogOrder.userEmail}</p>}
-              <p className="text-xs text-slate-400 pt-1 border-t border-slate-200">
-                Channel: <span className="font-semibold uppercase tracking-wider">
-                  {[otp.channels.email && "Email", otp.channels.sms && "SMS", otp.channels.app && "App"]
-                    .filter(Boolean)
-                    .join(" · ") || "—"}
-                </span>
-              </p>
-            </div>
-
-            {(() => {
-              const wantEmail = otp.channels.email;
-              const wantSms = otp.channels.sms;
-              const wantApp = otp.channels.app;
-              const hasEmail = !!otp.dialogOrder!.userEmail;
-              const hasPhone = !!otp.dialogOrder!.phone;
-              const hasApp = !!otp.dialogOrder!.userId;
-              const canSend = (wantEmail && hasEmail) || (wantSms && hasPhone) || (wantApp && hasApp);
-              const enabledCount = (wantEmail ? 1 : 0) + (wantSms ? 1 : 0) + (wantApp ? 1 : 0);
-
-              const channelParts: string[] = [];
-              if (wantSms && hasPhone) channelParts.push("SMS");
-              if (wantEmail && hasEmail) channelParts.push("Email");
-              if (wantApp && hasApp) channelParts.push("App");
-              const channelLabel = channelParts.length > 0 ? channelParts.join(" & ") : "N/A";
-
-              return !otp.sent ? (
-                <div className="space-y-3">
-                  <button
-                    onClick={otp.send}
-                    disabled={otp.sending || !canSend}
-                    className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                  >
-                    {otp.sending ? "Sending OTP..." : `Send OTP via ${channelLabel}`}
-                  </button>
-                  {!canSend && (
-                    <div className="text-sm text-amber-600 bg-amber-50 rounded-lg p-2">
-                      No contact info for selected channel{enabledCount > 1 ? "s" : ""}.
-                      {!hasPhone && wantSms && <span className="block text-xs mt-0.5">Phone number missing.</span>}
-                      {!hasEmail && wantEmail && <span className="block text-xs mt-0.5">Email missing.</span>}
-                      {!hasApp && wantApp && <span className="block text-xs mt-0.5">Buyer not signed in (no app account on this order).</span>}
-                      <button
-                        className="mt-2 w-full py-1.5 text-xs border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors"
-                        onClick={() => {
-                          doStatusChange(otp.dialogOrder!.id, "Fulfilled");
-                          otp.closeDialog();
-                        }}
-                      >
-                        Fulfill Without OTP
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    {otp.smsSent && (
-                      <p className="text-sm text-emerald-600 font-medium">✓ SMS sent to {otp.dialogOrder!.phone}</p>
-                    )}
-                    {otp.emailSent && (
-                      <p className="text-sm text-emerald-600 font-medium">✓ Email sent to {otp.dialogOrder!.userEmail}</p>
-                    )}
-                    {otp.appSent && (
-                      <p className="text-sm text-emerald-600 font-medium">✓ App banner active for buyer</p>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    value={otp.code}
-                    onChange={(e) => otp.setCode(e.target.value.replace(/\D/g, ""))}
-                    placeholder="Enter 6-digit OTP"
-                    className="w-full text-center text-2xl tracking-[0.5em] font-mono border-2 border-slate-200 rounded-xl py-3 focus:border-emerald-500 focus:outline-none"
-                  />
-                  <button
-                    onClick={otp.verify}
-                    disabled={otp.verifying || otp.code.length < 4}
-                    className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                  >
-                    {otp.verifying ? "Verifying..." : "Verify & Fulfill"}
-                  </button>
-                  <button
-                    onClick={otp.send}
-                    disabled={otp.sending}
-                    className="w-full py-2 text-sm text-slate-500 hover:text-slate-700"
-                  >
-                    Resend OTP
-                  </button>
-                </div>
-              );
-            })()}
-
-            {otp.error && (
-              <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2 whitespace-pre-line">{otp.error}</div>
-            )}
-          </div>
-        </div>
-      )}
+      <DeliveryOtpDialog
+        otp={otp}
+        onFulfillWithoutOtp={(orderId) => doStatusChange(orderId, "Fulfilled")}
+      />
       {/* ─── Assign Delivery Dialog ─────────────────────── */}
       <AssignDeliveryDialog
         open={assignDialogOpen}

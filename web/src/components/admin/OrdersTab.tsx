@@ -9,7 +9,6 @@ import {
   orderBy,
   limit,
   getDocs,
-  getDoc,
   updateDoc,
   doc,
   startAfter,
@@ -21,24 +20,11 @@ import {
   Timestamp,
   QueryConstraint,
 } from "firebase/firestore";
-import Image from "next/image";
 import {
   LayoutDashboard,
   RefreshCw,
   Download,
-  CheckCircle2,
-  XCircle,
-  Pencil,
-  FileText,
-  MapPin,
-  Clock,
   Calendar,
-  Truck,
-  ShieldCheck,
-  Loader2,
-  Phone as PhoneIcon,
-  Mail,
-  MessageSquare,
   List,
   ShoppingCart,
 } from "lucide-react";
@@ -53,21 +39,13 @@ import dynamic from "next/dynamic";
 import { useMode } from "@/contexts/ModeContext";
 import { Product } from "@/contexts/AppContext";
 import OrderEditModal from "./OrderEditModal";
+import { AdminOrderCard } from "./AdminOrderCard";
+import { DeliveryOtpDialog } from "./DeliveryOtpDialog";
 
 const BuyList = dynamic(() => import("./BuyList"), { ssr: false });
-import { StatusTimeline, formatStatusTime } from "@/components/OrderTimeline";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 
 const ORDERS_PER_PAGE = 50;
 const DAY = 86400000;
@@ -102,15 +80,6 @@ function getMidnightToday(): Date {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return d;
-}
-
-function statusBadgeVariant(status: OrderStatus, hasPendingMod: boolean): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "Fulfilled") return "default";
-  if (status === "Shipped") return "secondary";
-  if (status === "Accepted") return "secondary";
-  if (status === "Rejected") return "destructive";
-  if (hasPendingMod) return "outline";
-  return "outline";
 }
 
 interface OrdersTabProps {
@@ -511,210 +480,21 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
 
       {/* Order cards */}
       {viewMode === "orders" && !loading &&
-        orders.map((o) => {
-          const hasPendingMod = o.modificationStatus === "PendingBuyerApproval";
-          const statusText = hasPendingMod ? "Pending Approval" : o.status || "Pending";
-          const cart = o.cart || [];
-
-          return (
-            <div
-              key={o.id}
-              id={`order-card-${o.id}`}
-              className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden${
-                highlightOrderId === o.id ? " c2-order-highlight" : ""
-              }`}
-            >
-              {/* Header */}
-              <div className="p-4 border-b border-slate-100">
-                <div className="flex flex-col md:flex-row justify-between md:items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="font-mono text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-semibold">
-                        {o.orderId || o.id}
-                      </span>
-                      <Badge variant={statusBadgeVariant(o.status || "Pending", hasPendingMod)}>
-                        {statusText}
-                      </Badge>
-                      {hasPendingMod && (
-                        <Badge variant="outline" className="text-orange-600 border-orange-200 bg-orange-50">
-                          Waiting for buyer approval
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-sm text-slate-500 mb-0.5">
-                      <Clock className="w-3 h-3 inline mr-1" />
-                      {o.timestamp || formatStatusTime(o.createdAt)}
-                    </div>
-                    <div className="text-sm text-slate-700">
-                      <span className="font-semibold">{o.shopName || o.customerName}</span>
-                      {" \u2022 "}
-                      {o.customerName} {" \u2022 "} {o.phone}
-                    </div>
-                    {o.location && (
-                      <div className="text-sm text-slate-500 flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3 h-3 flex-shrink-0" />
-                        <a
-                          href={`https://maps.google.com/?q=${encodeURIComponent(o.location)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sky-600 hover:underline"
-                        >
-                          {o.location}
-                          {o.pincode ? ` - ${o.pincode}` : ""}
-                        </a>
-                      </div>
-                    )}
-                    <StatusTimeline order={o} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Cart items */}
-              <div className="px-4 py-3">
-                {cart.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b-2 border-emerald-600">
-                          <th className="py-2 px-2 text-left text-xs font-bold text-emerald-700 uppercase tracking-wider w-8">#</th>
-                          <th className="py-2 px-2 text-left text-xs font-bold text-emerald-700 uppercase tracking-wider">Item</th>
-                          <th className="py-2 px-2 text-center text-xs font-bold text-emerald-700 uppercase tracking-wider w-14">Qty</th>
-                          <th className="py-2 px-2 text-center text-xs font-bold text-emerald-700 uppercase tracking-wider w-16">Unit</th>
-                          <th className="py-2 px-2 text-right text-xs font-bold text-emerald-700 uppercase tracking-wider w-16">Price</th>
-                          <th className="py-2 px-2 text-right text-xs font-bold text-emerald-700 uppercase tracking-wider w-20">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {cart.map((item, idx) => {
-                          const amount = (item.qty || 0) * (item.price || 0);
-                          const origItem = o.originalCart
-                            ? o.originalCart.find((oi: OrderCartItem) => oi.name === item.name)
-                            : undefined;
-                          const qtyChanged = origItem && origItem.qty !== item.qty;
-                          const priceChanged = origItem && origItem.price !== item.price;
-                          const resolvedImg = item.image || productImageMap[(item.name || "").toLowerCase()] || "";
-
-                          return (
-                            <tr key={idx} className="border-b border-slate-100 last:border-0">
-                              <td className="py-2 px-2 text-slate-400 text-xs">{idx + 1}</td>
-                              <td className="py-2 px-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden relative shrink-0 flex items-center justify-center">
-                                    {resolvedImg ? (
-                                      <Image src={resolvedImg} alt={item.name} fill sizes="40px" className="object-cover" unoptimized={!resolvedImg.includes("googleapis.com")} />
-                                    ) : (
-                                      <span className="text-xs font-bold text-slate-300">{item.name?.[0] || "?"}</span>
-                                    )}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <span className="text-slate-700 font-medium">{item.name}</span>
-                                    {(item.telugu || item.hindi) && (
-                                      <div className="text-xs text-slate-400">
-                                        {[item.telugu, item.hindi].filter(Boolean).join(" · ")}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-2 px-2 text-center">
-                                {qtyChanged && (
-                                  <span className="line-through text-slate-400 mr-1 text-xs">{origItem.qty}</span>
-                                )}
-                                <span className={qtyChanged ? "bg-yellow-100 rounded px-1" : "text-slate-700"}>{item.qty}</span>
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-500">{item.unit}</td>
-                              <td className="py-2 px-2 text-right">
-                                {priceChanged && (
-                                  <span className="line-through text-slate-400 mr-1 text-xs">&#8377;{origItem.price}</span>
-                                )}
-                                <span className={priceChanged ? "bg-yellow-100 rounded px-1" : "text-slate-700"}>&#8377;{item.price}</span>
-                              </td>
-                              <td className="py-2 px-2 text-right font-bold text-emerald-700">&#8377;{amount.toLocaleString("en-IN")}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-sm text-slate-500">{o.orderSummary}</div>
-                )}
-              </div>
-
-              {/* Footer: actions left + total right */}
-              <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                {/* Action buttons — LEFT side */}
-                <div className="flex flex-wrap gap-2">
-                  {hasPendingMod ? (
-                    <>
-                      <Button variant="destructive" size="sm" onClick={() => handleCancelModification(o.id)}>
-                        <XCircle className="w-3.5 h-3.5" /> Cancel Changes
-                      </Button>
-                      <Button variant="secondary" size="sm" onClick={() => lazyDownloadInvoice(o)}>
-                        <FileText className="w-3.5 h-3.5" /> Invoice
-                      </Button>
-                    </>
-                  ) : o.status === "Pending" || !o.status ? (
-                    <>
-                      <Button size="sm" onClick={() => handleStatusChange(o.id, "Accepted")} className="bg-blue-500 hover:bg-blue-600">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Accept
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditingOrder(o)} className="text-amber-600 border-amber-300 hover:bg-amber-50">
-                        <Pencil className="w-3.5 h-3.5" /> Edit
-                      </Button>
-                      <Button size="sm" variant="secondary" onClick={() => lazyDownloadInvoice(o)}>
-                        <FileText className="w-3.5 h-3.5" /> Invoice
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleStatusChange(o.id, "Rejected")}>
-                        <XCircle className="w-3.5 h-3.5" /> Reject
-                      </Button>
-                    </>
-                  ) : o.status === "Accepted" ? (
-                    <>
-                      <Button size="sm" onClick={() => handleStatusChange(o.id, "Shipped")} className="bg-indigo-500 hover:bg-indigo-600">
-                        <Truck className="w-3.5 h-3.5" /> Ship
-                      </Button>
-                      <Button size="sm" variant="secondary" onClick={() => lazyDownloadInvoice(o)}>
-                        <FileText className="w-3.5 h-3.5" /> Invoice
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditingOrder(o)} className="text-amber-600 border-amber-300 hover:bg-amber-50">
-                        <Pencil className="w-3.5 h-3.5" /> Edit
-                      </Button>
-                    </>
-                  ) : o.status === "Shipped" ? (
-                    <>
-                      <Button size="sm" onClick={() => handleFulfillClick(o)}>
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Fulfill
-                      </Button>
-                      <Button size="sm" variant="secondary" onClick={() => lazyDownloadInvoice(o)}>
-                        <FileText className="w-3.5 h-3.5" /> Invoice
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditingOrder(o)} className="text-amber-600 border-amber-300 hover:bg-amber-50">
-                        <Pencil className="w-3.5 h-3.5" /> Edit
-                      </Button>
-                    </>
-                  ) : o.status === "Fulfilled" ? (
-                    <>
-                      <Button size="sm" variant="secondary" onClick={() => lazyDownloadInvoice(o)}>
-                        <FileText className="w-3.5 h-3.5" /> Invoice
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditingOrder(o)} className="text-amber-600 border-amber-300 hover:bg-amber-50">
-                        <Pencil className="w-3.5 h-3.5" /> Edit
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
-
-                {/* Item count + total — RIGHT side */}
-                <div className="flex items-center gap-4">
-                  <span className="text-xs text-slate-400">{o.productCount || cart.length} items</span>
-                  <span className="text-lg font-extrabold text-slate-800">{o.totalValue}</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-
+        orders.map((o) => (
+          <AdminOrderCard
+            key={o.id}
+            order={o}
+            productImageMap={productImageMap}
+            highlight={highlightOrderId === o.id}
+            onAccept={(id) => handleStatusChange(id, "Accepted")}
+            onShip={(id) => handleStatusChange(id, "Shipped")}
+            onReject={(id) => handleStatusChange(id, "Rejected")}
+            onFulfillClick={handleFulfillClick}
+            onEdit={(order) => setEditingOrder(order)}
+            onCancelModification={handleCancelModification}
+            onDownloadInvoice={lazyDownloadInvoice}
+          />
+        ))}
       {/* Load More */}
       {viewMode === "orders" && !loading && hasMore && (
         <div className="text-center pt-4">
@@ -739,159 +519,10 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
       )}
 
       {/* OTP Verification Dialog */}
-      <Dialog open={!!otp.dialogOrder} onOpenChange={(open) => { if (!open) otp.closeDialog(); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-amber-500" />
-              Delivery OTP Verification
-            </DialogTitle>
-            <DialogDescription>
-              Send OTP to confirm delivery of order{" "}
-              <span className="font-mono font-semibold text-slate-700">
-                {otp.dialogOrder?.orderId || otp.dialogOrder?.id}
-              </span>.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {/* Customer info */}
-            <div className="rounded-lg bg-slate-50 p-3 text-sm space-y-1.5">
-              <div><span className="text-slate-400">Customer:</span> <span className="font-medium">{otp.dialogOrder?.customerName}</span></div>
-              <div className="flex items-center gap-1.5">
-                <PhoneIcon className="w-3 h-3 text-slate-400" />
-                <span className="text-slate-400">Phone:</span>
-                <span className="font-medium">{otp.dialogOrder?.phone || "N/A"}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Mail className="w-3 h-3 text-slate-400" />
-                <span className="text-slate-400">Email:</span>
-                <span className="font-medium">{otp.dialogOrder?.userEmail || "N/A"}</span>
-              </div>
-              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-200">
-                <MessageSquare className="w-3 h-3 text-slate-400" />
-                <span className="text-slate-400">Channel:</span>
-                <span className="font-medium text-xs uppercase tracking-wider">
-                  {[otp.channels.email && "Email", otp.channels.sms && "SMS", otp.channels.app && "App"]
-                    .filter(Boolean)
-                    .join(" · ") || "—"}
-                </span>
-              </div>
-            </div>
-
-            {(() => {
-              const wantEmail = otp.channels.email;
-              const wantSms = otp.channels.sms;
-              const wantApp = otp.channels.app;
-              const hasEmail = !!otp.dialogOrder?.userEmail;
-              const hasPhone = !!otp.dialogOrder?.phone;
-              const hasApp = !!otp.dialogOrder?.userId;
-              const canSend = (wantEmail && hasEmail) || (wantSms && hasPhone) || (wantApp && hasApp);
-              const enabledCount = (wantEmail ? 1 : 0) + (wantSms ? 1 : 0) + (wantApp ? 1 : 0);
-
-              const channelParts: string[] = [];
-              if (wantSms && hasPhone) channelParts.push("SMS");
-              if (wantEmail && hasEmail) channelParts.push("Email");
-              if (wantApp && hasApp) channelParts.push("App");
-              const channelLabel = channelParts.length > 0 ? channelParts.join(" & ") : "N/A";
-
-              return !otp.sent ? (
-                /* Step 1: Send OTP */
-                <div className="space-y-3">
-                  <Button
-                    onClick={otp.send}
-                    disabled={otp.sending || !canSend}
-                    className="w-full bg-amber-500 hover:bg-amber-600"
-                  >
-                    {otp.sending ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP...</>
-                    ) : (
-                      <><ShieldCheck className="w-4 h-4" /> Send OTP via {channelLabel}</>
-                    )}
-                  </Button>
-                  {!canSend && (
-                    <div className="text-sm text-amber-600 bg-amber-50 rounded-lg p-2">
-                      No contact info available for the selected channel{enabledCount > 1 ? "s" : ""}.
-                      {!hasPhone && wantSms && <span className="block text-xs mt-0.5">Phone number missing.</span>}
-                      {!hasEmail && wantEmail && <span className="block text-xs mt-0.5">Email missing.</span>}
-                      {!hasApp && wantApp && <span className="block text-xs mt-0.5">Buyer not signed in (no app account on this order).</span>}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="mt-2 w-full"
-                        onClick={() => {
-                          handleStatusChange(otp.dialogOrder!.id, "Fulfilled");
-                          otp.closeDialog();
-                        }}
-                      >
-                        Fulfill Without OTP
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* Step 2: Enter & Verify OTP */
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    {otp.smsSent && (
-                      <div className="text-sm text-emerald-600 font-medium flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> SMS sent to {otp.dialogOrder?.phone}
-                      </div>
-                    )}
-                    {otp.emailSent && (
-                      <div className="text-sm text-emerald-600 font-medium flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Email sent to {otp.dialogOrder?.userEmail}
-                      </div>
-                    )}
-                    {otp.appSent && (
-                      <div className="text-sm text-emerald-600 font-medium flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> App banner active for buyer
-                      </div>
-                    )}
-                    {otp.smsSent && (otp.emailSent || otp.appSent) && (
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        SMS uses a separate code. Enter either the SMS code or the Email/App code to verify.
-                      </p>
-                    )}
-                  </div>
-                  <Input
-                    placeholder="Enter 6-digit OTP"
-                    value={otp.code}
-                    onChange={(e) => otp.setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    inputMode="numeric"
-                    maxLength={6}
-                    className="text-center text-2xl tracking-[0.5em] font-mono"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={otp.verify}
-                      disabled={otp.verifying || otp.code.length !== 6}
-                      className="flex-1"
-                    >
-                      {otp.verifying ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</>
-                      ) : (
-                        <><CheckCircle2 className="w-4 h-4" /> Verify &amp; Fulfill</>
-                      )}
-                    </Button>
-                    <Button variant="outline" onClick={otp.send} disabled={otp.sending} size="sm">
-                      Resend
-                    </Button>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Error message */}
-            {otp.error && (
-              <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2 whitespace-pre-line">
-                {otp.error}
-              </div>
-            )}
-
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DeliveryOtpDialog
+        otp={otp}
+        onFulfillWithoutOtp={(orderId) => handleStatusChange(orderId, "Fulfilled")}
+      />
 
       {/* Invisible reCAPTCHA container — OUTSIDE Dialog so it persists across open/close */}
       <div id="otp-recaptcha-container" />
