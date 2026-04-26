@@ -573,4 +573,18 @@ export const THEME_PRESETS: ThemePreset[] = [
             cardLayout: { imageWidth: 100, imagePosition: "top" },
         },
     },
+    {
+        id: "freightmanifest",
+        name: "Freight Manifest",
+        description: "Industrial shipping-label aesthetic — Oswald-condensed display, ink charcoal on paperboard, burnt-orange QC stamp, corner brackets on photo, weight-band tier rate chart, decorative barcode strip. For buyers who value transparency and dispatch reliability.",
+        featured: true,
+        defaults: {
+            activeTheme: "freightmanifest",
+            primaryColor: "#2a2f36",
+            accentColor: "#c84c00",
+            grid: { mobile: 1, tablet: 2, desktop: 3, wide: 3 },
+            cardStyle: { borderRadius: "lg" },
+            cardLayout: { imageWidth: 100, imagePosition: "top" },
+        },
+    },
 ];

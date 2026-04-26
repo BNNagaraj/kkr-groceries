@@ -45,6 +45,7 @@ import { PostalStampCard } from "./cards/PostalStampCard";
 import { MemoStickyCard } from "./cards/MemoStickyCard";
 import { PeriodicElementCard } from "./cards/PeriodicElementCard";
 import { HairlineModernCard } from "./cards/HairlineModernCard";
+import { FreightManifestCard } from "./cards/FreightManifestCard";
 
 export const ProductCard = memo(function ProductCard({ product }: { product: Product }) {
     const { theme } = useTheme();
@@ -132,6 +133,8 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
             return <PeriodicElementCard product={product} />;
         case "hairlinemodern":
             return <HairlineModernCard product={product} />;
+        case "freightmanifest":
+            return <FreightManifestCard product={product} />;
         case "classic":
         default:
             return <ClassicCard product={product} />;

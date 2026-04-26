@@ -13,6 +13,7 @@ import {
   IBM_Plex_Sans,
   Space_Grotesk,
   DM_Serif_Display,
+  Oswald,
 } from "next/font/google";
 import "./globals.css";
 
@@ -119,6 +120,14 @@ const dmSerifDisplay = DM_Serif_Display({
   display: "swap",
 });
 
+// Industrial-stenciled condensed sans for the Freight Manifest card
+const oswald = Oswald({
+  subsets: ["latin"],
+  variable: "--font-oswald",
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
 export const viewport: Viewport = {
   themeColor: "#064e3b",
   width: "device-width",
@@ -208,7 +217,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${outfit.variable} ${notoSansTelugu.variable} ${specialElite.variable} ${fraunces.variable} ${cormorant.variable} ${jetbrainsMono.variable} ${caveat.variable} ${kalam.variable} ${bebas.variable} ${ebGaramond.variable} ${ibmPlex.variable} ${spaceGrotesk.variable} ${dmSerifDisplay.variable} font-sans antialiased bg-gray-50 text-slate-800`}
+        className={`${outfit.variable} ${notoSansTelugu.variable} ${specialElite.variable} ${fraunces.variable} ${cormorant.variable} ${jetbrainsMono.variable} ${caveat.variable} ${kalam.variable} ${bebas.variable} ${ebGaramond.variable} ${ibmPlex.variable} ${spaceGrotesk.variable} ${dmSerifDisplay.variable} ${oswald.variable} font-sans antialiased bg-gray-50 text-slate-800`}
       >
         <a
           href="#main-content"

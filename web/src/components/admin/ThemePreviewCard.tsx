@@ -736,6 +736,52 @@ export function ThemePreviewCard({
                         ))}
                     </div>
                 )}
+
+                {/* FreightManifest: paperboard with ink-bar manifest, corner brackets, barcode strip, burnt-orange CTA */}
+                {id === "freightmanifest" && (
+                    <div className="grid grid-cols-2 gap-1 w-full">
+                        {[1, 2].map(i => (
+                            <div
+                                key={i}
+                                className="relative h-[56px] flex flex-col overflow-hidden rounded-md"
+                                style={{ background: "#f8f6f1", border: "1px solid #2a2f36" }}
+                            >
+                                {/* Manifest ink bar */}
+                                <div className="h-2 px-1 flex items-center justify-between" style={{ background: "#2a2f36" }}>
+                                    <div className="h-[1px] w-1/4" style={{ background: "#f8f6f1" }} />
+                                    <div className="h-[1px] w-1/3" style={{ background: "#f8f6f1", opacity: 0.7 }} />
+                                </div>
+                                {/* Photo with corner brackets */}
+                                <div className="relative mx-1 mt-1 h-3" style={{ background: "#e8e4dd", border: "1px solid #7a828c" }}>
+                                    <span className="absolute top-0 left-0 w-1 h-1" style={{ borderTop: "1px solid #2a2f36", borderLeft: "1px solid #2a2f36" }} />
+                                    <span className="absolute top-0 right-0 w-1 h-1" style={{ borderTop: "1px solid #2a2f36", borderRight: "1px solid #2a2f36" }} />
+                                    <span className="absolute bottom-0 left-0 w-1 h-1" style={{ borderBottom: "1px solid #2a2f36", borderLeft: "1px solid #2a2f36" }} />
+                                    <span className="absolute bottom-0 right-0 w-1 h-1" style={{ borderBottom: "1px solid #2a2f36", borderRight: "1px solid #2a2f36" }} />
+                                </div>
+                                {/* Name + Rate strip */}
+                                <div className="px-1 pt-0.5 flex-1 flex flex-col justify-between">
+                                    <div className="h-1.5 w-3/4 rounded-sm" style={{ background: "#2a2f36" }} />
+                                    <div className="flex items-stretch h-2">
+                                        <div className="px-0.5" style={{ background: "#2a2f36", width: 10 }} />
+                                        <div className="flex-1 flex items-center px-0.5" style={{ border: "1px solid #2a2f36" }}>
+                                            <div className="h-1 w-2/3 rounded-sm" style={{ background: "#2a2f36" }} />
+                                        </div>
+                                    </div>
+                                </div>
+                                {/* Barcode strip */}
+                                <div className="mx-1 mt-0.5 mb-0.5 flex items-center gap-px" style={{ height: 4 }}>
+                                    {Array.from({ length: 18 }).map((_, j) => {
+                                        const w = ((i * 31 + j * 7) % 5) === 0 ? 2 : 1;
+                                        const black = ((i + j) % 3) !== 0;
+                                        return <span key={j} style={{ width: w, height: "100%", background: black ? "#2a2f36" : "transparent" }} />;
+                                    })}
+                                </div>
+                                {/* Burnt-orange CTA strip */}
+                                <div className="h-2" style={{ background: "#c84c00" }} />
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Name & Description */}
