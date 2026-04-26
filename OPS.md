@@ -65,6 +65,50 @@ flip mode via the toggle in the dashboard header. Always reset to
 | `FIREBASE_SERVICE_ACCOUNT_KKR_GROCERIES_02` | GitHub Actions secrets | Both workflow files |
 | `NEXT_PUBLIC_OTP_FIREBASE_*` | `web/.env.local` (build-time) | OTP SMS via Phone Auth |
 | Firebase API key (main) | `web/.env.local` | Web app runtime |
+| `NEXT_PUBLIC_SENTRY_DSN` | `web/.env.local` + GH secret | Web error reporting (optional) |
+| `SENTRY_DSN` | Cloud Functions env config | Cloud Function error reporting (optional) |
+| `SENTRY_AUTH_TOKEN` | Build env (optional) | Source-map upload |
+
+## Error reporting (Sentry)
+
+Sentry is **scaffolded but not yet active** — both web and Cloud Functions
+gracefully no-op until DSNs are provisioned. To turn it on:
+
+### Web (browser errors)
+
+1. Create a Sentry project at sentry.io (Next.js platform).
+2. Copy the DSN. Set it locally:
+   ```
+   echo "NEXT_PUBLIC_SENTRY_DSN=https://...@sentry.io/..." >> web/.env.local
+   ```
+3. Push it as a GH Actions secret:
+   ```
+   gh secret set NEXT_PUBLIC_SENTRY_DSN --body "https://...@sentry.io/..."
+   ```
+4. Edit [.github/workflows/firebase-hosting-merge.yml](.github/workflows/firebase-hosting-merge.yml)
+   to expose it as an env var during `next build` — mirror the existing
+   `NEXT_PUBLIC_OTP_FIREBASE_*` pattern.
+
+The static-export build still works with no DSN; init in
+[web/sentry.client.config.ts](web/sentry.client.config.ts) is gated on the
+env var.
+
+### Cloud Functions (server errors)
+
+Functions read `SENTRY_DSN` from the runtime config. Set it:
+```
+npx firebase-tools functions:secrets:set SENTRY_DSN
+```
+Then redeploy functions. The lazy init in
+[functions/utils.js](functions/utils.js) keeps function-discovery time
+unaffected when DSN is missing.
+
+The `withSentry(fnName, handler)` wrapper is exported from `utils` and
+already wraps `sendDeliveryOTP` as a canary. Wrap additional functions as
+they become production-critical:
+```js
+exports.myFn = onCall(withSentry("myFn", async (request) => { ... }));
+```
 
 `.env.local` is gitignored. Source of truth for env vars is the local
 file on the build machine. If a `NEXT_PUBLIC_OTP_FIREBASE_*` var is
