@@ -23,6 +23,8 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
+  ChevronRight,
+  X,
 } from "lucide-react";
 import OrderLocationMap from "./OrderLocationMap";
 import HeatMap from "./HeatMap";
@@ -81,6 +83,20 @@ export default function AdminAnalytics() {
 
   // Online presence
   const [onlineUsers, setOnlineUsers] = useState<PresenceDoc[]>([]);
+
+  // Drill-down modal — click a row in Top Customers / Top Products / Top Pincodes
+  type DrillDown =
+    | { type: "customer"; key: string; name: string }
+    | { type: "pincode"; pincode: string }
+    | { type: "product"; product: string };
+  const [drillDown, setDrillDown] = useState<DrillDown | null>(null);
+
+  useEffect(() => {
+    if (!drillDown) return;
+    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setDrillDown(null); };
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, [drillDown]);
 
   // Fetch all orders
   useEffect(() => {
@@ -254,13 +270,30 @@ export default function AdminAnalytics() {
     });
 
     // Top customers by revenue
-    const customerRevenue: Record<string, { name: string; total: number }> = {};
+    const cleanName = (...vals: (string | undefined | null)[]) => {
+      for (const v of vals) {
+        if (!v) continue;
+        const trimmed = String(v).trim();
+        if (!trimmed) continue;
+        const lower = trimmed.toLowerCase();
+        if (lower === "not specified" || lower === "unknown" || lower === "n/a" || lower === "-") continue;
+        return trimmed;
+      }
+      return null;
+    };
+    const customerRevenue: Record<string, { userId: string; name: string; phone?: string; total: number; count: number }> = {};
     orders.forEach((o) => {
-      const key = o.userId || "anonymous";
+      const key = o.userId || o.phone || "anonymous";
       if (!customerRevenue[key]) {
-        customerRevenue[key] = { name: o.shopName || o.customerName || "Unknown", total: 0 };
+        const name =
+          cleanName(o.shopName, o.customerName) ||
+          (o.phone ? o.phone : null) ||
+          o.userEmail ||
+          `Customer ${key.slice(0, 6)}`;
+        customerRevenue[key] = { userId: key, name, phone: o.phone, total: 0, count: 0 };
       }
       customerRevenue[key].total += parseTotal(o.totalValue);
+      customerRevenue[key].count += 1;
     });
     const topCustomers = Object.values(customerRevenue)
       .sort((a, b) => b.total - a.total)
@@ -510,17 +543,26 @@ export default function AdminAnalytics() {
           {/* Top Customers Table */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="font-bold mb-4 text-slate-800">Top Customers</h3>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {analytics.topCustomers.map((c, i) => (
-                <div key={i} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setDrillDown({ type: "customer", key: c.userId, name: c.name })}
+                  className="w-full flex items-center justify-between py-2 px-2 -mx-2 rounded-lg border-b border-slate-50 last:border-0 hover:bg-emerald-50/60 transition-colors text-left group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-6 h-6 rounded-full bg-slate-100 group-hover:bg-emerald-100 flex items-center justify-center text-xs font-bold text-slate-500 group-hover:text-emerald-700 shrink-0">
                       {i + 1}
                     </span>
-                    <span className="font-medium text-slate-700">{c.name}</span>
+                    <span className="font-medium text-slate-700 truncate">{c.name}</span>
+                    <span className="text-[11px] text-slate-400 shrink-0">{c.count} orders</span>
                   </div>
-                  <span className="font-bold text-slate-800">₹{c.total.toLocaleString("en-IN")}</span>
-                </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="font-bold text-slate-800">₹{c.total.toLocaleString("en-IN")}</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600 transition-colors" />
+                  </div>
+                </button>
               ))}
             </div>
           </div>
@@ -559,7 +601,18 @@ export default function AdminAnalytics() {
                         },
                       ],
                     }}
-                    options={{ maintainAspectRatio: false }}
+                    options={{
+                      maintainAspectRatio: false,
+                      onHover: (_e: any, els: any[], chart: any) => {
+                        chart.canvas.style.cursor = els.length ? "pointer" : "default";
+                      },
+                      onClick: (_e: any, els: any[]) => {
+                        if (!els.length) return;
+                        const idx = els[0].index;
+                        const entry = analytics.topProducts[idx];
+                        if (entry) setDrillDown({ type: "product", product: entry[0] });
+                      },
+                    }}
                   />
                 </div>
               </div>
@@ -1042,7 +1095,11 @@ export default function AdminAnalytics() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {analytics.topPincodes.map(([pin, data], i) => (
-                    <tr key={pin} className="hover:bg-slate-50">
+                    <tr
+                      key={pin}
+                      className="hover:bg-emerald-50/60 cursor-pointer transition-colors"
+                      onClick={() => setDrillDown({ type: "pincode", pincode: pin })}
+                    >
                       <td className="px-4 py-3 text-slate-400 font-mono text-xs">
                         {i + 1}
                       </td>
@@ -1109,6 +1166,148 @@ export default function AdminAnalytics() {
           )}
         </div>
       )}
+
+      {drillDown && (
+        <DrillDownModal
+          drillDown={drillDown}
+          orders={orders}
+          onClose={() => setDrillDown(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function DrillDownModal({
+  drillDown,
+  orders,
+  onClose,
+}: {
+  drillDown:
+    | { type: "customer"; key: string; name: string }
+    | { type: "pincode"; pincode: string }
+    | { type: "product"; product: string };
+  orders: Order[];
+  onClose: () => void;
+}) {
+  const filtered = useMemo(() => {
+    if (drillDown.type === "customer") {
+      return orders.filter((o) => (o.userId || o.phone || "anonymous") === drillDown.key);
+    }
+    if (drillDown.type === "pincode") {
+      return orders.filter((o) => (o.pincode || "Unknown") === drillDown.pincode);
+    }
+    return orders.filter((o) =>
+      (o.cart || []).some((it) => it.name === drillDown.product),
+    );
+  }, [drillDown, orders]);
+
+  const sorted = useMemo(
+    () =>
+      [...filtered].sort((a, b) => {
+        const ta = a.createdAt && typeof a.createdAt.toDate === "function" ? a.createdAt.toDate().getTime() : 0;
+        const tb = b.createdAt && typeof b.createdAt.toDate === "function" ? b.createdAt.toDate().getTime() : 0;
+        return tb - ta;
+      }),
+    [filtered],
+  );
+
+  const totalRevenue = useMemo(
+    () => filtered.reduce((sum, o) => sum + parseTotal(o.totalValue), 0),
+    [filtered],
+  );
+
+  const title =
+    drillDown.type === "customer"
+      ? drillDown.name
+      : drillDown.type === "pincode"
+      ? `Pincode ${drillDown.pincode}`
+      : drillDown.product;
+
+  const subtitle =
+    drillDown.type === "customer"
+      ? "Customer order history"
+      : drillDown.type === "pincode"
+      ? "Orders from this area"
+      : "Orders containing this product";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between p-5 border-b border-slate-100">
+          <div className="min-w-0">
+            <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
+              {subtitle}
+            </div>
+            <h3 className="font-bold text-slate-800 text-lg truncate">{title}</h3>
+            <div className="text-sm text-slate-500 mt-0.5">
+              {filtered.length} orders · ₹{totalRevenue.toLocaleString("en-IN")} total
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 shrink-0"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1">
+          {sorted.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 text-sm">No orders found.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
+                <tr className="text-left text-xs text-slate-500 uppercase tracking-wider">
+                  <th className="px-4 py-2.5">Order</th>
+                  {drillDown.type !== "customer" && <th className="px-4 py-2.5">Customer</th>}
+                  <th className="px-4 py-2.5">Date</th>
+                  <th className="px-4 py-2.5 text-center">Items</th>
+                  <th className="px-4 py-2.5">Status</th>
+                  <th className="px-4 py-2.5 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sorted.map((o) => {
+                  const date =
+                    o.createdAt && typeof o.createdAt.toDate === "function"
+                      ? o.createdAt.toDate().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                      : "—";
+                  const customer = o.shopName || o.customerName || o.phone || "—";
+                  return (
+                    <tr key={o.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
+                        {o.orderId || o.id.slice(0, 8)}
+                      </td>
+                      {drillDown.type !== "customer" && (
+                        <td className="px-4 py-2.5 text-slate-700 truncate max-w-[180px]">{customer}</td>
+                      )}
+                      <td className="px-4 py-2.5 text-slate-500 text-xs">{date}</td>
+                      <td className="px-4 py-2.5 text-center text-slate-600">{o.productCount || (o.cart || []).length}</td>
+                      <td className="px-4 py-2.5">
+                        <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 uppercase tracking-wider">
+                          {o.status || "Pending"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-bold text-slate-800">
+                        ₹{parseTotal(o.totalValue).toLocaleString("en-IN")}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
