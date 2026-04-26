@@ -15,7 +15,6 @@ const {
   resolveCol, getAppMode,
   isRateLimited, requireAdmin,
   emailLayout,
-  withSentry,
 } = require("./utils");
 
 /**
@@ -30,7 +29,7 @@ const {
  *   - channels       : { email?: boolean, app?: boolean }
  *                      Default: { email: true } — preserves the legacy contract.
  */
-exports.sendDeliveryOTP = onCall(withSentry("sendDeliveryOTP", async (request) => {
+exports.sendDeliveryOTP = onCall(async (request) => {
   const caller = await requireAdmin(request);
   const { orderId, orderCollection, channels } = request.data;
   if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId.");
@@ -188,7 +187,7 @@ exports.sendDeliveryOTP = onCall(withSentry("sendDeliveryOTP", async (request) =
     errors,
     message: `OTP dispatched via ${sentTo.join(" + ") || "no channels"}`,
   };
-}));
+});
 
 /**
  * verifyDeliveryOTP — checks the OTP entered by admin against the stored value.

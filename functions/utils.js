@@ -8,75 +8,6 @@ const { initializeApp } = require("firebase-admin/app");
 const { getStorage } = require("firebase-admin/storage");
 const { getAuth } = require("firebase-admin/auth");
 
-// ─── Sentry — lazy init so a missing DSN doesn't slow function discovery ───
-let _sentryReady = false;
-function getSentry() {
-  if (_sentryReady) {
-    // eslint-disable-next-line global-require
-    return require("@sentry/node");
-  }
-  const dsn = process.env.SENTRY_DSN;
-  if (!dsn) {
-    _sentryReady = true; // mark as "tried" so we don't re-check every call
-    return null;
-  }
-  // eslint-disable-next-line global-require
-  const Sentry = require("@sentry/node");
-  Sentry.init({
-    dsn,
-    environment: process.env.FUNCTIONS_EMULATOR ? "emulator" : "production",
-    tracesSampleRate: 0.05, // 5% — keep cost low for high-volume callable functions
-    sendDefaultPii: false,
-  });
-  _sentryReady = true;
-  return Sentry;
-}
-
-/**
- * Wraps a Cloud Function handler so any thrown error is captured to Sentry
- * before being re-thrown. Preserves the original error so the existing
- * HttpsError flow continues to work for the client.
- *
- * Usage:
- *   exports.myFn = onCall(withSentry("myFn", async (request) => { ... }));
- */
-function withSentry(fnName, handler) {
-  return async (request) => {
-    try {
-      return await handler(request);
-    } catch (err) {
-      const Sentry = getSentry();
-      if (Sentry) {
-        Sentry.withScope((scope) => {
-          scope.setTag("function", fnName);
-          if (request?.auth?.uid) scope.setUser({ id: request.auth.uid });
-          if (request?.data) scope.setContext("requestData", safeData(request.data));
-          Sentry.captureException(err);
-        });
-        // Best-effort flush so the event reaches Sentry before the function exits.
-        try { await Sentry.flush(2000); } catch { /* ignore */ }
-      }
-      throw err;
-    }
-  };
-}
-
-/** Strip large fields from request data before sending to Sentry. */
-function safeData(data) {
-  if (!data || typeof data !== "object") return data;
-  const out = {};
-  for (const [k, v] of Object.entries(data)) {
-    if (typeof v === "string" && v.length > 500) {
-      out[k] = `${v.slice(0, 200)}…[${v.length} chars]`;
-    } else if (typeof v === "object" && v !== null) {
-      out[k] = "[object]";
-    } else {
-      out[k] = v;
-    }
-  }
-  return out;
-}
-
 // ─── Default SMTP config (fallback if settings/smtp doc doesn't exist) ───
 const DEFAULT_SMTP = {
   user: "kkr.groceries.hyd@gmail.com",
@@ -636,6 +567,4 @@ module.exports = {
   buildItemsTable,
   buildOrderEmailHtml,
   buildStatusEmailHtml,
-  // Observability
-  withSentry,
 };
