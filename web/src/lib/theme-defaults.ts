@@ -5,6 +5,12 @@ export interface ThemePreset {
     name: string;
     description: string;
     defaults: ThemeSettings;
+    /**
+     * Featured presets render in the "New & Featured" section at the top
+     * of the admin theme picker, with a NEW ribbon. Non-featured presets
+     * fall under the "Classic Library" section below.
+     */
+    featured?: boolean;
 }
 
 export const THEME_PRESETS: ThemePreset[] = [
@@ -389,6 +395,7 @@ export const THEME_PRESETS: ThemePreset[] = [
         id: "mandichit",
         name: "Mandi Chit",
         description: "Auction-yard ticket aesthetic — cream paper, rotated ink-stamp categories, typewriter headline, big tabular price, dotted ledger slabs and a three-script Weigh & Add action. Culturally grounded.",
+        featured: true,
         defaults: {
             activeTheme: "mandichit",
             primaryColor: "#1a1612",
@@ -402,6 +409,7 @@ export const THEME_PRESETS: ThemePreset[] = [
         id: "bulletin",
         name: "Daily Bulletin",
         description: "Broadsheet editorial — Fraunces serif headlines, italic tabular prices, two-column Today's Rate / Bulk Slabs body, sepia wire-photo crops, circular Save stamps angled diagonally. Slow, premium, intentional.",
+        featured: true,
         defaults: {
             activeTheme: "bulletin",
             primaryColor: "#1c1a17",
@@ -415,6 +423,7 @@ export const THEME_PRESETS: ThemePreset[] = [
         id: "produceforward",
         name: "Produce Forward",
         description: "The food is the design — full-bleed dramatic crops, category-tinted backgrounds, Cormorant Garamond serif name + italic price, pill action and tier slabs that reveal on tap. Closer to a Whole Foods quarterly than a B2B tile.",
+        featured: true,
         defaults: {
             activeTheme: "produceforward",
             primaryColor: "#0f3a2c",

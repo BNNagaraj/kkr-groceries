@@ -126,20 +126,61 @@ export default function ThemeSettingsSection() {
             </div>
 
             <div className="p-6 space-y-8">
-                {/* Theme Selection */}
-                <div>
-                    <label className="text-sm font-semibold text-slate-700 mb-3 block">Choose Theme</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {THEME_PRESETS.map(preset => (
-                            <ThemePreviewCard
-                                key={preset.id}
-                                preset={preset}
-                                isActive={theme.activeTheme === preset.id}
-                                onClick={() => handleSelectTheme(preset.id)}
-                            />
-                        ))}
-                    </div>
-                </div>
+                {/* Theme Selection — Featured first, then Classic Library */}
+                {(() => {
+                    const featured = THEME_PRESETS.filter(p => p.featured);
+                    const classics = THEME_PRESETS.filter(p => !p.featured);
+                    return (
+                        <div className="space-y-6">
+                            {/* Featured / New section */}
+                            {featured.length > 0 && (
+                                <div>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <label className="text-sm font-semibold text-slate-700">New &amp; Featured</label>
+                                        <span className="text-[10px] font-bold tracking-[0.18em] uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                                            Designed for KKR
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mb-3 -mt-1.5">
+                                        Three ground-up cards built around the wholesale experience. Each commits to one aesthetic direction rather than re-skinning the same template.
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {featured.map(preset => (
+                                            <ThemePreviewCard
+                                                key={preset.id}
+                                                preset={preset}
+                                                isActive={theme.activeTheme === preset.id}
+                                                onClick={() => handleSelectTheme(preset.id)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Classic library */}
+                            {classics.length > 0 && (
+                                <div className="border-t border-slate-100 pt-5">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <label className="text-sm font-semibold text-slate-700">
+                                            Classic Library
+                                            <span className="ml-2 text-xs font-normal text-slate-400">{classics.length} themes</span>
+                                        </label>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                        {classics.map(preset => (
+                                            <ThemePreviewCard
+                                                key={preset.id}
+                                                preset={preset}
+                                                isActive={theme.activeTheme === preset.id}
+                                                onClick={() => handleSelectTheme(preset.id)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
 
                 {/* Card Layout (Image & Content) */}
                 <div>

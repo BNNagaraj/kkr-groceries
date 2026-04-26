@@ -16,7 +16,7 @@ export function ThemePreviewCard({
     isActive: boolean;
     onClick: () => void;
 }) {
-    const { id, name, description } = preset;
+    const { id, name, description, featured } = preset;
 
     return (
         <button
@@ -24,9 +24,25 @@ export function ThemePreviewCard({
             className={`relative text-left p-4 rounded-xl border-2 transition-all hover:shadow-md ${
                 isActive
                     ? "border-emerald-500 bg-emerald-50/50 shadow-sm ring-2 ring-emerald-500/20"
-                    : "border-slate-200 bg-white hover:border-slate-300"
+                    : featured
+                        ? "border-emerald-200 bg-white hover:border-emerald-400 shadow-sm"
+                        : "border-slate-200 bg-white hover:border-slate-300"
             }`}
         >
+            {/* NEW ribbon — diagonal flag in the upper-left corner for featured presets */}
+            {featured && !isActive && (
+                <div
+                    className="absolute -top-2 -left-2 z-10 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-[0.2em] uppercase shadow-sm"
+                    style={{
+                        background: "#059669",
+                        color: "white",
+                        transform: "rotate(-3deg)",
+                    }}
+                >
+                    NEW
+                </div>
+            )}
+
             {/* Active check */}
             {isActive && (
                 <div className="absolute top-2 right-2 w-5 h-5 bg-emerald-600 rounded-full flex items-center justify-center">
