@@ -121,10 +121,32 @@ exports.sendDeliveryOTP = onCall(async (request) => {
   }
 
   // ── Channel: Customer App ──
-  // Tries an FCM push if the buyer has a registered token. Even without a token,
-  // the buyer's open order page picks up the OTP via the Firestore listener.
+  // Three surfaces for the same OTP code:
+  //   1. Live banner on the buyer's order detail page (Firestore listener on delivery_otps)
+  //   2. Notification doc → appears in the bell dropdown across all buyer pages
+  //   3. FCM push if the buyer has a registered token (otherwise no-op)
   if (wantApp) {
     let pushed = false;
+
+    // 1+2. Notification doc — drives both the bell entry and the in-app popup
+    try {
+      const notifCol = resolveCol("notifications", mode);
+      await db.collection(notifCol).add({
+        userId: buyerUid,
+        orderId,
+        type: "delivery_otp",
+        title: "Delivery OTP",
+        message: `Your code for order ${displayOrderId} is ${otp}. Valid 10 minutes.`,
+        otp,
+        expiresAt: expiresAt.toISOString(),
+        read: false,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      errors.push(`app notification: ${e.message}`);
+    }
+
+    // 3. FCM push (best-effort)
     try {
       const tokenSnap = await db
         .collection("users")
@@ -151,7 +173,7 @@ exports.sendDeliveryOTP = onCall(async (request) => {
     } catch (e) {
       errors.push(`app push: ${e.message}`);
     }
-    sentTo.push(pushed ? "app:push+banner" : "app:banner");
+    sentTo.push(pushed ? "app:push+bell+banner" : "app:bell+banner");
   }
 
   console.log(

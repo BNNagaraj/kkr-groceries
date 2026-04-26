@@ -16,6 +16,9 @@ interface Notification {
   message: string;
   read: boolean;
   createdAt: string | Timestamp;
+  /** Present on type === "delivery_otp" notifications */
+  otp?: string;
+  expiresAt?: string;
 }
 
 /** Convert createdAt (string | Timestamp | undefined) to epoch ms for sorting */
@@ -143,38 +146,62 @@ export function NotificationBell() {
                 No notifications yet
               </div>
             ) : (
-              notifications.map((notif) => (
-                <Link
-                  key={notif.id}
-                  href={`/dashboard/buyer/orders/detail?id=${notif.orderId}`}
-                  onClick={() => handleNotificationClick(notif)}
-                  className={`block px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition-colors ${
-                    !notif.read ? "bg-primary/5" : ""
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    {!notif.read && (
-                      <span className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-slate-800 truncate">
-                        {notif.title}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-0.5 line-clamp-2">
-                        {notif.message}
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-1">
-                        {new Date(toEpoch(notif.createdAt)).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+              notifications.map((notif) => {
+                const isOtp = notif.type === "delivery_otp" && !!notif.otp;
+                const otpExpired =
+                  isOtp && notif.expiresAt
+                    ? new Date(notif.expiresAt).getTime() < Date.now()
+                    : false;
+                return (
+                  <Link
+                    key={notif.id}
+                    href={`/dashboard/buyer/orders/detail?id=${notif.orderId}`}
+                    onClick={() => handleNotificationClick(notif)}
+                    className={`block px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition-colors ${
+                      !notif.read ? "bg-primary/5" : ""
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      {!notif.read && (
+                        <span className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-slate-800 truncate">
+                          {notif.title}
+                        </div>
+                        {isOtp ? (
+                          <div className="mt-1.5">
+                            <div
+                              className={`inline-block rounded-md px-2.5 py-1 font-mono text-base font-bold tracking-[0.35em] ${
+                                otpExpired
+                                  ? "bg-slate-100 text-slate-400 line-through"
+                                  : "bg-emerald-50 text-emerald-800"
+                              }`}
+                            >
+                              {notif.otp}
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-1">
+                              {otpExpired ? "Expired" : "Show this to delivery person"}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                            {notif.message}
+                          </div>
+                        )}
+                        <div className="text-[11px] text-slate-400 mt-1">
+                          {new Date(toEpoch(notif.createdAt)).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              ))
+                  </Link>
+                );
+              })
             )}
           </div>
         </div>
