@@ -70,7 +70,7 @@ export const HairlineModernCard = memo(function HairlineModernCard({ product }: 
                 {/* Content — generous spacing, single column */}
                 <div className="flex flex-col flex-1 px-5 pt-4 pb-5">
                     <h3
-                        className="text-[18px] leading-[1.15] tracking-tight"
+                        className="text-[18px] leading-[1.15] tracking-tight line-clamp-2 break-words"
                         style={{
                             color: "#0f172a",
                             fontWeight: 400,

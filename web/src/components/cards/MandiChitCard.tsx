@@ -162,7 +162,7 @@ export const MandiChitCard = memo(function MandiChitCard({ product }: { product:
                         {/* Name block */}
                         <div className="flex-1 min-w-0 pt-0.5 pr-16">
                             <h3
-                                className="font-bold text-[16px] leading-[1.15] uppercase tracking-wide truncate"
+                                className="font-bold text-[16px] leading-[1.15] uppercase tracking-wide line-clamp-2 break-words"
                                 style={{ color: "#1a1612", letterSpacing: "0.04em" }}
                             >
                                 {product.name}

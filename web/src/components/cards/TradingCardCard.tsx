@@ -128,7 +128,7 @@ export const TradingCardCard = memo(function TradingCardCard({ product }: { prod
 
                     {/* Name + sub */}
                     <div className="px-3 pt-2.5 pb-1">
-                        <h3 className="text-[18px] font-bold leading-tight tracking-tight truncate" style={{ color: "#f1f5f9" }}>
+                        <h3 className="text-[18px] font-bold leading-tight tracking-tight line-clamp-2 break-words" style={{ color: "#f1f5f9" }}>
                             {product.name}
                         </h3>
                         {(product.telugu || product.hindi) && (

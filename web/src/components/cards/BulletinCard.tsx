@@ -72,7 +72,7 @@ export const BulletinCard = memo(function BulletinCard({ product }: { product: P
                 <div className="flex gap-3 px-4 pt-3 pb-2">
                     <div className="flex-1 min-w-0">
                         <h3
-                            className="font-bold leading-[1.05] tracking-[-0.01em]"
+                            className="font-bold leading-[1.05] tracking-[-0.01em] line-clamp-2 break-words"
                             style={{
                                 fontSize: "22px",
                                 color: "#1c1a17",

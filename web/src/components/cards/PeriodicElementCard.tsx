@@ -135,7 +135,7 @@ export const PeriodicElementCard = memo(function PeriodicElementCard({ product }
                 {/* Element name */}
                 <div className="px-3 pt-2">
                     <h3
-                        className="text-[15px] font-bold uppercase tracking-tight leading-none truncate"
+                        className="text-[15px] font-bold uppercase tracking-tight leading-tight line-clamp-2 break-words"
                         style={{ color: "#0a0a0a", fontFamily: "var(--font-jetbrains), monospace" }}
                     >
                         {product.name}

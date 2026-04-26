@@ -131,7 +131,7 @@ export const MemoStickyCard = memo(function MemoStickyCard({ product }: { produc
 
                         <div className="flex-1 min-w-0">
                             <h3
-                                className="leading-[1] truncate"
+                                className="leading-[1.05] line-clamp-2 break-words"
                                 style={{
                                     fontSize: "22px",
                                     color: PEN_BLUE,

@@ -128,7 +128,7 @@ export const ChalkboardCard = memo(function ChalkboardCard({ product }: { produc
                     {/* Name + multilingual */}
                     <div className="flex-1 min-w-0">
                         <h3
-                            className="leading-[0.95] truncate"
+                            className="leading-[1] line-clamp-2 break-words"
                             style={{
                                 fontSize: "26px",
                                 color: "#f5f1e8",

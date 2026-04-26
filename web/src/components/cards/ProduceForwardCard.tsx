@@ -133,7 +133,7 @@ export const ProduceForwardCard = memo(function ProduceForwardCard({ product }: 
                 {/* Name + price as a typographic pair */}
                 <div className="flex items-baseline gap-3">
                     <h3
-                        className="flex-1 min-w-0 leading-[0.95] tracking-[-0.01em] truncate"
+                        className="flex-1 min-w-0 leading-[0.95] tracking-[-0.01em] line-clamp-2 break-words"
                         style={{
                             color: accent.ink,
                             fontFamily: "var(--font-cormorant), serif",

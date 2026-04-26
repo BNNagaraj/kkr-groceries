@@ -138,7 +138,7 @@ export const PostalStampCard = memo(function PostalStampCard({ product }: { prod
                 {/* Name + multilingual */}
                 <div className="text-center mb-1.5">
                     <h3
-                        className="text-[15px] font-bold uppercase tracking-[0.06em] leading-tight"
+                        className="text-[15px] font-bold uppercase tracking-[0.06em] leading-tight line-clamp-2 break-words"
                         style={{ color: STAMP_INK, fontFamily: "var(--font-jetbrains), monospace" }}
                     >
                         {product.name}

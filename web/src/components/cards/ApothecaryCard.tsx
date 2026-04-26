@@ -100,7 +100,7 @@ export const ApothecaryCard = memo(function ApothecaryCard({ product }: { produc
                         <div className="flex-1 min-w-0">
                             {/* Latin scientific name — italic large */}
                             <div
-                                className="leading-[1.05] italic"
+                                className="leading-[1.05] italic line-clamp-2 break-words"
                                 style={{
                                     fontSize: "21px",
                                     color: "#3a2818",
@@ -114,7 +114,7 @@ export const ApothecaryCard = memo(function ApothecaryCard({ product }: { produc
                             </div>
                             {/* Common name in small caps */}
                             <div
-                                className="mt-1 text-[12px] tracking-[0.2em] uppercase font-bold"
+                                className="mt-1 text-[12px] tracking-[0.2em] uppercase font-bold line-clamp-1 break-words"
                                 style={{ color: "#5a3e22", fontVariant: "small-caps" }}
                             >
                                 {product.name}

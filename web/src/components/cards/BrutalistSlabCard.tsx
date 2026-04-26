@@ -84,7 +84,7 @@ export const BrutalistSlabCard = memo(function BrutalistSlabCard({ product }: { 
 
                     <div className="flex-1 px-3 py-2 flex flex-col justify-between">
                         <h3
-                            className="leading-[0.85] uppercase break-words"
+                            className="leading-[0.9] uppercase break-words line-clamp-2"
                             style={{
                                 fontSize: "32px",
                                 color: "#0a0a0a",

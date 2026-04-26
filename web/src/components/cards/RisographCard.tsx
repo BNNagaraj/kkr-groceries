@@ -133,7 +133,7 @@ export const RisographCard = memo(function RisographCard({ product }: { product:
                     {/* Name */}
                     <div className="flex-1 min-w-0">
                         <h3
-                            className="leading-[0.95] uppercase tracking-tight"
+                            className="leading-[1.0] uppercase tracking-tight line-clamp-2 break-words"
                             style={{
                                 fontSize: "20px",
                                 fontWeight: 700,

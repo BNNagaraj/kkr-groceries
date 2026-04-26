@@ -124,7 +124,7 @@ export const BazaarPosterCard = memo(function BazaarPosterCard({ product }: { pr
                     {/* Name, hugely centered, italic display */}
                     <div className="flex-1 min-w-0 self-center text-center pr-2">
                         <h3
-                            className="leading-[0.95] italic uppercase tracking-tight"
+                            className="leading-[1.0] italic uppercase tracking-tight line-clamp-2 break-words"
                             style={{
                                 fontSize: "24px",
                                 color: accent.deep,
