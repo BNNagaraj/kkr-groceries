@@ -31,14 +31,18 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
 
     return (
         <>
-            <header role="banner" className="fixed top-0 left-0 right-0 h-[70px] bg-gradient-to-br from-[#064e3b] to-[#065f46] text-white z-50 shadow-md">
+            <header
+                role="banner"
+                className="fixed top-0 left-0 right-0 h-[70px] text-white z-50 shadow-md"
+                style={{ background: "linear-gradient(135deg, var(--color-primary-dark), var(--color-primary))" }}
+            >
                 <div className="max-w-[1400px] mx-auto h-full px-4 flex justify-between items-center">
                     {/* Brand */}
                     <Link href="/" className="flex items-center gap-2">
                         <img src={logoSrc} alt={biz.storeName || "KKR Groceries"} width={44} height={44} className="rounded-md" />
                         <div className="flex flex-col">
                             <span className="font-bold text-xl leading-none tracking-tight">{biz.storeName || "KKR Groceries"}</span>
-                            <span className="text-[10px] text-emerald-200 uppercase tracking-widest font-semibold mt-0.5">B2B Wholesale</span>
+                            <span className="text-[10px] text-white/60 uppercase tracking-widest font-semibold mt-0.5">B2B Wholesale</span>
                         </div>
                     </Link>
 
@@ -93,7 +97,10 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                     {currentUser ? (
                                         <>
                                             <div className="px-4 py-2 border-b border-slate-100 flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center shrink-0 overflow-hidden">
+                                                <div
+                                                    className="w-8 h-8 rounded-full font-bold flex items-center justify-center shrink-0 overflow-hidden text-white"
+                                                    style={{ background: "var(--color-primary)" }}
+                                                >
                                                     {currentUser.photoURL ? (
                                                         <img
                                                             src={currentUser.photoURL}
@@ -133,7 +140,8 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                                     setMenuOpen(false);
                                                     setAuthOpen(true);
                                                 }}
-                                                className="w-full bg-[#064e3b] text-white rounded-lg py-2 text-sm font-semibold hover:bg-[#065f46]"
+                                                className="w-full text-white rounded-lg py-2 text-sm font-semibold transition-colors"
+                                                style={{ background: "var(--color-primary)" }}
                                             >
                                                 Login / Sign Up
                                             </button>
@@ -146,11 +154,15 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                         <button
                             onClick={onOpenCart}
                             aria-label={`Shopping cart${cartItemCount > 0 ? `, ${cartItemCount} items` : ""}`}
-                            className="w-10 h-10 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center relative transition-colors shadow-sm"
+                            className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center relative transition-colors shadow-sm"
                         >
                             <ShoppingCart className="w-5 h-5" />
                             {cartItemCount > 0 && (
-                                <span aria-hidden="true" className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold border-2 border-[#064e3b]">
+                                <span
+                                    aria-hidden="true"
+                                    className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold border-2"
+                                    style={{ borderColor: "var(--color-primary-dark)" }}
+                                >
                                     {cartItemCount}
                                 </span>
                             )}
