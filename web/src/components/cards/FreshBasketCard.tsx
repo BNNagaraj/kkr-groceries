@@ -12,13 +12,12 @@ import { CartControls, ImageLightbox, useImageLayout } from "./shared";
  *
  * The logo is vibrant orange basket with green leaf accent.
  * This theme leads with that warm orange (#F7941D) as the hero colour,
- * using fresh green (#3A9B42) as the supporting accent — the opposite
- * polarity of the kkrbrand theme. Feels like a produce market: warm,
- * inviting, retail-friendly.
+ * using fresh green (#3A9B42) as the supporting accent.
  *
  * Design cues from the logo:
  * - Bold orange header band (the basket)
- * - White body with subtle warm tint (clean, readable)
+ * - Warm cream body (#fef7ee) that continues the warmth through the card
+ * - Light orange image well so no jarring white gaps
  * - Green accent on active tier & savings badges (the leaf emblem)
  * - Rounded, friendly borders matching the basket curves
  * - Shopping-basket icon motif
@@ -46,9 +45,9 @@ export const FreshBasketCard = memo(function FreshBasketCard({ product }: { prod
                 className="overflow-hidden flex flex-col h-full hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 ease-out"
                 style={{
                     borderRadius: "var(--theme-card-radius, 1rem)",
-                    background: "#fffcf8",
-                    border: "1px solid #fde3c0",
-                    boxShadow: "0 1px 4px rgba(247,148,29,0.10), 0 0 0 0.5px rgba(247,148,29,0.05)",
+                    background: "linear-gradient(180deg, #fef0dc 0%, #fef7ee 30%, #fefaf4 100%)",
+                    border: "1px solid #f5d5a8",
+                    boxShadow: "0 2px 8px rgba(247,148,29,0.12), 0 0 0 0.5px rgba(247,148,29,0.06)",
                 }}
             >
                 {/* ── Vibrant orange header (the basket band) ── */}
@@ -83,9 +82,10 @@ export const FreshBasketCard = memo(function FreshBasketCard({ product }: { prod
 
                 {/* ── Image + Info row ── */}
                 <div className={`flex ${img.containerClass} flex-1`}>
+                    {/* Image well — warm peach tint, never stark white */}
                     <div
                         className={`relative shrink-0 ${img.imageClass} overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
-                        style={{ ...img.imageStyle, background: "#fef7ee" }}
+                        style={{ ...img.imageStyle, background: "linear-gradient(135deg, #fde8cc, #fef0dc)" }}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (
@@ -104,8 +104,9 @@ export const FreshBasketCard = memo(function FreshBasketCard({ product }: { prod
                                 </div>
                             </>
                         ) : (
-                            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-orange-50 to-green-50">
-                                <span className="text-4xl font-black text-orange-200">{product.name.charAt(0)}</span>
+                            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#fde0b8] to-[#fcecd0]">
+                                <ShoppingBasket className="w-8 h-8 text-[#F7941D]/30" />
+                                <span className="text-3xl font-black text-[#F7941D]/25 absolute">{product.name.charAt(0)}</span>
                             </div>
                         )}
                     </div>
@@ -114,19 +115,19 @@ export const FreshBasketCard = memo(function FreshBasketCard({ product }: { prod
                     <div className="flex-1 min-w-0 px-3.5 pt-2.5 pb-1">
                         {/* Telugu + Hindi names */}
                         <div className="flex items-center gap-2">
-                            <span className="text-sm text-orange-900/70 font-medium" style={{ fontFamily: "'Noto Sans Telugu', sans-serif" }}>
+                            <span className="text-sm text-[#8B4513] font-medium" style={{ fontFamily: "'Noto Sans Telugu', sans-serif" }}>
                                 {product.telugu}
                             </span>
                             {product.hindi && (
                                 <>
-                                    <span className="w-1 h-1 rounded-full bg-orange-300" />
-                                    <span className="text-xs text-slate-500">{product.hindi}</span>
+                                    <span className="w-1 h-1 rounded-full bg-[#F7941D]/40" />
+                                    <span className="text-xs text-[#8B6914]">{product.hindi}</span>
                                 </>
                             )}
                         </div>
 
                         {product.moqRequired !== false && (
-                            <div className="text-[10px] text-slate-400 mt-1">
+                            <div className="text-[10px] text-[#b08040] mt-1">
                                 Min order: {product.moq} {product.unit}
                             </div>
                         )}
@@ -143,27 +144,27 @@ export const FreshBasketCard = memo(function FreshBasketCard({ product }: { prod
                                             className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-all duration-200 ${
                                                 isActive
                                                     ? "shadow-md scale-[1.01]"
-                                                    : "border text-slate-600"
+                                                    : "text-slate-600"
                                             }`}
                                             style={
                                                 isActive
                                                     ? { background: "#3A9B42", color: "#fff" }
-                                                    : { background: "#fef9f2", borderColor: "#fde3c0" }
+                                                    : { background: "rgba(247,148,29,0.08)", border: "1px solid rgba(247,148,29,0.18)" }
                                             }
                                         >
                                             <div className="flex items-center gap-1.5">
                                                 {isActive && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
-                                                <span className={`text-xs font-semibold ${isActive ? "text-green-100" : "text-slate-500"}`}>
+                                                <span className={`text-xs font-semibold ${isActive ? "text-green-100" : "text-[#8B6914]"}`}>
                                                     {tier.range} {product.unit}
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-1.5">
-                                                <span className={`text-sm font-extrabold tabular-nums ${isActive ? "text-white" : "text-slate-800"}`}>
+                                                <span className={`text-sm font-extrabold tabular-nums ${isActive ? "text-white" : "text-[#7a4a0a]"}`}>
                                                     ₹{tier.price}
                                                 </span>
                                                 {saving > 0 && (
                                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                                                        isActive ? "bg-white/20 text-white" : "bg-green-100 text-green-700"
+                                                        isActive ? "bg-white/20 text-white" : "bg-[#3A9B42]/15 text-[#2d7a32]"
                                                     }`}>
                                                         <TrendingDown className="w-2 h-2 inline mr-0.5 -mt-px" />{saving}%
                                                     </span>
@@ -177,12 +178,12 @@ export const FreshBasketCard = memo(function FreshBasketCard({ product }: { prod
                                 {nudge && qty > 0 && (
                                     <div
                                         className="rounded-lg px-2.5 py-1.5 text-center"
-                                        style={{ background: "#fef3e2", border: "1px dashed #F7941D" }}
+                                        style={{ background: "rgba(247,148,29,0.12)", border: "1px dashed #F7941D" }}
                                     >
                                         <span className="text-[11px] font-bold text-[#D06A00]">
                                             🛒 Add {nudge.qtyNeeded} more
                                         </span>
-                                        <span className="text-[11px] text-slate-500 mx-1">→</span>
+                                        <span className="text-[11px] text-[#8B6914] mx-1">→</span>
                                         <span className="text-[11px] font-bold text-[#3A9B42]">
                                             ₹{nudge.nextPrice}/{product.unit}
                                         </span>

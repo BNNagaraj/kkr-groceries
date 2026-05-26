@@ -152,7 +152,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             sapphire: "#0c1220",
             sakura: "#fff5f8",
             kkrbrand: "#f5faf8",
-            freshbasket: "#fffcf8",
+            freshbasket: "#fef8f0",
         };
         const bg = PAGE_BG[theme.activeTheme] || "#f8faf9";
         root.style.setProperty("--theme-page-bg", bg);
