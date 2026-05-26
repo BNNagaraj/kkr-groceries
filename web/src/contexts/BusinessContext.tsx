@@ -38,6 +38,22 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, []);
 
+  // Sync favicon with uploaded logo
+  useEffect(() => {
+    if (!biz.logoUrl) return;
+    const setFavicon = (rel: string, href: string) => {
+      let link = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      link.href = href;
+    };
+    setFavicon("icon", biz.logoUrl);
+    setFavicon("apple-touch-icon", biz.logoUrl);
+  }, [biz.logoUrl]);
+
   return (
     <BusinessContext.Provider value={{ biz, loading }}>
       {children}
