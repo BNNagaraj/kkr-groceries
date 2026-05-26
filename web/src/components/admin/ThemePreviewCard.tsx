@@ -919,6 +919,34 @@ export function ThemePreviewCard({
                         ))}
                     </div>
                 )}
+
+                {/* Fresh Basket */}
+                {id === "freshbasket" && (
+                    <div className="grid grid-cols-3 gap-1 w-full">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="flex flex-col overflow-hidden" style={{ background: "#fffcf8", border: "1px solid #fde3c0", borderRadius: 6, height: 60 }}>
+                                {/* Orange header band */}
+                                <div className="flex items-center justify-between px-1 py-0.5" style={{ background: "linear-gradient(135deg, #F7941D, #D97B0D)" }}>
+                                    <div className="h-1 w-6 rounded-sm bg-white/80" />
+                                    <div className="h-2.5 w-5 rounded-full bg-white flex items-center justify-center">
+                                        <div className="h-1 w-3 rounded-sm" style={{ background: "#D06A00" }} />
+                                    </div>
+                                </div>
+                                {/* Image + tiers */}
+                                <div className="flex flex-1 p-0.5 gap-0.5">
+                                    <div className="w-5 rounded-sm shrink-0" style={{ background: "#fef7ee" }} />
+                                    <div className="flex-1 flex flex-col gap-0.5 justify-center">
+                                        <div className="h-1.5 w-full rounded-sm" style={{ background: "#3A9B42", opacity: 0.35 }} />
+                                        <div className="h-1 w-3/4 rounded-sm" style={{ background: "#F7941D", opacity: 0.2 }} />
+                                        <div className="h-1 w-full rounded-sm" style={{ background: "#F7941D", opacity: 0.12 }} />
+                                    </div>
+                                </div>
+                                {/* CTA */}
+                                <div className="mx-0.5 mb-0.5 h-1.5 rounded-sm" style={{ background: "#F7941D", opacity: 0.6 }} />
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Name & Description */}

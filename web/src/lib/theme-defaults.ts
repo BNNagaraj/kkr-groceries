@@ -629,4 +629,18 @@ export const THEME_PRESETS: ThemePreset[] = [
             cardLayout: { imageWidth: 35, imagePosition: "left" },
         },
     },
+    {
+        id: "freshbasket",
+        name: "Fresh Basket",
+        description: "Orange-forward theme matching the KKR Groceries logo — vibrant orange header band (the basket), white body with warm tint, fresh green tier highlights (the leaf). Warm, inviting, produce-market energy.",
+        featured: true,
+        defaults: {
+            activeTheme: "freshbasket",
+            primaryColor: "#F7941D",
+            accentColor: "#3A9B42",
+            grid: { mobile: 1, tablet: 2, desktop: 3, wide: 4 },
+            cardStyle: { borderRadius: "2xl" },
+            cardLayout: { imageWidth: 35, imagePosition: "left" },
+        },
+    },
 ];
