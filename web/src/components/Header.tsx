@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAppStore } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBusiness } from "@/contexts/BusinessContext";
 import { ShoppingCart, User, LogOut, Settings, TrendingUp } from "lucide-react";
 import { markOffline } from "@/hooks/usePresence";
 
@@ -16,6 +17,8 @@ import { AuthModal } from "./AuthModal";
 export function Header({ onOpenCart }: { onOpenCart: () => void }) {
     const { cart } = useAppStore();
     const { currentUser, isAdmin } = useAuth();
+    const { biz } = useBusiness();
+    const logoSrc = biz.logoUrl || "/icon-192.png";
     const [menuOpen, setMenuOpen] = useState(false);
     const [enquiryOpen, setEnquiryOpen] = useState(false);
     const [authOpen, setAuthOpen] = useState(false);
@@ -32,9 +35,9 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                 <div className="max-w-[1400px] mx-auto h-full px-4 flex justify-between items-center">
                     {/* Brand */}
                     <Link href="/" className="flex items-center gap-2">
-                        <div className="text-3xl">🥬</div>
+                        <img src={logoSrc} alt={biz.storeName || "KKR Groceries"} width={44} height={44} className="rounded-md" />
                         <div className="flex flex-col">
-                            <span className="font-bold text-xl leading-none tracking-tight">KKR Groceries</span>
+                            <span className="font-bold text-xl leading-none tracking-tight">{biz.storeName || "KKR Groceries"}</span>
                             <span className="text-[10px] text-emerald-200 uppercase tracking-widest font-semibold mt-0.5">B2B Wholesale</span>
                         </div>
                     </Link>

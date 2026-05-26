@@ -153,9 +153,8 @@ export const metadata: Metadata = {
   ],
   manifest: "/manifest.json",
   icons: {
-    icon: "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥬</text></svg>",
-    apple:
-      "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥬</text></svg>",
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
   },
   openGraph: {
     type: "website",
@@ -165,6 +164,7 @@ export const metadata: Metadata = {
     title: "KKR Groceries | Hyderabad B2B Vegetable Wholesale",
     description:
       "Fresh vegetables at APMC wholesale prices for hotels, restaurants & retailers in Hyderabad.",
+    images: [{ url: "/og-image.png", width: 1200, height: 1200 }],
   },
   twitter: {
     card: "summary",
@@ -183,6 +183,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ModeProvider } from "@/contexts/ModeContext";
 import { AppProvider } from "@/contexts/AppContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { BusinessProvider } from "@/contexts/BusinessContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -229,9 +230,11 @@ export default function RootLayout({
           <ModeProvider>
             <AppProvider>
               <ThemeProvider>
-                <ErrorBoundary>
-                  {children}
-                </ErrorBoundary>
+                <BusinessProvider>
+                  <ErrorBoundary>
+                    {children}
+                  </ErrorBoundary>
+                </BusinessProvider>
               </ThemeProvider>
             </AppProvider>
           </ModeProvider>

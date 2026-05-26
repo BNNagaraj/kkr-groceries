@@ -265,7 +265,7 @@ export default function TrackPage() {
       <div className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🥬</span>
+            <img src="/logo-64.png" alt="KKR Groceries" width={28} height={28} className="rounded" />
             <span className="text-sm font-bold text-emerald-800 tracking-wide">KKR Groceries</span>
           </div>
           <div className="flex items-center gap-1.5">

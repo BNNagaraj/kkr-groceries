@@ -146,12 +146,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             premiumribbon: "#f5f7ff",
             premiumticket: "#fdfcf9",
             premiumshelf: "#f5faf8",
+            zen: "#f7f5f0",
+            aurora: "#12121f",
+            terracotta: "#fdf6ee",
+            sapphire: "#0c1220",
+            sakura: "#fff5f8",
         };
         const bg = PAGE_BG[theme.activeTheme] || "#f8faf9";
         root.style.setProperty("--theme-page-bg", bg);
 
         // Set body class for dark themes
-        if (theme.activeTheme === "darkluxe" || theme.activeTheme === "mandi") {
+        if (theme.activeTheme === "darkluxe" || theme.activeTheme === "mandi" || theme.activeTheme === "aurora" || theme.activeTheme === "sapphire") {
             document.body.classList.add("theme-dark-page");
         } else {
             document.body.classList.remove("theme-dark-page");

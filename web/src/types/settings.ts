@@ -13,6 +13,7 @@ export interface BusinessSettings {
   minOrderValue: number;
   gstNumber?: string;
   address: string;
+  logoUrl?: string;
 }
 
 /** Legacy single-string form. Kept only so old Firestore docs still parse. */
@@ -92,6 +93,7 @@ export const DEFAULT_BUSINESS: BusinessSettings = {
   minOrderValue: 0,
   gstNumber: "",
   address: "",
+  logoUrl: "",
 };
 
 export const DEFAULT_CHECKOUT: CheckoutFormSettings = {

@@ -16,9 +16,9 @@ const HYDERABAD_CENTER = { lat: 17.385, lng: 78.4867 };
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || "";
 const GEOCODE_CACHE_KEY = "kkr-geocode-cache";
 
-// ─── Branded 🥬 Pin SVG Generator ──────────────────────────────────────────
+// ─── Branded KKR Pin SVG Generator ─────────────────────────────────────────
 function createBrandedPin(color: string, darkColor: string) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="58" viewBox="0 0 44 58"><defs><filter id="s" x="-15%" y="-10%" width="130%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="${darkColor}" flood-opacity="0.5"/></filter><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}"/><stop offset="100%" stop-color="${darkColor}"/></linearGradient></defs><path d="M22 2C10.4 2 1 11.4 1 23c0 14.5 21 33 21 33s21-18.5 21-33C43 11.4 33.6 2 22 2z" fill="url(#g)" filter="url(#s)"/><circle cx="22" cy="21" r="11" fill="white" opacity="0.95"/><text x="22" y="26.5" text-anchor="middle" font-size="14">🥬</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="58" viewBox="0 0 44 58"><defs><filter id="s" x="-15%" y="-10%" width="130%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="${darkColor}" flood-opacity="0.5"/></filter><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}"/><stop offset="100%" stop-color="${darkColor}"/></linearGradient></defs><path d="M22 2C10.4 2 1 11.4 1 23c0 14.5 21 33 21 33s21-18.5 21-33C43 11.4 33.6 2 22 2z" fill="url(#g)" filter="url(#s)"/><circle cx="22" cy="21" r="11" fill="white" opacity="0.95"/><text x="22" y="26.5" text-anchor="middle" font-size="12" font-weight="bold" fill="${darkColor}">KKR</text></svg>`;
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 
@@ -191,7 +191,7 @@ export default function OrderLocationMap({ orders }: Props) {
         infoWindow.setContent(`
           <div style="font-family:'Outfit',system-ui,sans-serif;max-width:280px;padding:2px 0;">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-              <span style="font-size:22px;">🥬</span>
+              <img src="/logo-64.png" alt="KKR" width="28" height="28" style="border-radius:6px;" />
               <div>
                 <div style="font-weight:700;font-size:14px;color:#1e293b;line-height:1.2;">${order.customerName || "Customer"}</div>
                 ${order.shopName ? `<div style="font-size:11px;color:#64748b;margin-top:1px;">🏪 ${order.shopName}</div>` : ""}
@@ -264,7 +264,7 @@ export default function OrderLocationMap({ orders }: Props) {
       <div className="p-4 border-b border-emerald-900/20 bg-gradient-to-r from-slate-900 to-emerald-950/50">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
-            <span className="text-lg">🥬</span>
+            <img src="/logo-64.png" alt="" width={22} height={22} className="rounded" />
             <h3 className="font-bold text-white text-sm tracking-wide">Order Locations</h3>
             <span className="text-[10px] text-emerald-400 bg-emerald-400/10 px-2.5 py-0.5 rounded-full font-semibold border border-emerald-400/20">
               {stats.count} orders

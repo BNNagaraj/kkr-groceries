@@ -1,24 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import React from "react";
 import { Phone, Mail, MapPin } from "lucide-react";
-import { BusinessSettings, DEFAULT_BUSINESS } from "@/types/settings";
+import { useBusiness } from "@/contexts/BusinessContext";
 
 export function Footer() {
-  const [biz, setBiz] = useState<BusinessSettings>(DEFAULT_BUSINESS);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, "settings", "business"));
-        if (snap.exists()) setBiz({ ...DEFAULT_BUSINESS, ...(snap.data() as Partial<BusinessSettings>) });
-      } catch (e) {
-        console.warn("[Footer] Failed to load business settings:", e);
-      }
-    })();
-  }, []);
+  const { biz } = useBusiness();
+  const logoSrc = biz.logoUrl || "/icon-192.png";
 
   return (
     <footer className="bg-[#064e3b] text-white mt-12">
@@ -27,7 +15,7 @@ export function Footer() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-3xl">🥬</span>
+              <img src={logoSrc} alt={biz.storeName || "KKR Groceries"} width={40} height={40} className="rounded-md" />
               <div>
                 <div className="font-bold text-xl">{biz.storeName || "KKR Groceries"}</div>
                 <div className="text-emerald-300 text-xs uppercase tracking-widest font-semibold">B2B Wholesale</div>

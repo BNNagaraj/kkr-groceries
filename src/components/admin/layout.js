@@ -117,7 +117,7 @@ export function renderAdminLayout(contentRenderer) {
         <div class="admin-mobile-header">
             <div style="display: flex; align-items: center; gap: 12px;">
                 <button id="sidebarToggle" style="background: none; border: none; font-size: 24px; cursor: pointer; padding: 8px;">☰</button>
-                <span style="font-weight: 700; font-size: 18px; color: #1e293b;">🥬 Admin</span>
+                <span style="font-weight: 700; font-size: 18px; color: #1e293b;"><img src="/logo-64.png" alt="KKR" width="24" height="24" style="border-radius:6px;vertical-align:middle;margin-right:4px;">Admin</span>
             </div>
             <button id="exitAdminMobile" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer;">Exit</button>
         </div>
@@ -128,7 +128,7 @@ export function renderAdminLayout(contentRenderer) {
         <!-- Sidebar -->
         <aside class="admin-sidebar" id="adminSidebar">
             <div style="padding: 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 12px;">
-                <span style="font-size: 24px;">🥬</span>
+                <img src="/logo-64.png" alt="KKR" width="28" height="28" style="border-radius:6px;">
                 <span style="font-weight: 700; font-size: 18px; color: #1e293b;">Admin Portal</span>
                 <button id="closeSidebar" style="display: none; margin-left: auto; background: none; border: none; font-size: 24px; cursor: pointer;">×</button>
             </div>

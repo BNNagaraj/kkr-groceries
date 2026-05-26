@@ -8,7 +8,7 @@ import {
   Save, MapPin, Store, FileText, Plus, X, Loader2, Mail, Eye, EyeOff, Send,
   RefreshCw, AlertTriangle, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp,
   Settings2, Activity, TestTube2, RotateCcw, Users, ArrowLeft, Palette, Warehouse,
-  MessageSquare, ShoppingCart,
+  MessageSquare, ShoppingCart, ImagePlus, Trash2,
 } from "lucide-react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
@@ -124,6 +124,8 @@ export default function SettingsTab() {
   const [showAdvancedSmtp, setShowAdvancedSmtp] = useState(false);
   const [sendingToAll, setSendingToAll] = useState(false);
   const [activePanel, setActivePanel] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -263,6 +265,49 @@ export default function SettingsTab() {
       toast.error("Failed to save business settings.");
     } finally {
       setSavingBusiness(false);
+    }
+  };
+
+  const onLogoFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Logo must be under 2 MB.");
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const uploadFn = httpsCallable<
+        { base64Image: string },
+        { success: boolean; url: string }
+      >(functions, "uploadLogoImage");
+      const result = await uploadFn({ base64Image: base64 });
+      if (result.data.success && result.data.url) {
+        setBusiness((p) => ({ ...p, logoUrl: result.data.url }));
+        toast.success("Logo uploaded!");
+      }
+    } catch (err) {
+      console.error("Logo upload failed:", err);
+      toast.error("Logo upload failed. Please try again.");
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  };
+
+  const removeLogo = async () => {
+    try {
+      await setDoc(doc(db, "settings", "business"), { logoUrl: "" }, { merge: true });
+      setBusiness((p) => ({ ...p, logoUrl: "" }));
+      toast.success("Logo removed — default logo will be used.");
+    } catch {
+      toast.error("Failed to remove logo.");
     }
   };
 
@@ -659,116 +704,187 @@ export default function SettingsTab() {
 
       {/* Business Settings */}
       {activePanel === "business" && (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-              <Store className="w-5 h-5 text-blue-600" />
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                <Store className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800">Business Settings</h3>
+                <p className="text-sm text-slate-500">
+                  Brand logo, store info, contact &amp; delivery
+                </p>
+              </div>
+            </div>
+            <Button onClick={saveBusiness_} disabled={savingBusiness} size="sm">
+              <Save className="w-4 h-4" />
+              {savingBusiness ? "Saving..." : "Save"}
+            </Button>
+          </div>
+
+          {/* Brand Logo */}
+          <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
+            <label className="text-sm font-semibold text-slate-700 mb-3 block">Brand Logo</label>
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-300 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                {business.logoUrl ? (
+                  <img src={business.logoUrl} alt="Logo" className="w-full h-full object-contain rounded-lg" />
+                ) : (
+                  <img src="/icon-192.png" alt="Default logo" className="w-full h-full object-contain rounded-lg opacity-50" />
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={onLogoFileSelected}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                >
+                  {uploadingLogo ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
+                  ) : (
+                    <><ImagePlus className="w-4 h-4" /> {business.logoUrl ? "Change Logo" : "Upload Logo"}</>
+                  )}
+                </Button>
+                {business.logoUrl && (
+                  <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50 justify-start" onClick={removeLogo}>
+                    <Trash2 className="w-4 h-4" /> Remove
+                  </Button>
+                )}
+                <p className="text-xs text-slate-400">PNG, JPG or WebP. Max 2 MB. Shows in header &amp; footer.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Store Info */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-slate-600 mb-1 block">
+                Store Name
+              </label>
+              <Input
+                value={business.storeName}
+                onChange={(e) =>
+                  setBusiness((p) => ({ ...p, storeName: e.target.value }))
+                }
+              />
             </div>
             <div>
-              <h3 className="font-bold text-slate-800">Business Settings</h3>
-              <p className="text-sm text-slate-500">
-                Store info, delivery charges, minimum order
-              </p>
+              <label className="text-sm font-medium text-slate-600 mb-1 block">
+                GST Number
+              </label>
+              <Input
+                value={business.gstNumber || ""}
+                onChange={(e) =>
+                  setBusiness((p) => ({ ...p, gstNumber: e.target.value }))
+                }
+                placeholder="Optional"
+              />
             </div>
           </div>
-          <Button onClick={saveBusiness_} disabled={savingBusiness} size="sm">
-            <Save className="w-4 h-4" />
-            {savingBusiness ? "Saving..." : "Save"}
-          </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm font-medium text-slate-600 mb-1 block">
-              Store Name
-            </label>
-            <Input
-              value={business.storeName}
-              onChange={(e) =>
-                setBusiness((p) => ({ ...p, storeName: e.target.value }))
-              }
-            />
+        {/* Contact Details */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <Mail className="w-4 h-4 text-emerald-600" />
+            </div>
+            <h4 className="font-bold text-slate-800">Contact Details &amp; Address</h4>
           </div>
-          <div>
-            <label className="text-sm font-medium text-slate-600 mb-1 block">
-              Contact Phone
-            </label>
-            <Input
-              value={business.contactPhone}
-              onChange={(e) =>
-                setBusiness((p) => ({ ...p, contactPhone: e.target.value }))
-              }
-              placeholder="+91 ..."
-            />
+          <p className="text-xs text-slate-400 mb-4">These appear in the website footer and on invoices.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-slate-600 mb-1 block">
+                Contact Phone
+              </label>
+              <Input
+                value={business.contactPhone}
+                onChange={(e) =>
+                  setBusiness((p) => ({ ...p, contactPhone: e.target.value }))
+                }
+                placeholder="+91 98765 43210"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-600 mb-1 block">
+                Contact Email
+              </label>
+              <Input
+                type="email"
+                value={business.contactEmail}
+                onChange={(e) =>
+                  setBusiness((p) => ({ ...p, contactEmail: e.target.value }))
+                }
+                placeholder="orders@example.com"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-sm font-medium text-slate-600 mb-1 block">
+                Business Address
+              </label>
+              <Input
+                value={business.address}
+                onChange={(e) =>
+                  setBusiness((p) => ({ ...p, address: e.target.value }))
+                }
+                placeholder="Full business address shown in footer"
+              />
+            </div>
           </div>
-          <div>
-            <label className="text-sm font-medium text-slate-600 mb-1 block">
-              Contact Email
-            </label>
-            <Input
-              type="email"
-              value={business.contactEmail}
-              onChange={(e) =>
-                setBusiness((p) => ({ ...p, contactEmail: e.target.value }))
-              }
-            />
+        </div>
+
+        {/* Delivery & Order */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+              <ShoppingCart className="w-4 h-4 text-amber-600" />
+            </div>
+            <h4 className="font-bold text-slate-800">Delivery &amp; Order</h4>
           </div>
-          <div>
-            <label className="text-sm font-medium text-slate-600 mb-1 block">
-              GST Number
-            </label>
-            <Input
-              value={business.gstNumber || ""}
-              onChange={(e) =>
-                setBusiness((p) => ({ ...p, gstNumber: e.target.value }))
-              }
-              placeholder="Optional"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-sm font-medium text-slate-600 mb-1 block">
-              Address
-            </label>
-            <Input
-              value={business.address}
-              onChange={(e) =>
-                setBusiness((p) => ({ ...p, address: e.target.value }))
-              }
-              placeholder="Full business address"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-slate-600 mb-1 block">
-              Delivery Charges (₹)
-            </label>
-            <Input
-              type="number"
-              value={business.deliveryCharges}
-              onChange={(e) =>
-                setBusiness((p) => ({
-                  ...p,
-                  deliveryCharges: parseFloat(e.target.value) || 0,
-                }))
-              }
-              min={0}
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-slate-600 mb-1 block">
-              Minimum Order Value (₹)
-            </label>
-            <Input
-              type="number"
-              value={business.minOrderValue}
-              onChange={(e) =>
-                setBusiness((p) => ({
-                  ...p,
-                  minOrderValue: parseFloat(e.target.value) || 0,
-                }))
-              }
-              min={0}
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-slate-600 mb-1 block">
+                Delivery Charges (₹)
+              </label>
+              <Input
+                type="number"
+                value={business.deliveryCharges}
+                onChange={(e) =>
+                  setBusiness((p) => ({
+                    ...p,
+                    deliveryCharges: parseFloat(e.target.value) || 0,
+                  }))
+                }
+                min={0}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-600 mb-1 block">
+                Minimum Order Value (₹)
+              </label>
+              <Input
+                type="number"
+                value={business.minOrderValue}
+                onChange={(e) =>
+                  setBusiness((p) => ({
+                    ...p,
+                    minOrderValue: parseFloat(e.target.value) || 0,
+                  }))
+                }
+                min={0}
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 /**
  * Storage Cloud Functions.
  * - uploadProductImage
+ * - uploadLogoImage
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getStorage } = require("firebase-admin/storage");
@@ -104,5 +105,68 @@ exports.uploadProductImage = onCall(async (request) => {
       error.code || "internal",
       error.message || "Upload failed"
     );
+  }
+});
+
+/**
+ * Upload logo image to Storage and save URL in settings/business
+ */
+exports.uploadLogoImage = onCall(async (request) => {
+  try {
+    const caller = await requireAdmin(request);
+    if (await isRateLimited(caller.uid, "uploadLogo", 10, 10 * 60 * 1000)) {
+      throw new HttpsError("resource-exhausted", "Too many uploads. Try again later.");
+    }
+
+    const { base64Image } = request.data || {};
+    if (!base64Image) {
+      throw new HttpsError("invalid-argument", "Missing base64Image.");
+    }
+
+    const base64Size = base64Image.length * 0.75;
+    if (base64Size > 2 * 1024 * 1024) {
+      throw new HttpsError("invalid-argument", "Image too large. Maximum size is 2MB.");
+    }
+
+    let imageUrl;
+    let storageAvailable = false;
+
+    if (storage) {
+      try {
+        const bucket = storage.bucket();
+        await bucket.getMetadata();
+        storageAvailable = true;
+      } catch (e) {
+        storageAvailable = false;
+      }
+    }
+
+    if (storageAvailable) {
+      try {
+        const bucket = storage.bucket();
+        const filePath = `branding/logo-${Date.now()}.png`;
+        const file = bucket.file(filePath);
+        const buffer = Buffer.from(base64Image.replace(/^data:image\/\w+;base64,/, ""), "base64");
+        await file.save(buffer, {
+          metadata: { contentType: "image/png" },
+          public: true,
+        });
+        imageUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+      } catch (e) {
+        imageUrl = base64Image;
+      }
+    } else {
+      imageUrl = base64Image;
+    }
+
+    await db.collection("settings").doc("business").set(
+      { logoUrl: imageUrl, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+
+    return { success: true, url: imageUrl };
+  } catch (error) {
+    console.error("Error in uploadLogoImage:", error);
+    throw new HttpsError(error.code || "internal", error.message || "Upload failed");
   }
 });

@@ -9,7 +9,7 @@
  *   email.js     — processMailQueue, testSmtpConfig, getEmailStats, getEmailLogs, retryFailedEmail
  *   delivery.js  — sendDeliveryOTP, verifyDeliveryOTP, autoAssignDeliveryBoy, generateTrackingLink, cleanupExpiredTracking
  *   gstin.js     — verifyGSTIN
- *   storage.js   — uploadProductImage
+ *   storage.js   — uploadProductImage, uploadLogoImage
  */
 
 // Initialize Firebase Admin (must happen before any module imports that use db)

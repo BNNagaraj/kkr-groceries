@@ -75,7 +75,7 @@ type SearchMode = "search" | "coords" | "pluscode";
 
 // ─── Branded Map Pin SVG ────────────────────────────────────────────────
 function createBrandedPin(color = "#059669", darkColor = "#064e3b") {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="52" height="68" viewBox="0 0 52 68"><defs><filter id="s" x="-15%" y="-10%" width="130%" height="130%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="${darkColor}" flood-opacity="0.45"/></filter><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}"/><stop offset="100%" stop-color="${darkColor}"/></linearGradient></defs><path d="M26 2C13.3 2 3 12.3 3 25c0 17 23 39 23 39s23-22 23-39C49 12.3 38.7 2 26 2z" fill="url(#g)" filter="url(#s)"/><circle cx="26" cy="23" r="13" fill="white" opacity="0.95"/><text x="26" y="29" text-anchor="middle" font-size="17">🥬</text></svg>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="52" height="68" viewBox="0 0 52 68"><defs><filter id="s" x="-15%" y="-10%" width="130%" height="130%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="${darkColor}" flood-opacity="0.45"/></filter><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}"/><stop offset="100%" stop-color="${darkColor}"/></linearGradient></defs><path d="M26 2C13.3 2 3 12.3 3 25c0 17 23 39 23 39s23-22 23-39C49 12.3 38.7 2 26 2z" fill="url(#g)" filter="url(#s)"/><circle cx="26" cy="23" r="13" fill="white" opacity="0.95"/><text x="26" y="29" text-anchor="middle" font-size="14" font-weight="bold" fill="${darkColor}">KKR</text></svg>`;
     return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 
@@ -579,7 +579,7 @@ export function MapPicker({
                     <div className="px-5 py-4 border-b border-emerald-100 flex justify-between items-center bg-gradient-to-r from-emerald-50 to-white">
                         <div>
                             <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2.5">
-                                <span className="text-xl">🥬</span>
+                                <img src="/logo-64.png" alt="" width={24} height={24} className="rounded" />
                                 Delivery Location
                             </h3>
                             <p className="text-xs text-slate-400 mt-0.5">We'll deliver your fresh vegetables here</p>
@@ -757,7 +757,7 @@ export function MapPicker({
                 <div className="px-5 py-4 border-b border-emerald-100 flex justify-between items-center bg-gradient-to-r from-emerald-50 to-white">
                     <div>
                         <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2.5">
-                            <span className="text-xl">🥬</span>
+                            <img src="/logo-64.png" alt="" width={24} height={24} className="rounded" />
                             Choose Location
                         </h3>
                         <p className="text-xs text-slate-400 mt-0.5">Search, paste coordinates, Plus Code, or drag the pin</p>
@@ -922,7 +922,7 @@ export function MapPicker({
                             {isOutOfZone
                                 ? <AlertCircle className="w-5 h-5" />
                                 : address
-                                    ? <span className="text-lg">🥬</span>
+                                    ? <img src="/logo-64.png" alt="" width={22} height={22} className="rounded" />
                                     : <MapPin className="w-5 h-5" />
                             }
                         </div>

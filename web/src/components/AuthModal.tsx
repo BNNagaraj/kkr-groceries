@@ -187,7 +187,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       {/* Full-screen loading overlay — hides header/navbar during auth processing */}
       {loading && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[200] bg-[#064e3b]/95 flex flex-col items-center justify-center text-white">
-          <div className="text-5xl mb-4 animate-bounce">🥬</div>
+          <img src="/logo-64.png" alt="KKR Groceries" width={56} height={56} className="mb-4 animate-bounce rounded-lg" />
           <div className="font-bold text-xl mb-1 tracking-tight">KKR Groceries</div>
           <div className="text-emerald-300 text-[10px] uppercase tracking-widest font-semibold mb-6">B2B Wholesale</div>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
@@ -200,7 +200,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden">
           {/* Branded header */}
           <div className="flex flex-col items-center gap-1 py-5 bg-gradient-to-br from-[#064e3b] to-[#065f46] text-white rounded-t-lg">
-            <div className="text-3xl">🥬</div>
+            <img src="/logo-64.png" alt="KKR Groceries" width={40} height={40} className="rounded-lg" />
             <div className="font-bold text-lg tracking-tight">KKR Groceries</div>
             <div className="text-emerald-200 text-[10px] uppercase tracking-widest font-semibold">B2B Wholesale</div>
           </div>

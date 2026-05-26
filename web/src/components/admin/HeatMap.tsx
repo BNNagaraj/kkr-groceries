@@ -37,7 +37,7 @@ type GradientKey = "emerald" | "fire" | "revenue";
 const GRADIENT_PRESETS: Record<GradientKey, { label: string; emoji: string; colors: string[]; cssGradient: string }> = {
   emerald: {
     label: "Emerald",
-    emoji: "🥬",
+    emoji: "K",
     colors: [
       "rgba(209, 250, 229, 0)",
       "rgba(167, 243, 208, 0.4)",
