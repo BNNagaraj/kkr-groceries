@@ -151,9 +151,8 @@ export const metadata: Metadata = {
     "restaurant supplies Hyderabad",
     "hotel groceries wholesale",
   ],
-  manifest: "/manifest.json",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/icon-192.png",
     apple: "/apple-touch-icon.png",
   },
   openGraph: {

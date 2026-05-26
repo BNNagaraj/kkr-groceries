@@ -38,9 +38,9 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, []);
 
-  // Sync favicon + apple-touch-icon + PWA manifest with uploaded logo
+  // Sync favicon, apple-touch-icon & PWA manifest with business settings
   useEffect(() => {
-    if (!biz.logoUrl) return;
+    const iconSrc = biz.logoUrl || "/icon-192.png";
 
     // Update favicon & apple-touch-icon
     const setLink = (rel: string, href: string) => {
@@ -52,10 +52,13 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
       }
       link.href = href;
     };
-    setLink("icon", biz.logoUrl);
-    setLink("apple-touch-icon", biz.logoUrl);
+    setLink("icon", iconSrc);
+    setLink("apple-touch-icon", iconSrc);
 
-    // Update PWA manifest so "Add to Home Screen" uses the uploaded logo
+    // Always generate a dynamic PWA manifest so the browser never uses
+    // the stale static manifest.json (which points to old icon files).
+    // This runs after hydration — before this, there is intentionally
+    // NO <link rel="manifest"> in the HTML (removed from Next.js metadata).
     try {
       const manifest = {
         name: `${biz.storeName || "KKR Groceries"} - B2B Wholesale`,
@@ -67,14 +70,21 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
         background_color: "#f8fafc",
         orientation: "portrait-primary",
         icons: [
-          { src: biz.logoUrl, sizes: "192x192", type: "image/png", purpose: "any maskable" },
-          { src: biz.logoUrl, sizes: "512x512", type: "image/png", purpose: "any maskable" },
+          { src: iconSrc, sizes: "192x192", type: "image/png", purpose: "any maskable" },
+          { src: iconSrc, sizes: "512x512", type: "image/png", purpose: "any maskable" },
         ],
         categories: ["food", "shopping", "business"],
       };
       const blob = new Blob([JSON.stringify(manifest)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      setLink("manifest", url);
+      const newUrl = URL.createObjectURL(blob);
+
+      // Revoke previous blob URL to prevent memory leaks
+      const existing = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
+      if (existing?.href?.startsWith("blob:")) {
+        URL.revokeObjectURL(existing.href);
+      }
+
+      setLink("manifest", newUrl);
     } catch (e) {
       console.warn("[BusinessContext] manifest update failed:", e);
     }
