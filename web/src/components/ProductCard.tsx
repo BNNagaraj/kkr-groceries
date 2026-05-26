@@ -58,6 +58,7 @@ const cardLoaders: Record<Exclude<ThemeId, "classic">, () => Promise<{ default: 
     freightmanifest: () => import("./cards/FreightManifestCard").then((m) => ({ default: m.FreightManifestCard })),
     truckarttailgate: () => import("./cards/TruckArtTailgateCard").then((m) => ({ default: m.TruckArtTailgateCard })),
     thermalreceipt: () => import("./cards/ThermalReceiptCard").then((m) => ({ default: m.ThermalReceiptCard })),
+    kkrbrand: () => import("./cards/KkrBrandCard").then((m) => ({ default: m.KkrBrandCard })),
 };
 
 const cardCache = new Map<ThemeId, CardComponent>();

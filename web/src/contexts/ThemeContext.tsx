@@ -151,6 +151,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             terracotta: "#fdf6ee",
             sapphire: "#0c1220",
             sakura: "#fff5f8",
+            kkrbrand: "#f5faf8",
         };
         const bg = PAGE_BG[theme.activeTheme] || "#f8faf9";
         root.style.setProperty("--theme-page-bg", bg);

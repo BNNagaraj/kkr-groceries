@@ -893,6 +893,32 @@ export function ThemePreviewCard({
                         ))}
                     </div>
                 )}
+
+                {/* KKR Brand */}
+                {id === "kkrbrand" && (
+                    <div className="grid grid-cols-3 gap-1 w-full">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="flex flex-col overflow-hidden" style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 4, height: 60 }}>
+                                {/* Green header */}
+                                <div className="flex items-center justify-between px-1 py-0.5" style={{ background: "#064e3b" }}>
+                                    <div className="h-1 w-6 rounded-sm bg-white/80" />
+                                    <div className="h-2 w-4 rounded-sm" style={{ background: "#f7941d" }} />
+                                </div>
+                                {/* Image + tiers */}
+                                <div className="flex flex-1 p-0.5 gap-0.5">
+                                    <div className="w-5 rounded-sm shrink-0" style={{ background: "#ecfdf5" }} />
+                                    <div className="flex-1 flex flex-col gap-0.5 justify-center">
+                                        <div className="h-1 w-full rounded-sm" style={{ background: "#064e3b", opacity: 0.3 }} />
+                                        <div className="h-1 w-3/4 rounded-sm" style={{ background: "#064e3b", opacity: 0.15 }} />
+                                        <div className="h-1.5 w-full rounded-sm" style={{ background: "#f7941d", opacity: 0.2 }} />
+                                    </div>
+                                </div>
+                                {/* CTA */}
+                                <div className="mx-0.5 mb-0.5 h-1.5 rounded-sm" style={{ background: "#064e3b", opacity: 0.6 }} />
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Name & Description */}

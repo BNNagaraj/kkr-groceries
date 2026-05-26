@@ -615,4 +615,18 @@ export const THEME_PRESETS: ThemePreset[] = [
             cardLayout: { imageWidth: 30, imagePosition: "left" },
         },
     },
+    {
+        id: "kkrbrand",
+        name: "KKR Brand",
+        description: "Official KKR Groceries theme — deep green header band with orange price badges, matching the brand logo. Clean, professional B2B wholesale look with bold tier pricing and savings percentages.",
+        featured: true,
+        defaults: {
+            activeTheme: "kkrbrand",
+            primaryColor: "#064e3b",
+            accentColor: "#f7941d",
+            grid: { mobile: 1, tablet: 2, desktop: 3, wide: 4 },
+            cardStyle: { borderRadius: "xl" },
+            cardLayout: { imageWidth: 35, imagePosition: "left" },
+        },
+    },
 ];
