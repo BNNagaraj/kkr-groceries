@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppStore } from "@/contexts/AppContext";
@@ -59,7 +59,7 @@ type DateFilterKey = (typeof DATE_FILTERS)[number]["key"];
 
 export default function BuyingStockTab() {
   const { currentUser } = useAuth();
-  const { products } = useAppStore();
+  const { allProducts: products } = useAppStore();
   const { col } = useMode();
 
   // Form state
@@ -92,6 +92,13 @@ export default function BuyingStockTab() {
 
   // Allocation tracking: how much of each product has been allocated to stores
   const [allocatedByProduct, setAllocatedByProduct] = useState<Map<string, number>>(new Map());
+
+  // productId → image URL, for showing thumbnails in the table & autocomplete
+  const productImageById = useMemo(() => {
+    const m = new Map<string, string>();
+    products.forEach((p) => { if (p.image) m.set(String(p.id), p.image); });
+    return m;
+  }, [products]);
 
   // Load purchases
   const loadPurchases = useCallback(
@@ -179,21 +186,32 @@ export default function BuyingStockTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFilter, customFrom, customTo]);
 
-  // Fetch allocation data (receipt transactions grouped by productId)
+  // Fetch allocation data (receipt transactions grouped by productId).
+  // The window MUST match the purchase date filter so the Allocated column and
+  // the summary cards are comparing the same period.
   useEffect(() => {
-    if (purchases.length === 0) return;
     async function fetchAllocations() {
       try {
-        // Get the date range matching current filter
-        const cutoff = Timestamp.fromDate(
-          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-        );
-        const receiptsQuery = query(
-          collection(db, col("stockTransactions")),
-          where("type", "==", "receipt"),
-          where("createdAt", ">=", cutoff)
-        );
-        const snap = await getDocs(receiptsQuery);
+        const constraints: QueryConstraint[] = [where("type", "==", "receipt")];
+
+        if (dateFilter !== "all" && dateFilter !== "custom") {
+          const msMap: Record<string, number> = { today: DAY, week: 7 * DAY, month: 30 * DAY };
+          const ms = msMap[dateFilter];
+          if (ms) {
+            constraints.push(where("createdAt", ">=", Timestamp.fromDate(new Date(Date.now() - ms))));
+          }
+        } else if (dateFilter === "custom") {
+          if (customFrom) {
+            constraints.push(where("createdAt", ">=", Timestamp.fromDate(new Date(customFrom))));
+          }
+          if (customTo) {
+            const endDate = new Date(customTo);
+            endDate.setHours(23, 59, 59, 999);
+            constraints.push(where("createdAt", "<=", Timestamp.fromDate(endDate)));
+          }
+        }
+
+        const snap = await getDocs(query(collection(db, col("stockTransactions")), ...constraints));
         const allocMap = new Map<string, number>();
         snap.docs.forEach((d) => {
           const data = d.data() as StockTransaction;
@@ -206,7 +224,7 @@ export default function BuyingStockTab() {
       }
     }
     fetchAllocations();
-  }, [purchases, col]);
+  }, [dateFilter, customFrom, customTo, col]);
 
   // Product name autocomplete
   const handleProductNameChange = (val: string) => {
@@ -385,9 +403,17 @@ export default function BuyingStockTab() {
                     <button
                       key={s.id}
                       onClick={() => selectProduct(s)}
-                      className="w-full text-left px-3 py-2 hover:bg-emerald-50 text-sm flex justify-between items-center"
+                      className="w-full text-left px-3 py-2 hover:bg-emerald-50 text-sm flex items-center gap-2.5"
                     >
-                      <span className="font-medium text-slate-700">{s.name}</span>
+                      <div className="w-8 h-8 rounded-md border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0">
+                        {s.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={s.image} alt={s.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-slate-400 text-xs font-bold">{s.name?.[0] || "?"}</span>
+                        )}
+                      </div>
+                      <span className="font-medium text-slate-700 flex-1">{s.name}</span>
                       <span className="text-xs text-slate-400">{s.unit}</span>
                     </button>
                   ))}
@@ -532,7 +558,8 @@ export default function BuyingStockTab() {
       {/* Summary Cards */}
       {(() => {
         const totalAllocated = Array.from(allocatedByProduct.values()).reduce((s, v) => s + v, 0);
-        const unallocated = totalItems - totalAllocated;
+        const unallocated = Math.max(0, totalItems - totalAllocated);
+        const fullyAllocated = unallocated === 0 && totalItems > 0;
         return (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
@@ -547,10 +574,10 @@ export default function BuyingStockTab() {
               <div className="text-2xl font-bold text-emerald-700">{totalAllocated.toLocaleString("en-IN")}</div>
               <div className="text-xs text-emerald-600 font-medium">Allocated to Stores</div>
             </div>
-            <div className={`p-4 rounded-xl border ${unallocated > 0 ? "bg-orange-50 border-orange-100" : "bg-red-50 border-red-100"}`}>
-              <div className={`text-2xl font-bold ${unallocated > 0 ? "text-orange-700" : "text-red-700"}`}>{unallocated.toLocaleString("en-IN")}</div>
-              <div className={`text-xs font-medium ${unallocated > 0 ? "text-orange-600" : "text-red-600"}`}>
-                {unallocated > 0 ? "Pending Allocation" : "Fully Allocated"}
+            <div className={`p-4 rounded-xl border ${fullyAllocated ? "bg-emerald-50 border-emerald-100" : "bg-amber-50 border-amber-100"}`}>
+              <div className={`text-2xl font-bold ${fullyAllocated ? "text-emerald-700" : "text-amber-700"}`}>{unallocated.toLocaleString("en-IN")}</div>
+              <div className={`text-xs font-medium ${fullyAllocated ? "text-emerald-600" : "text-amber-600"}`}>
+                {fullyAllocated ? "Fully Allocated" : "Pending Allocation"}
               </div>
             </div>
           </div>
@@ -699,7 +726,21 @@ export default function BuyingStockTab() {
                         </span>
                       </td>
                       <td className="px-4 py-3 font-medium text-slate-800">
-                        {p.productName}
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shrink-0">
+                            {p.productId && productImageById.get(String(p.productId)) ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={productImageById.get(String(p.productId))}
+                                alt={p.productName}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-slate-400 text-xs font-bold">{p.productName?.[0] || "?"}</span>
+                            )}
+                          </div>
+                          <span>{p.productName}</span>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-center font-mono text-slate-700">
                         {p.qty}

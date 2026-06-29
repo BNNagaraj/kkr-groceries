@@ -7,6 +7,8 @@ export interface DeliverySettings {
 
 export interface BusinessSettings {
   storeName: string;
+  /** Brand tagline shown across the web app, invoices and emails. */
+  tagline: string;
   contactPhone: string;
   contactEmail: string;
   deliveryCharges: number;
@@ -70,6 +72,26 @@ export const DEFAULT_SMS_GATEWAY: SmsGatewaySettings = {
   enabled: false,
 };
 
+/* ─── Payments ─── */
+
+export interface PaymentSettings {
+  /** off = no online payment; upi = UPI link/QR; razorpay = gateway; both = customer chooses. */
+  mode: "off" | "upi" | "razorpay" | "both";
+  /** Business UPI VPA, e.g. "business@okhdfcbank" (safe to expose — meant to be shared). */
+  upiVpa: string;
+  /** Payee name shown in the customer's UPI app. */
+  payeeName: string;
+  /** Razorpay public Key ID (safe to expose). The secret lives ONLY in Functions secrets. */
+  razorpayKeyId: string;
+}
+
+export const DEFAULT_PAYMENTS: PaymentSettings = {
+  mode: "off",
+  upiVpa: "",
+  payeeName: "",
+  razorpayKeyId: "",
+};
+
 export interface CustomField {
   label: string;
   key: string;
@@ -87,6 +109,7 @@ export const DEFAULT_DELIVERY: DeliverySettings = {
 
 export const DEFAULT_BUSINESS: BusinessSettings = {
   storeName: "KKR Groceries",
+  tagline: "Hyderabad B2B & B2C Wholesale",
   contactPhone: "",
   contactEmail: "",
   deliveryCharges: 0,

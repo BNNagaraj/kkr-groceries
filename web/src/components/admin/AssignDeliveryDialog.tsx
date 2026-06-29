@@ -9,6 +9,7 @@ import {
   where,
   doc,
   updateDoc,
+  addDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -124,15 +125,43 @@ export default function AssignDeliveryDialog({
           .filter((s) => s.isActive);
         setStores(allStores);
 
-        // Fetch online delivery boys from presence
+        // Build the delivery-agent list from the authoritative claim list
+        // (so even agents who have NEVER opened the app can be assigned),
+        // merged with presence data for online/GPS status where available.
         const presenceSnap = await getDocs(
-          query(
-            collection(db, "presence"),
-            where("isDelivery", "==", true),
-            where("online", "==", true)
-          )
+          query(collection(db, "presence"), where("isDelivery", "==", true))
         );
-        const boys = presenceSnap.docs.map((d) => d.data() as PresenceDoc);
+        const presenceByUid = new Map<string, PresenceDoc>();
+        presenceSnap.docs.forEach((d) => {
+          const p = d.data() as PresenceDoc;
+          presenceByUid.set(p.uid, p);
+        });
+
+        let boys: PresenceDoc[];
+        try {
+          const listFn = httpsCallable<
+            Record<string, never>,
+            { agents: { uid: string; name: string | null; phone: string | null; email: string | null }[] }
+          >(functions, "listDeliveryAgents");
+          const { data } = await listFn({});
+          boys = data.agents.map((a) => {
+            const p = presenceByUid.get(a.uid);
+            return {
+              uid: a.uid,
+              displayName: a.name || (a.email ? a.email.split("@")[0] : null),
+              phone: a.phone,
+              online: p?.online ?? false,
+              lat: p?.lat,
+              lng: p?.lng,
+              isDelivery: true,
+            } as PresenceDoc;
+          });
+        } catch (listErr) {
+          // Fallback: presence-only list if the callable is unavailable
+          console.warn("[AssignDelivery] listDeliveryAgents failed, using presence:", listErr);
+          boys = Array.from(presenceByUid.values());
+        }
+        boys.sort((a, b) => Number(b.online) - Number(a.online));
         setDeliveryBoys(boys);
 
         // Auto-select nearest store (fallback if routing fails)
@@ -270,6 +299,7 @@ export default function AssignDeliveryDialog({
       updates.assignedToName =
         selectedBoy.displayName || selectedBoy.phone || selectedDeliveryUid;
       updates.assignedAt = serverTimestamp();
+      updates.assignmentStatus = "pending"; // awaits the agent's Accept/Reject
     }
 
     if (Object.keys(updates).length > 0) {
@@ -277,6 +307,36 @@ export default function AssignDeliveryDialog({
       try {
         await updateDoc(doc(db, col("orders"), order.id), updates);
         toast.success("Delivery assigned!");
+
+        // Notify the assigned delivery agent + the store agent (if any)
+        try {
+          const notifCol = collection(db, col("notifications"));
+          if (selectedDeliveryUid && selectedBoy) {
+            await addDoc(notifCol, {
+              userId: selectedDeliveryUid,
+              orderId: order.id,
+              type: "delivery_assigned",
+              title: "New delivery assigned",
+              message: `Order #${order.orderId} — ${order.location || "address on file"}.`,
+              read: false,
+              createdAt: serverTimestamp(),
+            });
+          }
+          const storeAgentUid = (selectedStore as Store & { agentUid?: string })?.agentUid;
+          if (storeAgentUid) {
+            await addDoc(notifCol, {
+              userId: storeAgentUid,
+              orderId: order.id,
+              type: "store_order",
+              title: "New order for your store",
+              message: `Order #${order.orderId} routed to ${selectedStore?.name || "your store"}.`,
+              read: false,
+              createdAt: serverTimestamp(),
+            });
+          }
+        } catch (notifErr) {
+          console.warn("[AssignDelivery] notify failed:", notifErr);
+        }
       } catch (e) {
         console.error("[AssignDelivery] Save failed:", e);
         toast.error("Failed to assign delivery.");
@@ -567,16 +627,16 @@ export default function AssignDeliveryDialog({
               {/* Delivery Boy */}
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
-                  <Truck className="w-3.5 h-3.5 text-blue-600" /> Delivery Boy
+                  <Truck className="w-3.5 h-3.5 text-blue-600" /> Delivery Agent
                   {deliveryBoys.length > 0 && (
                     <span className="text-slate-400 font-normal">
-                      ({deliveryBoys.length} online)
+                      ({deliveryBoys.filter((b) => b.online).length} online / {deliveryBoys.length} total)
                     </span>
                   )}
                 </label>
                 {deliveryBoys.length === 0 ? (
                   <p className="text-xs text-slate-400 italic">
-                    No delivery boys online. Assign delivery role in User Management.
+                    No delivery agents found. Assign the delivery role in User Management.
                   </p>
                 ) : (
                   <select
@@ -588,11 +648,15 @@ export default function AssignDeliveryDialog({
                     {deliveryBoys.map((b) => (
                       <option key={b.uid} value={b.uid}>
                         {b.displayName || b.phone || b.uid}
+                        {b.online ? " • online" : " • offline"}
                         {b.lat && b.lng ? " (GPS)" : " (no GPS)"}
                       </option>
                     ))}
                   </select>
                 )}
+                <p className="text-[10px] text-slate-400 mt-1">
+                  You can assign any agent — they don&apos;t need GPS active. Live location just enables tracking & nearest-agent sorting.
+                </p>
               </div>
 
               {/* Summary */}

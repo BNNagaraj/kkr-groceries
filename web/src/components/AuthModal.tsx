@@ -10,6 +10,7 @@ import {
   ConfirmationResult,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { useBusiness } from "@/contexts/BusinessContext";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -33,6 +34,8 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ isOpen, onClose }: AuthModalProps) {
+  const { biz } = useBusiness();
+  const tagline = biz.tagline || "Hyderabad B2B & B2C Wholesale";
   const [mode, setMode] = useState<"choose" | "phone" | "otp">("choose");
   const [phone, setPhone] = useState("+91 ");
   const [otp, setOtp] = useState("");
@@ -189,7 +192,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         <div className="fixed inset-0 z-[200] bg-[#064e3b]/95 flex flex-col items-center justify-center text-white">
           <img src="/logo-64.png" alt="KKR Groceries" width={56} height={56} className="mb-4 animate-bounce rounded-lg" />
           <div className="font-bold text-xl mb-1 tracking-tight">KKR Groceries</div>
-          <div className="text-emerald-300 text-[10px] uppercase tracking-widest font-semibold mb-6">B2B Wholesale</div>
+          <div className="text-emerald-300 text-[10px] uppercase tracking-widest font-semibold mb-6">{tagline}</div>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
           <div className="text-emerald-200 text-sm mt-4">{loadingText}</div>
         </div>,
@@ -202,7 +205,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           <div className="flex flex-col items-center gap-1 py-5 bg-gradient-to-br from-[#064e3b] to-[#065f46] text-white rounded-t-lg">
             <img src="/logo-64.png" alt="KKR Groceries" width={40} height={40} className="rounded-lg" />
             <div className="font-bold text-lg tracking-tight">KKR Groceries</div>
-            <div className="text-emerald-200 text-[10px] uppercase tracking-widest font-semibold">B2B Wholesale</div>
+            <div className="text-emerald-200 text-[10px] uppercase tracking-widest font-semibold">{tagline}</div>
           </div>
 
           <div className="px-6 pb-6 pt-4">

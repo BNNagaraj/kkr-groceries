@@ -3,4 +3,4 @@ Allow: /
 Disallow: /dashboard/
 Disallow: /api/
 
-Sitemap: https://kkrgroceries.com/sitemap.xml
+Sitemap: https://kkr-groceries-02.web.app/sitemap.xml

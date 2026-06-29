@@ -61,7 +61,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     // NO <link rel="manifest"> in the HTML (removed from Next.js metadata).
     try {
       const manifest = {
-        name: `${biz.storeName || "KKR Groceries"} - B2B Wholesale`,
+        name: `${biz.storeName || "KKR Groceries"} - B2B & B2C Wholesale`,
         short_name: biz.storeName || "KKR Groceries",
         description: "Fresh vegetables at APMC wholesale prices for hotels, restaurants & retailers in Hyderabad.",
         start_url: "/",

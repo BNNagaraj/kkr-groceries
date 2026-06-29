@@ -32,8 +32,17 @@ import { Order, OrderStatus, STATUS_TIMESTAMP_FIELDS, OrderCartItem } from "@/ty
 import { useDeliveryOTP } from "@/hooks/useDeliveryOTP";
 // jsPDF lazy-loaded on click (~200KB kept out of initial bundle)
 const lazyDownloadInvoice = async (order: Order) => {
-  const { downloadInvoice } = await import("@/lib/invoice");
-  downloadInvoice(order);
+  const [{ downloadInvoice }, { getDoc, doc }, { db }] = await Promise.all([
+    import("@/lib/invoice"),
+    import("firebase/firestore"),
+    import("@/lib/firebase"),
+  ]);
+  let biz;
+  try {
+    const snap = await getDoc(doc(db, "settings", "business"));
+    if (snap.exists()) biz = snap.data();
+  } catch { /* fall back to defaults */ }
+  downloadInvoice(order, biz);
 };
 import dynamic from "next/dynamic";
 import { useMode } from "@/contexts/ModeContext";
@@ -43,6 +52,7 @@ import { AdminOrderCard } from "./AdminOrderCard";
 import { DeliveryOtpDialog } from "./DeliveryOtpDialog";
 
 const BuyList = dynamic(() => import("./BuyList"), { ssr: false });
+const ShipDeliveryChooser = dynamic(() => import("./ShipDeliveryChooser"), { ssr: false });
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -108,6 +118,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [shipOrder, setShipOrder] = useState<Order | null>(null);
   const [viewMode, setViewMode] = useState<"orders" | "buylist">("orders");
   const lastDocRef = useRef<DocumentSnapshot | null>(null);
 
@@ -260,6 +271,20 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
       toast.error("Failed to update order status.", {
         description: "You may need to sign out and back in to refresh admin permissions.",
       });
+    }
+  };
+
+  const handleMarkPaid = async (orderId: string, paid: boolean) => {
+    try {
+      await updateDoc(doc(db, col("orders"), orderId), paid
+        ? { paymentStatus: "paid", paidAt: serverTimestamp() }
+        : { paymentStatus: "unpaid" }
+      );
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, paymentStatus: paid ? "paid" : "unpaid" } : o)));
+      toast.success(paid ? "Order marked as paid." : "Order marked as unpaid.");
+    } catch (e) {
+      console.error("Failed to update payment status:", e);
+      toast.error("Failed to update payment status.");
     }
   };
 
@@ -487,12 +512,13 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
             productImageMap={productImageMap}
             highlight={highlightOrderId === o.id}
             onAccept={(id) => handleStatusChange(id, "Accepted")}
-            onShip={(id) => handleStatusChange(id, "Shipped")}
+            onShip={(id) => setShipOrder(orders.find((x) => x.id === id) || null)}
             onReject={(id) => handleStatusChange(id, "Rejected")}
             onFulfillClick={handleFulfillClick}
             onEdit={(order) => setEditingOrder(order)}
             onCancelModification={handleCancelModification}
             onDownloadInvoice={lazyDownloadInvoice}
+            onMarkPaid={handleMarkPaid}
           />
         ))}
       {/* Load More */}
@@ -517,6 +543,14 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
           onSave={handleSaveEdit}
         />
       )}
+
+      {/* Ship → Assign Delivery Agent (Auto / Manual) */}
+      <ShipDeliveryChooser
+        open={!!shipOrder}
+        order={shipOrder}
+        onClose={() => setShipOrder(null)}
+        onShipped={(orderId) => handleStatusChange(orderId, "Shipped")}
+      />
 
       {/* OTP Verification Dialog */}
       <DeliveryOtpDialog

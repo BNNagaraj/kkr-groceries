@@ -4,6 +4,7 @@
     "ignore": [
       "firebase.json",
       "**/.*",
+      "!**/.well-known/**",
       "**/node_modules/**",
       "apps-script/**",
       "*.py",
@@ -11,6 +12,10 @@
       "README.md"
     ],
     "rewrites": [
+      {
+        "source": "/og-image.jpg",
+        "function": "serveOgBanner"
+      },
       {
         "source": "**",
         "destination": "/index.html"
@@ -89,6 +94,19 @@
           {
             "key": "Cache-Control",
             "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": ".well-known/**",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=86400"
           }
         ]
       }

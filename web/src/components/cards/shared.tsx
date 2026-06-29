@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, memo } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Product, useAppStore } from "@/contexts/AppContext";
-import { Trash2, ZoomIn, X, Check } from "lucide-react";
+import { Trash2, ZoomIn, X, Check, ShoppingCart } from "lucide-react";
 import { resolveSlabPrice } from "@/lib/pricing";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -110,7 +110,8 @@ export function InlineQtyInput({
                     if (e.key === "Escape") onCancel();
                 }}
                 onBlur={handleConfirm}
-                className="w-full h-full bg-white text-emerald-700 text-center font-bold text-sm outline-none"
+                className="w-full h-full bg-white text-center font-bold text-sm outline-none"
+                style={{ color: "var(--color-primary-dark)" }}
             />
         );
     }
@@ -118,7 +119,7 @@ export function InlineQtyInput({
     return (
         <div>
             <div className="flex items-center gap-1.5 h-10">
-                <div className="flex-1 flex items-center border-2 border-emerald-600 rounded-xl h-full overflow-hidden">
+                <div className="flex-1 flex items-center border-2 rounded-xl h-full overflow-hidden" style={{ borderColor: "var(--color-primary)" }}>
                     <input
                         ref={inputRef}
                         type="text"
@@ -129,13 +130,15 @@ export function InlineQtyInput({
                             if (e.key === "Enter") handleConfirm();
                             if (e.key === "Escape") onCancel();
                         }}
-                        className="flex-1 min-w-0 px-3 text-center font-bold text-emerald-700 outline-none bg-emerald-50 h-full"
+                        className="flex-1 min-w-0 px-3 text-center font-bold outline-none h-full"
+                        style={{ color: "var(--color-primary-dark)", background: "color-mix(in srgb, var(--color-primary) 8%, white)" }}
                     />
-                    <span className="text-[11px] text-emerald-600 font-medium pr-2 whitespace-nowrap">{unit}</span>
+                    <span className="text-[11px] font-medium pr-2 whitespace-nowrap" style={{ color: "var(--color-primary)" }}>{unit}</span>
                 </div>
                 <button
                     onClick={handleConfirm}
-                    className="h-10 px-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors flex items-center gap-1 shrink-0"
+                    className="h-10 px-3 text-white font-bold rounded-xl transition-all flex items-center gap-1 shrink-0 hover:brightness-110 shadow-sm"
+                    style={{ background: "var(--color-accent, #3A9B42)" }}
                 >
                     <Check className="w-4 h-4" /> Add
                 </button>
@@ -176,8 +179,10 @@ export const CartControls = memo(function CartControls({ product }: { product: P
         return (
             <button
                 onClick={() => setShowInput(true)}
-                className="w-full h-9 sm:h-10 bg-emerald-50 text-emerald-700 font-semibold rounded-xl hover:bg-emerald-100 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
+                className="w-full h-9 sm:h-10 font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 text-sm sm:text-base text-white shadow-sm hover:shadow-md hover:brightness-110 active:scale-[0.97]"
+                style={{ background: "var(--color-accent, #3A9B42)" }}
             >
+                <ShoppingCart className="w-4 h-4" />
                 Add to Cart
             </button>
         );
@@ -195,17 +200,23 @@ export const CartControls = memo(function CartControls({ product }: { product: P
                 >
                     <Trash2 className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                 </button>
-                <div className="flex-1 flex items-center bg-emerald-700 text-white rounded-xl h-9 sm:h-10 overflow-hidden shadow-sm shadow-emerald-700/20">
+                <div className="flex-1 flex items-center text-white rounded-xl h-9 sm:h-10 overflow-hidden shadow-sm" style={{ background: "var(--color-primary-dark)" }}>
                     <button
                         onClick={() => addToCart(product, -1)}
-                        className="w-9 sm:w-10 h-full flex items-center justify-center text-xl font-medium hover:bg-emerald-800 transition-colors"
+                        className="w-9 sm:w-10 h-full flex items-center justify-center text-xl font-medium transition-colors"
+                        style={{ ["--hover-bg" as string]: "rgba(0,0,0,0.15)" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.15)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}
                     >
                         −
                     </button>
                     <div
-                        className="flex-1 text-center font-bold text-sm bg-emerald-800/20 h-full flex items-center justify-center cursor-pointer hover:bg-emerald-800/40 transition-colors"
+                        className="flex-1 text-center font-bold text-sm h-full flex items-center justify-center cursor-pointer transition-colors"
+                        style={{ background: "rgba(0,0,0,0.1)" }}
                         onClick={() => setEditingQty(true)}
                         title="Click to edit quantity"
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.2)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.1)")}
                     >
                         {editingQty ? (
                             <InlineQtyInput
@@ -222,20 +233,22 @@ export const CartControls = memo(function CartControls({ product }: { product: P
                             />
                         ) : (
                             <>
-                                {qty} <span className="text-[11px] font-medium ml-1 text-emerald-100">{product.unit}</span>
+                                {qty} <span className="text-[11px] font-medium ml-1 opacity-70">{product.unit}</span>
                             </>
                         )}
                     </div>
                     <button
                         onClick={() => addToCart(product, 1)}
-                        className="w-9 sm:w-10 h-full flex items-center justify-center text-xl font-medium hover:bg-emerald-800 transition-colors"
+                        className="w-9 sm:w-10 h-full flex items-center justify-center text-xl font-medium transition-colors"
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.15)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}
                     >
                         +
                     </button>
                 </div>
             </div>
             {effectivePrice !== null && (
-                <div className="text-[11px] text-emerald-600 font-medium text-center mt-1">
+                <div className="text-[11px] font-medium text-center mt-1" style={{ color: "var(--color-primary)" }}>
                     Rate: ₹{effectivePrice}/{product.unit} = ₹{(effectivePrice * qty).toLocaleString("en-IN")}
                 </div>
             )}

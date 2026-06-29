@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { doc, setDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/lib/firebase";
-import { Product } from "@/contexts/AppContext";
-import { CATEGORY_GROUPS, UNIT_OPTIONS } from "@/lib/constants";
+import { Product, ProductTier } from "@/contexts/AppContext";
+import { CATEGORY_GROUPS } from "@/lib/constants";
+import { useUnitOptions } from "@/hooks/useUnitOptions";
 import { toast } from "sonner";
 import Image from "next/image";
 import { Upload, Loader2 } from "lucide-react";
@@ -25,9 +26,11 @@ interface Props {
     onClose: () => void;
     existingIds: number[];
     onProductAdded: (product: Product) => void;
+    defaultTier?: ProductTier;
 }
 
-export default function AddProductModal({ open, onClose, existingIds, onProductAdded }: Props) {
+export default function AddProductModal({ open, onClose, existingIds, onProductAdded, defaultTier = "standard" }: Props) {
+    const { units: allUnits } = useUnitOptions();
     const [name, setName] = useState("");
     const [telugu, setTelugu] = useState("");
     const [hindi, setHindi] = useState("");
@@ -35,12 +38,18 @@ export default function AddProductModal({ open, onClose, existingIds, onProductA
     const [unit, setUnit] = useState("Kg");
     const [moq, setMoq] = useState<number>(1);
     const [category, setCategory] = useState("");
+    const [tier, setTier] = useState<ProductTier>(defaultTier);
     const [saving, setSaving] = useState(false);
     const [imageUrl, setImageUrl] = useState("");
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+
+    // When the modal opens, default the tier to the currently active sub-tab
+    useEffect(() => {
+        if (open) setTier(defaultTier);
+    }, [open, defaultTier]);
 
     const resetForm = () => {
         setName("");
@@ -50,6 +59,7 @@ export default function AddProductModal({ open, onClose, existingIds, onProductA
         setUnit("Kg");
         setMoq(1);
         setCategory("");
+        setTier(defaultTier);
         setImageUrl("");
     };
 
@@ -107,6 +117,7 @@ export default function AddProductModal({ open, onClose, existingIds, onProductA
                 image: imageUrl,
                 isHidden: false,
                 moqRequired: true,
+                tier,
             };
             await setDoc(doc(db, "products", nextId.toString()), newProduct);
             toast.success(`Product "${name}" added successfully!`);
@@ -193,7 +204,7 @@ export default function AddProductModal({ open, onClose, existingIds, onProductA
                             onChange={(e) => setUnit(e.target.value)}
                             className="w-full h-10 px-3 border border-slate-200 rounded-md text-sm bg-white focus:ring-1 focus:ring-emerald-500 outline-none"
                         >
-                            {UNIT_OPTIONS.map((u) => (
+                            {allUnits.map((u) => (
                                 <option key={u} value={u}>{u}</option>
                             ))}
                         </select>
@@ -230,6 +241,21 @@ export default function AddProductModal({ open, onClose, existingIds, onProductA
                                     ))}
                                 </optgroup>
                             ))}
+                        </select>
+                    </div>
+
+                    {/* Product Tier */}
+                    <div>
+                        <label className="text-sm font-medium text-slate-600 mb-1 block">
+                            Tier
+                        </label>
+                        <select
+                            value={tier}
+                            onChange={(e) => setTier(e.target.value as ProductTier)}
+                            className="w-full h-10 px-3 border border-slate-200 rounded-md text-sm bg-white focus:ring-1 focus:ring-emerald-500 outline-none"
+                        >
+                            <option value="standard">Regular</option>
+                            <option value="economy">Restaurant / Hotel</option>
                         </select>
                     </div>
 

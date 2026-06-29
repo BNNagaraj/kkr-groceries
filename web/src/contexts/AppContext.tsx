@@ -11,6 +11,8 @@ export interface PriceTier {
     price: number;
 }
 
+export type ProductTier = "standard" | "economy";
+
 export interface Product {
     id: number;
     name: string;
@@ -26,6 +28,11 @@ export interface Product {
     fresh?: boolean;
     moqRequired?: boolean;
     priceTiers?: PriceTier[];
+    sortOrder?: number;
+    /** Product quality tier: "standard" (default/retail) or "economy" (HORECA only) */
+    tier?: ProductTier;
+    /** For economy (Restaurant/Hotel) copies: the id of the Regular product this was duplicated from. Used to keep the copy operation idempotent. */
+    sourceId?: number;
 }
 
 interface CartItem extends Product {
@@ -34,22 +41,30 @@ interface CartItem extends Product {
 
 interface AppContextType {
     products: Product[];
+    /** All products unfiltered — used by admin pages */
+    allProducts: Product[];
     cart: Record<number, CartItem>;
     loadingProducts: boolean;
     addToCart: (product: Product, quantityChanged: number) => void;
     removeFromCart: (productId: number) => void;
     clearCart: () => void;
     getCartTotal: () => number;
+    /** Current active tier for product display */
+    activeTier: ProductTier;
+    setActiveTier: (tier: ProductTier) => void;
 }
 
 const AppContext = createContext<AppContextType>({
     products: [],
+    allProducts: [],
     cart: {},
     loadingProducts: true,
     addToCart: () => { },
     removeFromCart: () => { },
     clearCart: () => { },
     getCartTotal: () => 0,
+    activeTier: "standard",
+    setActiveTier: () => { },
 });
 
 export const useAppStore = () => useContext(AppContext);
@@ -57,10 +72,17 @@ export const useAppStore = () => useContext(AppContext);
 const CART_STORAGE_KEY = "kkr-cart";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-    const [products, setProducts] = useState<Product[]>([]);
+    const [allProducts, setAllProducts] = useState<Product[]>([]);
     const [loadingProducts, setLoadingProducts] = useState(true);
     const [cart, setCart] = useState<Record<number, CartItem>>({});
+    const [activeTier, setActiveTier] = useState<ProductTier>("standard");
     const cartLoaded = useRef(false);
+
+    // Filter products by the active tier (default: "standard")
+    // Products without a tier field are treated as "standard"
+    const products = allProducts.filter((p) =>
+        (p.tier || "standard") === activeTier
+    );
 
     // Hydrate cart from localStorage after mount (avoids SSR mismatch)
     useEffect(() => {
@@ -98,7 +120,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                         ...doc.data(),
                     } as Product)
                 );
-                setProducts(prods);
+                // Sort by custom sortOrder first, then fall back to id
+                prods.sort((a, b) => (a.sortOrder ?? a.id) - (b.sortOrder ?? b.id));
+                setAllProducts(prods);
                 setLoadingProducts(false);
             },
             (error) => {
@@ -153,7 +177,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     return (
         <AppContext.Provider
-            value={{ products, cart, loadingProducts, addToCart, removeFromCart, clearCart, getCartTotal }}
+            value={{ products, allProducts, cart, loadingProducts, addToCart, removeFromCart, clearCart, getCartTotal, activeTier, setActiveTier }}
         >
             {children}
         </AppContext.Provider>

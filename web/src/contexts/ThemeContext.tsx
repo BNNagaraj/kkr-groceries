@@ -58,7 +58,12 @@ function hslToHex(h: number, s: number, l: number): string {
 function deriveDarkShade(hex: string): string {
     try {
         const { h, s, l } = hexToHSL(hex);
-        return hslToHex(h, Math.min(s + 10, 100), Math.max(l - 25, 10));
+        // Warm hues (orange/yellow 15-60°) need a gentler darkening to avoid
+        // turning into muddy brown. Cool hues can darken more aggressively.
+        const isWarm = h >= 15 && h <= 60;
+        const lDrop = isWarm ? 15 : 25;
+        const sBump = isWarm ? 5 : 10;
+        return hslToHex(h, Math.min(s + sBump, 100), Math.max(l - lDrop, 15));
     } catch { return "#064e3b"; }
 }
 
@@ -152,7 +157,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             sapphire: "#0c1220",
             sakura: "#fff5f8",
             kkrbrand: "#f5faf8",
-            freshbasket: "#fef8f0",
+            freshbasket: "#faf5ed",
         };
         const bg = PAGE_BG[theme.activeTheme] || "#f8faf9";
         root.style.setProperty("--theme-page-bg", bg);

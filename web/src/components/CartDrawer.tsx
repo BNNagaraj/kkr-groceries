@@ -165,6 +165,22 @@ export function CartDrawer({
     const [loading, setLoading] = useState(false);
     const [mapOpen, setMapOpen] = useState(false);
 
+    // Payment method selection at checkout
+    const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod");
+    const [upiAvailable, setUpiAvailable] = useState(false);
+    useEffect(() => {
+        import("firebase/firestore").then(async ({ getDoc, doc: fdoc }) => {
+            try {
+                const snap = await getDoc(fdoc(db, "settings", "payments"));
+                const mode = snap.exists() ? (snap.data().mode as string) : "off";
+                const hasUpi = mode === "upi" || mode === "both";
+                setUpiAvailable(hasUpi);
+                // Default to Pay Online (UPI) when available; the user can still pick COD.
+                if (hasUpi) setPaymentMethod("online");
+            } catch { setUpiAvailable(false); }
+        });
+    }, []);
+
     // Ref-based guard: stays true for a brief window AFTER mapOpen becomes false
     // so that delayed mobile touch/focus events don't leak through to the Sheet.
     const mapOpenRef = useRef(false);
@@ -485,6 +501,7 @@ export function CartDrawer({
                 orderSummary,
                 productCount: cartItems.length,
                 totalValue: `₹${total.toLocaleString("en-IN")}`,
+                paymentMethod: paymentMethod === "online" ? "upi" : "cod",
             };
 
             // Include verified GSTIN if present
@@ -503,6 +520,10 @@ export function CartDrawer({
                 clearCart();
                 setStep(1);
                 onClose();
+                // For online payment, take the buyer straight to the order's Pay screen
+                if (paymentMethod === "online" && result.data.orderId) {
+                    window.location.href = `/dashboard/buyer/orders/detail?id=${result.data.orderId}`;
+                }
             }
         } catch (err: unknown) {
             console.error("[Cart] Failed to submit order:", err);
@@ -1036,6 +1057,47 @@ export function CartDrawer({
                                         <div className="text-xs font-bold text-primary uppercase tracking-wider mb-1 flex items-center gap-1 justify-end">
                                             <Truck className="w-3 h-3" /> Free Delivery
                                         </div>
+                                    </div>
+                                </div>
+
+                                {/* Payment method */}
+                                <div className="mb-3">
+                                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Payment</div>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPaymentMethod("cod")}
+                                            className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
+                                                paymentMethod === "cod"
+                                                    ? "border-emerald-400 bg-emerald-50 ring-1 ring-emerald-200"
+                                                    : "border-slate-200 hover:bg-slate-50"
+                                            }`}
+                                        >
+                                            <span className="text-lg">💵</span>
+                                            <span className="flex-1">
+                                                <span className="font-semibold text-slate-800">Cash on Delivery</span>
+                                                <span className="block text-xs text-slate-400">Pay the delivery agent when your order arrives.</span>
+                                            </span>
+                                            {paymentMethod === "cod" && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                                        </button>
+                                        {upiAvailable && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setPaymentMethod("online")}
+                                                className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
+                                                    paymentMethod === "online"
+                                                        ? "border-emerald-400 bg-emerald-50 ring-1 ring-emerald-200"
+                                                        : "border-slate-200 hover:bg-slate-50"
+                                                }`}
+                                            >
+                                                <span className="text-lg">📱</span>
+                                                <span className="flex-1">
+                                                    <span className="font-semibold text-slate-800">Pay Online (UPI)</span>
+                                                    <span className="block text-xs text-slate-400">Pay now via GPay / PhonePe / Paytm after placing.</span>
+                                                </span>
+                                                {paymentMethod === "online" && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 

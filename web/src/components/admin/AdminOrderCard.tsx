@@ -38,6 +38,7 @@ interface AdminOrderCardProps {
   onEdit: (order: Order) => void;
   onCancelModification: (orderId: string) => void;
   onDownloadInvoice: (order: Order) => void;
+  onMarkPaid?: (orderId: string, paid: boolean) => void;
 }
 
 export function AdminOrderCard({
@@ -51,6 +52,7 @@ export function AdminOrderCard({
   onEdit,
   onCancelModification,
   onDownloadInvoice,
+  onMarkPaid,
 }: AdminOrderCardProps) {
   const hasPendingMod = o.modificationStatus === "PendingBuyerApproval";
   const statusText = hasPendingMod ? "Pending Approval" : o.status || "Pending";
@@ -294,7 +296,40 @@ export function AdminOrderCard({
           ) : null}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Payment status + Mark Paid */}
+          {onMarkPaid && o.status !== "Rejected" && (() => {
+            const ps = o.paymentStatus || "unpaid";
+            if (ps === "paid") {
+              return (
+                <button
+                  onClick={() => onMarkPaid(o.id, false)}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+                  title="Click to mark as unpaid"
+                >
+                  <CheckCircle2 className="w-3 h-3" /> {o.paymentMethod === "cash" ? "Paid (Cash)" : "Paid"}
+                </button>
+              );
+            }
+            return (
+              <div className="flex items-center gap-1.5">
+                {o.paymentMethod === "cod" && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-600">COD</span>
+                )}
+                <button
+                  onClick={() => onMarkPaid(o.id, true)}
+                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full transition-colors ${
+                    ps === "submitted"
+                      ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  }`}
+                  title={o.paymentRef ? `UTR: ${o.paymentRef} — click to mark Paid` : "Mark as Paid"}
+                >
+                  {ps === "submitted" ? "Confirm Paid" : "Mark Paid"}
+                </button>
+              </div>
+            );
+          })()}
           <span className="text-xs text-slate-400">{o.productCount || cart.length} items</span>
           <span className="text-lg font-extrabold text-slate-800">{o.totalValue}</span>
         </div>

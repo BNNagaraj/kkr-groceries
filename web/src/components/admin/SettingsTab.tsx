@@ -8,7 +8,7 @@ import {
   Save, MapPin, Store, FileText, Plus, X, Loader2, Mail, Eye, EyeOff, Send,
   RefreshCw, AlertTriangle, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp,
   Settings2, Activity, TestTube2, RotateCcw, Users, ArrowLeft, Palette, Warehouse,
-  MessageSquare, ShoppingCart, ImagePlus, Trash2,
+  MessageSquare, ShoppingCart, ImagePlus, Trash2, CreditCard,
 } from "lucide-react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
@@ -16,16 +16,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ThemeSettingsSection from "./ThemeSettingsSection";
 import StoresSection from "./StoresSection";
+import dynamic from "next/dynamic";
+
+const OgBannerSection = dynamic(() => import("./OgBannerSection"), {
+  loading: () => (
+    <div className="text-center py-10 bg-white rounded-2xl border border-slate-100">
+      <div className="w-6 h-6 animate-spin mx-auto border-2 border-orange-400 border-t-transparent rounded-full" />
+      <p className="text-slate-400 mt-2 text-sm">Loading OG Banner Manager...</p>
+    </div>
+  ),
+});
 import {
   DeliverySettings,
   BusinessSettings,
   CheckoutFormSettings,
   CustomField,
   SmsGatewaySettings,
+  PaymentSettings,
   DEFAULT_DELIVERY,
   DEFAULT_BUSINESS,
   DEFAULT_CHECKOUT,
   DEFAULT_SMS_GATEWAY,
+  DEFAULT_PAYMENTS,
   normalizeOtpChannels,
 } from "@/types/settings";
 
@@ -101,6 +113,8 @@ export default function SettingsTab() {
   const [checkout, setCheckout] = useState<CheckoutFormSettings>(DEFAULT_CHECKOUT);
   const [smtp, setSmtp] = useState<SmtpSettings>(DEFAULT_SMTP);
   const [smsGateway, setSmsGateway] = useState<SmsGatewaySettings>(DEFAULT_SMS_GATEWAY);
+  const [payments, setPayments] = useState<PaymentSettings>(DEFAULT_PAYMENTS);
+  const [savingPayments, setSavingPayments] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingDelivery, setSavingDelivery] = useState(false);
   const [savingBusiness, setSavingBusiness] = useState(false);
@@ -136,16 +150,18 @@ export default function SettingsTab() {
   useEffect(() => {
     (async () => {
       try {
-        const [dSnap, bSnap, cSnap, sSnap, aSnap, sgSnap] = await Promise.all([
+        const [dSnap, bSnap, cSnap, sSnap, aSnap, sgSnap, pSnap] = await Promise.all([
           getDoc(doc(db, "settings", "delivery")),
           getDoc(doc(db, "settings", "business")),
           getDoc(doc(db, "settings", "checkout")),
           getDoc(doc(db, "settings", "smtp")),
           getDoc(doc(db, "settings", "admins")),
           getDoc(doc(db, "settings", "smsGateway")),
+          getDoc(doc(db, "settings", "payments")),
         ]);
         if (dSnap.exists()) setDelivery({ ...DEFAULT_DELIVERY, ...dSnap.data() });
         if (bSnap.exists()) setBusiness({ ...DEFAULT_BUSINESS, ...bSnap.data() });
+        if (pSnap.exists()) setPayments({ ...DEFAULT_PAYMENTS, ...pSnap.data() });
         if (cSnap.exists()) {
           const raw = cSnap.data();
           setCheckout({
@@ -265,6 +281,28 @@ export default function SettingsTab() {
       toast.error("Failed to save business settings.");
     } finally {
       setSavingBusiness(false);
+    }
+  };
+
+  const savePayments_ = async () => {
+    if ((payments.mode === "upi" || payments.mode === "both") && !payments.upiVpa.trim()) {
+      toast.error("Enter the business UPI ID (VPA) to enable UPI payments.");
+      return;
+    }
+    setSavingPayments(true);
+    try {
+      await setDoc(doc(db, "settings", "payments"), {
+        ...payments,
+        upiVpa: payments.upiVpa.trim(),
+        payeeName: payments.payeeName.trim(),
+        razorpayKeyId: payments.razorpayKeyId.trim(),
+      }, { merge: true });
+      toast.success("Payment settings saved!");
+    } catch (e) {
+      console.error("[Settings] Save payments error:", e);
+      toast.error("Failed to save payment settings.");
+    } finally {
+      setSavingPayments(false);
     }
   };
 
@@ -549,10 +587,12 @@ export default function SettingsTab() {
     { id: "delivery", label: "Delivery Zone", desc: "Center, radius & zone", icon: MapPin, color: "emerald" },
     { id: "business", label: "Business", desc: "Store info & charges", icon: Store, color: "blue" },
     { id: "checkout", label: "Checkout Form", desc: "Fields & custom inputs", icon: ShoppingCart, color: "amber" },
+    { id: "payments", label: "Payments", desc: "UPI & online payment", icon: CreditCard, color: "emerald" },
     { id: "email", label: "Email Center", desc: "SMTP, activity & testing", icon: Mail, color: "purple" },
     { id: "sms", label: "SMS Gateway", desc: "MSG91 configuration", icon: MessageSquare, color: "sky" },
     { id: "stores", label: "Stores", desc: "Warehouses & agents", icon: Warehouse, color: "orange" },
     { id: "theme", label: "Theme & Cards", desc: "Appearance & layout", icon: Palette, color: "pink" },
+    { id: "ogbanner", label: "OG Banner", desc: "Social link preview", icon: ImagePlus, color: "amber" },
   ] as const;
 
   const COLOR_MAP: Record<string, { bg: string; iconBg: string; iconText: string; border: string; hoverBg: string }> = {
@@ -790,6 +830,21 @@ export default function SettingsTab() {
                 }
                 placeholder="Optional"
               />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-sm font-medium text-slate-600 mb-1 block">
+                Tagline
+              </label>
+              <Input
+                value={business.tagline ?? ""}
+                onChange={(e) =>
+                  setBusiness((p) => ({ ...p, tagline: e.target.value }))
+                }
+                placeholder="Hyderabad B2B & B2C Wholesale"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Shown across the website header/footer, sign-in screen, invoices and emails.
+              </p>
             </div>
           </div>
         </div>
@@ -1661,6 +1716,93 @@ export default function SettingsTab() {
       )}
 
       {/* SMS Gateway Settings (MSG91 — Future Use) */}
+      {activePanel === "payments" && (
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                <CreditCard className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800">Payments</h3>
+                <p className="text-sm text-slate-500">Let customers pay for their orders online.</p>
+              </div>
+            </div>
+            <Button onClick={savePayments_} disabled={savingPayments} size="sm">
+              <Save className="w-4 h-4 mr-1" />
+              {savingPayments ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </div>
+        <div className="p-6 space-y-5">
+          {/* Mode */}
+          <div>
+            <label className="text-sm font-medium text-slate-600 mb-1.5 block">Payment Mode</label>
+            <select
+              value={payments.mode}
+              onChange={(e) => setPayments((p) => ({ ...p, mode: e.target.value as PaymentSettings["mode"] }))}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            >
+              <option value="off">Off — no online payment (COD / credit only)</option>
+              <option value="upi">UPI link / QR (manual confirmation)</option>
+              <option value="razorpay">Razorpay (auto-confirm) — coming soon</option>
+              <option value="both">Both — customer chooses</option>
+            </select>
+            <p className="text-xs text-slate-400 mt-1">
+              UPI shows a Pay button + QR on the customer&apos;s order. You confirm payment via their UTR or your bank statement.
+            </p>
+          </div>
+
+          {/* UPI config */}
+          {(payments.mode === "upi" || payments.mode === "both") && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl bg-emerald-50/50 border border-emerald-100 p-4">
+              <div>
+                <label className="text-sm font-medium text-slate-600 mb-1 block">Business UPI ID (VPA) *</label>
+                <Input
+                  value={payments.upiVpa}
+                  onChange={(e) => setPayments((p) => ({ ...p, upiVpa: e.target.value }))}
+                  placeholder="business@okhdfcbank"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-600 mb-1 block">Payee Name</label>
+                <Input
+                  value={payments.payeeName}
+                  onChange={(e) => setPayments((p) => ({ ...p, payeeName: e.target.value }))}
+                  placeholder="KKR Groceries"
+                />
+              </div>
+              <p className="sm:col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                💡 Use a <strong>merchant UPI ID</strong> (from Paytm/PhonePe for Business, BHIM merchant, or your bank&apos;s current account), <strong>not a personal UPI ID</strong>. Personal IDs trigger &quot;risky payment&quot; warnings in apps like Paytm; merchant IDs are trusted and skip them.
+              </p>
+            </div>
+          )}
+
+          {/* Razorpay config (Phase 2) */}
+          {(payments.mode === "razorpay" || payments.mode === "both") && (
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-slate-700">Razorpay</span>
+                <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full uppercase tracking-wider">Coming soon</span>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-600 mb-1 block">Razorpay Key ID</label>
+                <Input
+                  value={payments.razorpayKeyId}
+                  onChange={(e) => setPayments((p) => ({ ...p, razorpayKeyId: e.target.value }))}
+                  placeholder="rzp_live_xxxxxxxx"
+                />
+              </div>
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                ⚠️ The Razorpay <strong>Key Secret</strong> is never stored here (this doc is public). It is set securely in Cloud Functions. Auto-confirm checkout ships in Phase 2.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+      )}
+
       {activePanel === "sms" && (
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100">
@@ -1779,6 +1921,9 @@ export default function SettingsTab() {
 
       {/* Store Theme Settings */}
       {activePanel === "theme" && <ThemeSettingsSection />}
+
+      {/* OG Banner Manager */}
+      {activePanel === "ogbanner" && <OgBannerSection />}
     </div>
   );
 }

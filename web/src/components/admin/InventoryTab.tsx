@@ -32,7 +32,7 @@ const InventoryAnalytics = dynamic(() => import("@/components/admin/InventoryAna
 
 export default function InventoryTab() {
   const { col } = useMode();
-  const { products } = useAppStore();
+  const { allProducts: products } = useAppStore();
   const [stores, setStores] = useState<Store[]>([]);
   const [inventory, setInventory] = useState<StoreInventoryItem[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);

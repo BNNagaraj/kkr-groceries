@@ -1,4 +1,5 @@
 import { Order, OrderCartItem } from "@/types/order";
+import type { BusinessSettings } from "@/types/settings";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -29,10 +30,10 @@ const C = {
   amberBg: "#fef3c7",
 } as const;
 
-/* ─── Seller / Company info ─── */
-const SELLER = {
+/* ─── Seller / Company info (defaults; overridden by business settings) ─── */
+const SELLER_DEFAULTS = {
   name: "KKR Groceries",
-  tagline: "B2B Vegetable Wholesale",
+  tagline: "Hyderabad B2B & B2C Wholesale",
   address: "Hyderabad, Telangana, India",
   phone: "+91 93472 13498",
   gstin: "Not Registered",
@@ -184,7 +185,16 @@ function getStatusBadge(status: string) {
 /* ══════════════════════════════════════════════════════════════════
    MAIN PDF GENERATOR
    ══════════════════════════════════════════════════════════════════ */
-export function downloadInvoice(order: Order): void {
+export function downloadInvoice(order: Order, biz?: Partial<BusinessSettings>): void {
+  // Build the seller block from business settings, falling back to defaults
+  const seller = {
+    name: biz?.storeName || SELLER_DEFAULTS.name,
+    tagline: biz?.tagline || SELLER_DEFAULTS.tagline,
+    address: biz?.address || SELLER_DEFAULTS.address,
+    phone: biz?.contactPhone || SELLER_DEFAULTS.phone,
+    gstin: biz?.gstNumber || SELLER_DEFAULTS.gstin,
+    placeOfSupply: SELLER_DEFAULTS.placeOfSupply,
+  };
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const W = doc.internal.pageSize.getWidth(); // 210
   const H = doc.internal.pageSize.getHeight(); // 297
@@ -235,22 +245,22 @@ export function downloadInvoice(order: Order): void {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
   doc.setTextColor(...hex(C.white));
-  doc.text(SELLER.name, M + 2, 14);
+  doc.text(seller.name, M + 2, 14);
 
   // Tagline
   doc.setFontSize(8);
   doc.setTextColor(167, 243, 208);
-  doc.text(SELLER.tagline.toUpperCase(), M + 2, 20);
+  doc.text(seller.tagline.toUpperCase(), M + 2, 20);
 
   // Seller contact — right
   doc.setFontSize(7.5);
   doc.setTextColor(...hex(C.white));
   doc.setFont("helvetica", "normal");
-  doc.text(SELLER.address, W - M - 2, 10, { align: "right" });
-  doc.text("Phone: " + SELLER.phone, W - M - 2, 15, { align: "right" });
+  doc.text(seller.address, W - M - 2, 10, { align: "right" });
+  doc.text("Phone: " + seller.phone, W - M - 2, 15, { align: "right" });
   if (IS_GST_REGISTERED) {
     doc.setFont("helvetica", "bold");
-    doc.text("GSTIN: " + SELLER.gstin, W - M - 2, 20, { align: "right" });
+    doc.text("GSTIN: " + seller.gstin, W - M - 2, 20, { align: "right" });
   }
 
   // Document title in accent stripe
@@ -296,7 +306,7 @@ export function downloadInvoice(order: Order): void {
   doc.text("PLACE OF SUPPLY", infoCol3, y + 6);
   doc.setFontSize(9);
   doc.setTextColor(...hex(C.slate900));
-  doc.text(SELLER.placeOfSupply, infoCol3, y + 12);
+  doc.text(seller.placeOfSupply, infoCol3, y + 12);
 
   // Status badge
   doc.setFillColor(...badge.bg);
@@ -332,17 +342,17 @@ export function downloadInvoice(order: Order): void {
 
   doc.setFontSize(10);
   doc.setTextColor(...hex(C.slate900));
-  doc.text(SELLER.name, M + 5, y + 13);
+  doc.text(seller.name, M + 5, y + 13);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...hex(C.slate500));
-  doc.text(SELLER.address, M + 5, y + 19);
-  doc.text("Ph: " + SELLER.phone, M + 5, y + 24);
+  doc.text(seller.address, M + 5, y + 19);
+  doc.text("Ph: " + seller.phone, M + 5, y + 24);
   if (IS_GST_REGISTERED) {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...hex(C.slate700));
-    doc.text("GSTIN: " + SELLER.gstin, M + 5, y + 29);
+    doc.text("GSTIN: " + seller.gstin, M + 5, y + 29);
   }
 
   // ── TO (Buyer) ──
@@ -610,7 +620,7 @@ export function downloadInvoice(order: Order): void {
   doc.setFontSize(7.5);
   doc.setTextColor(...hex(C.greenMid));
   doc.setFont("helvetica", "bold");
-  doc.text("For " + SELLER.name, sigX + sigW / 2, sigTopY + 6, { align: "center" });
+  doc.text("For " + seller.name, sigX + sigW / 2, sigTopY + 6, { align: "center" });
 
   doc.setDrawColor(...hex(C.slate300));
   doc.setLineWidth(0.2);
@@ -648,14 +658,14 @@ export function downloadInvoice(order: Order): void {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(...hex(C.greenMid));
-  doc.text(SELLER.name, midX, y, { align: "center" });
+  doc.text(seller.name, midX, y, { align: "center" });
   y += 3.5;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.5);
   doc.setTextColor(...hex(C.slate500));
   doc.text(
-    SELLER.tagline + " | " + SELLER.address + " | " + SELLER.phone,
+    seller.tagline + " | " + seller.address + " | " + seller.phone,
     midX,
     y,
     { align: "center" }

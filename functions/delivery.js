@@ -14,8 +14,79 @@ const {
   haversineKm,
   resolveCol, getAppMode,
   isRateLimited, requireAdmin,
-  emailLayout,
+  emailLayout, getBusinessTagline,
+  getNotificationEmails,
 } = require("./utils");
+
+/**
+ * Find delivery-agent candidates near a reference point, excluding any UIDs
+ * (e.g. agents who already rejected the order). Returns the best candidate
+ * (available + nearest first) and the full sorted list.
+ */
+async function findBestAgent(orderCol, refLat, refLng, excludeUids = []) {
+  const presenceSnap = await db.collection("presence")
+    .where("isDelivery", "==", true)
+    .where("online", "==", true)
+    .get();
+
+  const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
+  const exclude = new Set(excludeUids);
+  const candidates = [];
+
+  for (const docSnap of presenceSnap.docs) {
+    const p = docSnap.data();
+    const uid = p.uid || docSnap.id;
+    if (exclude.has(uid)) continue;
+    const lastSeenMs = p.lastSeen?.toMillis?.() || 0;
+    if (lastSeenMs < twoMinutesAgo) continue;
+    if (!p.lat || !p.lng) continue;
+
+    const activeOrders = await db.collection(orderCol)
+      .where("assignedTo", "==", uid)
+      .where("status", "in", ["Accepted", "Shipped"])
+      .limit(1)
+      .get();
+
+    candidates.push({
+      uid,
+      name: p.displayName || p.phone || p.email?.split("@")[0] || "Unknown",
+      phone: p.phone || null,
+      lat: p.lat,
+      lng: p.lng,
+      distanceKm: Math.round(haversineKm(refLat, refLng, p.lat, p.lng) * 10) / 10,
+      isBusy: !activeOrders.empty,
+    });
+  }
+
+  candidates.sort((a, b) => {
+    if (a.isBusy !== b.isBusy) return a.isBusy ? 1 : -1; // available first
+    return a.distanceKm - b.distanceKm; // then nearest
+  });
+
+  return { best: candidates[0] || null, candidates };
+}
+
+/**
+ * Authorize a caller as either an admin OR the delivery agent assigned to the
+ * given order. Returns { uid, isAdmin }. Throws HttpsError otherwise.
+ */
+async function authorizeAdminOrAssignedAgent(request, order) {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required.");
+  }
+  // Admins are always allowed
+  try {
+    await requireAdmin(request);
+    return { uid: request.auth.uid, isAdmin: true };
+  } catch (_) {
+    // not an admin — fall through to the assigned-agent check
+  }
+  const hasDeliveryClaim = !!(request.auth.token && request.auth.token.delivery === true);
+  if (hasDeliveryClaim && order.assignedTo === request.auth.uid) {
+    return { uid: request.auth.uid, isAdmin: false };
+  }
+  throw new HttpsError("permission-denied", "You are not authorized for this delivery.");
+}
 
 /**
  * sendDeliveryOTP — generates a 6-digit OTP, stores it in Firestore,
@@ -30,7 +101,6 @@ const {
  *                      Default: { email: true } — preserves the legacy contract.
  */
 exports.sendDeliveryOTP = onCall(async (request) => {
-  const caller = await requireAdmin(request);
   const { orderId, orderCollection, channels } = request.data;
   if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId.");
 
@@ -46,6 +116,9 @@ exports.sendDeliveryOTP = onCall(async (request) => {
   const orderSnap = await db.collection(colName).doc(orderId).get();
   if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found.");
   const order = orderSnap.data();
+
+  // Admin OR the delivery agent assigned to this order may dispatch the OTP.
+  const caller = await authorizeAdminOrAssignedAgent(request, order);
 
   const buyerEmail = order.userEmail || null;
   const buyerPhone = order.phone || null;
@@ -86,6 +159,7 @@ exports.sendDeliveryOTP = onCall(async (request) => {
   // ── Channel: Email ──
   if (wantEmail) {
     try {
+      await getBusinessTagline();
       const otpEmailHtml = emailLayout(`
         <div style="padding:32px 24px;text-align:center;">
           <div style="width:64px;height:64px;background:#f0fdf4;border-radius:50%;line-height:64px;font-size:28px;margin:0 auto 16px;">\u{1F510}</div>
@@ -235,6 +309,168 @@ exports.verifyDeliveryOTP = onCall(async (request) => {
 });
 
 /**
+ * completeDelivery — marks an order as delivered (Fulfilled).
+ *
+ * Callable by the admin OR the delivery agent assigned to the order. This is
+ * the ONLY way a delivery agent completes a delivery (they have no direct write
+ * access to order docs). When `requireDeliveryOTP` is enabled in settings, a
+ * valid OTP must be supplied — it is verified here, server-side, before the
+ * order is marked delivered.
+ *
+ * Request data: { orderId, orderCollection?, otp? }
+ */
+exports.completeDelivery = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in required.");
+
+  const { orderId, orderCollection, otp, cashOutcome, collectedAmount } = request.data || {};
+  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId.");
+
+  if (await isRateLimited(request.auth.uid, "completeDelivery", 30, 10 * 60 * 1000)) {
+    throw new HttpsError("resource-exhausted", "Too many attempts. Please wait a moment.");
+  }
+
+  const mode = await getAppMode();
+  const colName = orderCollection || resolveCol("orders", mode);
+  const orderRef = db.collection(colName).doc(orderId);
+  const orderSnap = await orderRef.get();
+  if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found.");
+  const order = orderSnap.data();
+
+  // Admin OR the assigned delivery agent only
+  const caller = await authorizeAdminOrAssignedAgent(request, order);
+
+  if (order.status === "Fulfilled") {
+    return { success: true, message: "Order is already marked delivered." };
+  }
+
+  // OTP enforcement (only when the business requires it)
+  let requireOtp = false;
+  try {
+    const checkoutSnap = await db.collection("settings").doc("checkout").get();
+    requireOtp = checkoutSnap.exists && checkoutSnap.data().requireDeliveryOTP === true;
+  } catch (_) { /* default to not required if settings unreadable */ }
+
+  if (requireOtp) {
+    if (!otp) throw new HttpsError("failed-precondition", "Delivery OTP is required to complete this delivery.");
+    const otpSnap = await db.collection("delivery_otps").doc(orderId).get();
+    if (!otpSnap.exists) throw new HttpsError("not-found", "No OTP found for this order. Please send one first.");
+    const otpDoc = otpSnap.data();
+    if (new Date(otpDoc.expiresAt) < new Date()) {
+      throw new HttpsError("deadline-exceeded", "OTP has expired. Please send a new one.");
+    }
+    if ((otpDoc.attempts || 0) >= 5) {
+      throw new HttpsError("resource-exhausted", "Too many OTP attempts. Please send a new one.");
+    }
+    await db.collection("delivery_otps").doc(orderId).update({ attempts: FieldValue.increment(1) });
+    if (otpDoc.otp !== String(otp).trim()) {
+      const remaining = 4 - (otpDoc.attempts || 0);
+      throw new HttpsError("permission-denied", `Incorrect OTP. ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining.`);
+    }
+    await db.collection("delivery_otps").doc(orderId).update({
+      verified: true,
+      verifiedAt: FieldValue.serverTimestamp(),
+    });
+  }
+
+  const update = {
+    status: "Fulfilled",
+    deliveredAt: FieldValue.serverTimestamp(),
+    deliveredBy: caller.uid,
+  };
+
+  // Cash on Delivery: for orders not paid online (and not awaiting a UPI
+  // reference), record the agent's explicit cash-collection outcome.
+  //   full     → Paid (Cash), full amount
+  //   partial  → Partial, records collectedAmount, remainder stays outstanding
+  //   none     → Delivered but Unpaid (outstanding) — no cash booked
+  const ps = order.paymentStatus;
+  if (ps !== "paid" && ps !== "submitted") {
+    const orderTotal = Math.round(Number(String(order.totalValue || "0").replace(/[^0-9.]/g, "")) || 0);
+    const outcome = cashOutcome || "full"; // default keeps prior behaviour
+    if (outcome === "none") {
+      update.paymentMethod = "cod"; // delivered, payment still pending
+    } else if (outcome === "partial") {
+      const amt = Math.max(0, Math.min(orderTotal, Math.round(Number(collectedAmount) || 0)));
+      update.paymentStatus = amt >= orderTotal ? "paid" : "partial";
+      update.paymentMethod = "cash";
+      update.collectedAmount = amt;
+      update.collectedBy = caller.uid;
+      update.paidAt = FieldValue.serverTimestamp();
+    } else {
+      update.paymentStatus = "paid";
+      update.paymentMethod = "cash";
+      update.collectedAmount = orderTotal;
+      update.collectedBy = caller.uid;
+      update.paidAt = FieldValue.serverTimestamp();
+    }
+  }
+
+  await orderRef.update(update);
+
+  console.log(`Order ${orderId} delivered by ${caller.isAdmin ? "admin" : "agent"} ${caller.uid} (cash: ${cashOutcome || "full"})`);
+  return { success: true, message: "Delivery completed.", cashCollected: update.paymentMethod === "cash" };
+});
+
+/**
+ * advanceDeliveryStage — Swiggy/Zomato-style live progress for an in-transit
+ * order. Callable by the admin OR the assigned delivery agent. Sets the
+ * `deliveryStage` field and pings the customer on the recognizable stages.
+ *
+ * Valid stages (before the final "delivered", which goes via completeDelivery):
+ *   reached_store → picked_up → on_the_way
+ */
+exports.advanceDeliveryStage = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in required.");
+
+  const { orderId, orderCollection, stage } = request.data || {};
+  const VALID = ["reached_store", "picked_up", "on_the_way"];
+  if (!orderId || !VALID.includes(stage)) {
+    throw new HttpsError("invalid-argument", "orderId and a valid stage are required.");
+  }
+
+  const mode = await getAppMode();
+  const colName = orderCollection || resolveCol("orders", mode);
+  const orderRef = db.collection(colName).doc(orderId);
+  const orderSnap = await orderRef.get();
+  if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found.");
+  const order = orderSnap.data();
+
+  const caller = await authorizeAdminOrAssignedAgent(request, order);
+
+  await orderRef.update({
+    deliveryStage: stage,
+    deliveryStageAt: FieldValue.serverTimestamp(),
+  });
+
+  // Notify the customer on the stages they care about
+  try {
+    if ((stage === "picked_up" || stage === "on_the_way") && order.userId && order.userId !== "anonymous") {
+      const notifCol = resolveCol("notifications", mode);
+      const displayId = order.orderId || orderId;
+      const title = stage === "picked_up" ? "Order picked up" : "Out for delivery";
+      const message =
+        stage === "picked_up"
+          ? `Order #${displayId} has been picked up and will be on its way shortly.`
+          : `Order #${displayId} is on the way to you!`;
+      await db.collection(notifCol).add({
+        userId: order.userId,
+        orderId,
+        type: "delivery_update",
+        title,
+        message,
+        read: false,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    }
+  } catch (notifErr) {
+    console.warn("[advanceDeliveryStage] customer notify failed:", notifErr.message);
+  }
+
+  console.log(`Order ${orderId} stage → ${stage} by ${caller.isAdmin ? "admin" : "agent"} ${caller.uid}`);
+  return { success: true, stage };
+});
+
+/**
  * Auto-assign nearest available delivery boy to an order.
  * Called when admin wants one-tap auto-assignment.
  * Finds online delivery boys with GPS, picks nearest to assigned store (or order location).
@@ -264,12 +500,16 @@ exports.autoAssignDeliveryBoy = onCall(async (request) => {
 
     // 2. Determine reference location (assigned store > order location)
     let refLat, refLng;
+    let storeAgentUid = null;
+    let storeName = null;
     if (order.assignedStoreId) {
       const storeDoc = await db.collection(storeCol).doc(order.assignedStoreId).get();
       if (storeDoc.exists) {
         const store = storeDoc.data();
         refLat = store.lat;
         refLng = store.lng;
+        storeAgentUid = store.agentUid || null;
+        storeName = store.name || null;
       }
     }
     if (!refLat || !refLng) {
@@ -280,61 +520,47 @@ exports.autoAssignDeliveryBoy = onCall(async (request) => {
       throw new HttpsError("failed-precondition", "No location available for order or assigned store.");
     }
 
-    // 3. Find online delivery boys with GPS
-    const presenceSnap = await db.collection("presence")
-      .where("isDelivery", "==", true)
-      .where("online", "==", true)
-      .get();
-
-    const now = Date.now();
-    const twoMinutesAgo = now - 2 * 60 * 1000;
-    const candidates = [];
-
-    for (const doc of presenceSnap.docs) {
-      const p = doc.data();
-      const lastSeenMs = p.lastSeen?.toMillis?.() || 0;
-      if (lastSeenMs < twoMinutesAgo) continue;
-      if (!p.lat || !p.lng) continue;
-
-      // Check if already assigned to an active delivery
-      const activeOrders = await db.collection(orderCol)
-        .where("assignedTo", "==", p.uid || doc.id)
-        .where("status", "in", ["Accepted", "Shipped"])
-        .limit(1)
-        .get();
-
-      const isBusy = !activeOrders.empty;
-      const distance = haversineKm(refLat, refLng, p.lat, p.lng);
-
-      candidates.push({
-        uid: p.uid || doc.id,
-        name: p.displayName || p.phone || p.email?.split("@")[0] || "Unknown",
-        phone: p.phone || null,
-        lat: p.lat,
-        lng: p.lng,
-        distanceKm: Math.round(distance * 10) / 10,
-        isBusy,
-      });
-    }
-
-    if (candidates.length === 0) {
+    // 3-4. Find the best candidate (excluding any agent who already rejected it)
+    const { best, candidates } = await findBestAgent(orderCol, refLat, refLng, order.rejectedBy || []);
+    if (!best) {
       throw new HttpsError("not-found", "No delivery boys with GPS are currently online.");
     }
 
-    // 4. Score: prefer available (not busy) + closest
-    candidates.sort((a, b) => {
-      if (a.isBusy !== b.isBusy) return a.isBusy ? 1 : -1; // available first
-      return a.distanceKm - b.distanceKm; // then nearest
-    });
-
-    const best = candidates[0];
-
-    // 5. Assign to order
+    // 5. Assign to order (assignmentStatus "pending" → awaits agent Accept/Reject)
     await db.collection(orderCol).doc(orderId).update({
       assignedTo: best.uid,
       assignedToName: best.name,
+      assignmentStatus: "pending",
       assignedAt: FieldValue.serverTimestamp(),
     });
+
+    // 6. Notify the assigned delivery agent (and the store agent, if any)
+    try {
+      const notifCol = resolveCol("notifications", mode);
+      const displayId = order.orderId || orderId;
+      await db.collection(notifCol).add({
+        userId: best.uid,
+        orderId,
+        type: "delivery_assigned",
+        title: "New delivery assigned",
+        message: `Order #${displayId} — ${order.location || "address on file"}.`,
+        read: false,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      if (storeAgentUid) {
+        await db.collection(notifCol).add({
+          userId: storeAgentUid,
+          orderId,
+          type: "store_order",
+          title: "Order out for delivery",
+          message: `Order #${displayId} from ${storeName || "your store"} assigned to ${best.name}.`,
+          read: false,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (notifErr) {
+      console.warn("[autoAssignDeliveryBoy] notify failed:", notifErr.message);
+    }
 
     console.log(`[autoAssignDeliveryBoy] Assigned ${best.name} (${best.distanceKm}km) to order ${orderId}`);
 
@@ -355,6 +581,120 @@ exports.autoAssignDeliveryBoy = onCall(async (request) => {
     console.error("Error in autoAssignDeliveryBoy:", error);
     throw new HttpsError("internal", error.message || "Failed to auto-assign delivery boy.");
   }
+});
+
+/**
+ * respondToAssignment — a delivery agent (or admin) accepts or rejects an
+ * assigned order.
+ *   accept → assignmentStatus = "accepted"
+ *   reject → agent removed, added to rejectedBy, admins emailed, and the system
+ *            attempts to AUTO-REASSIGN to the next-best agent (excluding anyone
+ *            who already rejected). If none available, the order is left
+ *            unassigned for the admin to reassign manually.
+ *
+ * Request data: { orderId, orderCollection?, response: "accept" | "reject" }
+ */
+exports.respondToAssignment = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in required.");
+
+  const { orderId, orderCollection, response } = request.data || {};
+  if (!orderId || !["accept", "reject"].includes(response)) {
+    throw new HttpsError("invalid-argument", "orderId and response (accept|reject) are required.");
+  }
+
+  const mode = await getAppMode();
+  const colName = orderCollection || resolveCol("orders", mode);
+  const orderRef = db.collection(colName).doc(orderId);
+  const orderSnap = await orderRef.get();
+  if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found.");
+  const order = orderSnap.data();
+
+  const caller = await authorizeAdminOrAssignedAgent(request, order);
+  const displayId = order.orderId || orderId;
+
+  // ── Accept ──
+  if (response === "accept") {
+    await orderRef.update({
+      assignmentStatus: "accepted",
+      assignmentRespondedAt: FieldValue.serverTimestamp(),
+    });
+    return { success: true, status: "accepted" };
+  }
+
+  // ── Reject ──
+  const rejectorName = order.assignedToName || "Delivery agent";
+  const rejectedBy = Array.from(new Set([...(order.rejectedBy || []), caller.uid]));
+
+  await orderRef.update({
+    assignedTo: FieldValue.delete(),
+    assignedToName: FieldValue.delete(),
+    assignmentStatus: FieldValue.delete(),
+    rejectedBy,
+  });
+
+  // Email admins about the rejection
+  try {
+    const notifyEmails = await getNotificationEmails();
+    await getBusinessTagline();
+    const html = emailLayout(
+      `<div style="padding:28px 24px;">
+        <h2 style="color:#1e293b;font-size:20px;font-weight:700;margin:0 0 8px;">🚫 Delivery assignment rejected</h2>
+        <p style="color:#64748b;font-size:14px;margin:0 0 4px;"><strong>${rejectorName}</strong> rejected the delivery for order <strong>#${displayId}</strong>.</p>
+        <p style="color:#64748b;font-size:14px;margin:0;">${order.location || ""}</p>
+      </div>`,
+      `Delivery rejected for order ${displayId}`
+    );
+    await db.collection("mail").add({
+      to: notifyEmails,
+      message: { subject: `🚫 Delivery rejected — Order ${displayId}`, html },
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  } catch (e) {
+    console.warn("[respondToAssignment] reject email failed:", e.message);
+  }
+
+  // Attempt auto-reassign to the next-best agent (excluding rejecters)
+  let refLat = order.lat;
+  let refLng = order.lng;
+  try {
+    if (order.assignedStoreId) {
+      const storeCol = resolveCol("stores", mode);
+      const sd = await db.collection(storeCol).doc(order.assignedStoreId).get();
+      if (sd.exists) {
+        refLat = sd.data().lat || refLat;
+        refLng = sd.data().lng || refLng;
+      }
+    }
+  } catch (_) { /* ignore */ }
+
+  if (refLat && refLng) {
+    const { best } = await findBestAgent(colName, refLat, refLng, rejectedBy);
+    if (best) {
+      await orderRef.update({
+        assignedTo: best.uid,
+        assignedToName: best.name,
+        assignmentStatus: "pending",
+        assignedAt: FieldValue.serverTimestamp(),
+      });
+      try {
+        const notifCol = resolveCol("notifications", mode);
+        await db.collection(notifCol).add({
+          userId: best.uid,
+          orderId,
+          type: "delivery_assigned",
+          title: "New delivery assigned",
+          message: `Order #${displayId} — ${order.location || "address on file"}.`,
+          read: false,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      } catch (_) { /* ignore */ }
+      console.log(`[respondToAssignment] Order ${orderId} reassigned to ${best.name} after rejection by ${caller.uid}`);
+      return { success: true, status: "reassigned", assigned: { uid: best.uid, name: best.name, distanceKm: best.distanceKm } };
+    }
+  }
+
+  console.log(`[respondToAssignment] Order ${orderId} left unassigned after rejection by ${caller.uid}`);
+  return { success: true, status: "unassigned" };
 });
 
 /**

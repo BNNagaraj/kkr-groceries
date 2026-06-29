@@ -42,7 +42,7 @@ import { MarketCompare } from "@/components/market/MarketCompare";
 type Tab = "prices" | "supply" | "arbitrage" | "compare";
 
 export default function MarketRatesPage() {
-  const { products } = useAppStore();
+  const { allProducts: products } = useAppStore();
   const [selectedMarket, setSelectedMarket] = useState<string>("Bowenpally");
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<Tab>("prices");

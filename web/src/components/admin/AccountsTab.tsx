@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { db } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMode } from "@/contexts/ModeContext";
 import {
@@ -34,6 +35,9 @@ import {
   DollarSign,
   ArrowDown,
   ArrowUp,
+  CheckCircle2,
+  Clock,
+  Banknote,
 } from "lucide-react";
 import { AccountEntry, LedgerRow, PnLData, EntryCategory } from "@/types/accounts";
 import { StockPurchase } from "@/types/stock";
@@ -99,6 +103,7 @@ export default function AccountsTab() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [stockPurchases, setStockPurchases] = useState<StockPurchase[]>([]);
   const [loading, setLoading] = useState(true);
+  const [settlingUid, setSettlingUid] = useState<string | null>(null);
 
   // Filters
   const [period, setPeriod] = useState<PeriodKey>("month");
@@ -196,6 +201,7 @@ export default function AccountsTab() {
           balance: 0,
           source: "auto-sale",
           refId: o.id,
+          payment: { status: o.paymentStatus || "unpaid", method: o.paymentMethod, ref: o.paymentRef, collectedAmount: o.collectedAmount },
         });
       });
 
@@ -412,6 +418,49 @@ export default function AccountsTab() {
   const totalCredit = ledgerRows.reduce((a, r) => a + r.credit, 0);
   const totalDebit = ledgerRows.reduce((a, r) => a + r.debit, 0);
   const currentBalance = ledgerRows.length > 0 ? ledgerRows[0].balance : 0;
+
+  // Collected vs Outstanding — across the auto-sale (fulfilled order) rows.
+  // Partial payments count the collected portion as collected, the rest as outstanding.
+  const saleRows = ledgerRows.filter((r) => r.source === "auto-sale");
+  const collected = saleRows.reduce((a, r) => {
+    if (r.payment?.status === "paid") return a + r.credit;
+    if (r.payment?.status === "partial") return a + (r.payment.collectedAmount || 0);
+    return a;
+  }, 0);
+  const outstanding = saleRows.reduce((a, r) => {
+    if (r.payment?.status === "paid") return a;
+    if (r.payment?.status === "partial") return a + Math.max(0, r.credit - (r.payment.collectedAmount || 0));
+    return a + r.credit;
+  }, 0);
+
+  // Per-agent unsettled cash (COD) for reconciliation
+  const agentCash = useMemo(() => {
+    const map = new Map<string, { uid: string; name: string; amount: number; count: number }>();
+    orders.forEach((o) => {
+      if (o.paymentMethod === "cash" && !o.cashSettled && o.collectedBy) {
+        const cur = map.get(o.collectedBy) || { uid: o.collectedBy, name: o.assignedToName || "Agent", amount: 0, count: 0 };
+        cur.amount += Number(o.collectedAmount || 0);
+        cur.count += 1;
+        if (o.assignedToName) cur.name = o.assignedToName;
+        map.set(o.collectedBy, cur);
+      }
+    });
+    return Array.from(map.values()).filter((a) => a.amount > 0).sort((a, b) => b.amount - a.amount);
+  }, [orders]);
+
+  const handleSettle = async (uid: string) => {
+    setSettlingUid(uid);
+    try {
+      const fn = httpsCallable<{ agentUid: string; orderCollection: string }, { success: boolean; settledCount: number; settledAmount: number }>(functions, "settleAgentCash");
+      const { data } = await fn({ agentUid: uid, orderCollection: col("orders") });
+      toast.success(`Settled ${formatCurrency(data.settledAmount)} (${data.settledCount} order${data.settledCount !== 1 ? "s" : ""}).`);
+      fetchData();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to settle cash.");
+    } finally {
+      setSettlingUid(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -743,6 +792,59 @@ export default function AccountsTab() {
         </div>
       </div>
 
+      {/* Payment reconciliation: Collected vs Outstanding (across delivered orders) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+          <div className="flex items-center gap-2 mb-1">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <span className="text-xs font-medium text-emerald-600">Collected (paid)</span>
+          </div>
+          <div className="text-2xl font-bold text-emerald-700">{formatCurrency(collected)}</div>
+          <div className="text-[11px] text-emerald-600/70 mt-0.5">UPI + cash received on delivered orders</div>
+        </div>
+        <div className={`p-4 rounded-xl border ${outstanding > 0 ? "bg-amber-50 border-amber-100" : "bg-slate-50 border-slate-100"}`}>
+          <div className="flex items-center gap-2 mb-1">
+            <Clock className={`w-4 h-4 ${outstanding > 0 ? "text-amber-500" : "text-slate-400"}`} />
+            <span className={`text-xs font-medium ${outstanding > 0 ? "text-amber-600" : "text-slate-500"}`}>Outstanding (receivables)</span>
+          </div>
+          <div className={`text-2xl font-bold ${outstanding > 0 ? "text-amber-700" : "text-slate-600"}`}>{formatCurrency(outstanding)}</div>
+          <div className={`text-[11px] mt-0.5 ${outstanding > 0 ? "text-amber-600/70" : "text-slate-400"}`}>Delivered but not yet paid (credit)</div>
+        </div>
+      </div>
+
+      {/* Agent cash reconciliation (COD cash held by delivery agents) */}
+      {agentCash.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+            <Banknote className="w-4 h-4 text-emerald-600" />
+            <h3 className="font-bold text-slate-800 text-sm">Agent Cash to Collect (COD)</h3>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {agentCash.map((a) => (
+              <div key={a.uid} className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <div className="font-semibold text-slate-800 text-sm">{a.name}</div>
+                  <div className="text-xs text-slate-400">{a.count} order{a.count !== 1 ? "s" : ""} · cash in hand</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-extrabold text-emerald-700">{formatCurrency(a.amount)}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleSettle(a.uid)}
+                    disabled={settlingUid === a.uid}
+                    className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                  >
+                    {settlingUid === a.uid ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    Mark Settled
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Ledger Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
@@ -878,8 +980,19 @@ export default function AccountsTab() {
                       <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
                         {row.date.toLocaleDateString("en-IN")}
                       </td>
-                      <td className="px-4 py-3 text-slate-700 max-w-xs truncate">
-                        {row.description}
+                      <td className="px-4 py-3 text-slate-700 max-w-xs">
+                        <div className="truncate">{row.description}</div>
+                        {row.source === "auto-sale" && row.payment && (
+                          row.payment.status === "paid" ? (
+                            <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5">
+                              <CheckCircle2 className="w-2.5 h-2.5" /> Paid{row.payment.method === "cash" ? " (Cash)" : row.payment.method === "upi" ? " (UPI)" : ""}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5">
+                              <Clock className="w-2.5 h-2.5" /> {row.payment.status === "submitted" ? "Payment submitted" : "Unpaid"}
+                            </span>
+                          )
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <Badge

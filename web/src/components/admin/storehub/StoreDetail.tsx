@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { Store } from "@/types/settings";
 import { Order, OrderStatus } from "@/types/order";
 import { StoreInventoryItem } from "@/types/inventory";
@@ -31,6 +32,8 @@ import {
   Copy,
 } from "lucide-react";
 
+const AssignDeliveryDialog = dynamic(() => import("../AssignDeliveryDialog"), { ssr: false });
+
 interface StoreDetailProps {
   store: Store;
   orders: Order[];
@@ -46,6 +49,7 @@ export default function StoreDetail({ store, orders, inventory, onBack, onNaviga
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [autoAssigningId, setAutoAssigningId] = useState<string | null>(null);
   const [trackingLinkId, setTrackingLinkId] = useState<string | null>(null);
+  const [manualAssignOrder, setManualAssignOrder] = useState<Order | null>(null);
 
   // Auto-assign delivery boy
   const handleAutoAssign = useCallback(async (orderId: string) => {
@@ -378,6 +382,18 @@ export default function StoreDetail({ store, orders, inventory, onBack, onNaviga
                               Auto-assign delivery
                             </button>
                           )}
+                          {/* Manual-assign delivery boy */}
+                          {!order.assignedTo && (order.status === "Accepted" || order.status === "Pending") && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setManualAssignOrder(order);
+                              }}
+                              className="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1"
+                            >
+                              <UserCheck className="w-3 h-3" /> Manual assign
+                            </button>
+                          )}
                           {/* Generate tracking link (needs delivery boy assigned) */}
                           {order.assignedTo && (order.status === "Accepted" || order.status === "Shipped") && (
                             <button
@@ -487,6 +503,14 @@ export default function StoreDetail({ store, orders, inventory, onBack, onNaviga
           </div>
         </div>
       )}
+
+      {/* Manual delivery assignment */}
+      <AssignDeliveryDialog
+        open={!!manualAssignOrder}
+        order={manualAssignOrder}
+        onClose={() => setManualAssignOrder(null)}
+        onAssigned={() => setManualAssignOrder(null)}
+      />
     </div>
   );
 }

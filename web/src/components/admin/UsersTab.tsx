@@ -24,6 +24,7 @@ import {
   UserCheck,
   Truck,
   Warehouse,
+  UtensilsCrossed,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -53,13 +54,14 @@ interface RegisteredUser {
   isAdmin: boolean;
   isDelivery: boolean;
   isAgent: boolean;
+  isHoreca: boolean;
   agentStoreId: string | null;
   orderCount: number;
   totalSpent: number;
 }
 
 interface ConfirmAction {
-  type: "admin" | "disable" | "delivery" | "agent";
+  type: "admin" | "disable" | "delivery" | "agent" | "horeca";
   user: RegisteredUser;
   newValue: boolean;
   storeId?: string;
@@ -176,6 +178,30 @@ export default function UsersTab() {
     }
   };
 
+  const handleHorecaToggle = async () => {
+    if (!confirmAction || confirmAction.type !== "horeca") return;
+    const { user, newValue } = confirmAction;
+
+    setActionLoading(true);
+    try {
+      const setHorecaClaim = httpsCallable<{ uid: string; horeca: boolean }, { success: boolean }>(
+        functions,
+        "setHorecaClaim"
+      );
+      await setHorecaClaim({ uid: user.uid, horeca: newValue });
+      setUsers((prev) =>
+        prev.map((u) => (u.uid === user.uid ? { ...u, isHoreca: newValue } : u))
+      );
+      toast.success(newValue ? "HORECA role granted — user will see economy items." : "HORECA role revoked.");
+    } catch (e) {
+      console.error("[UsersTab] Failed to update HORECA role:", e);
+      toast.error("Failed to update HORECA role.");
+    } finally {
+      setActionLoading(false);
+      setConfirmAction(null);
+    }
+  };
+
   const handleAgentToggle = async () => {
     if (!confirmAction || confirmAction.type !== "agent") return;
     const { user, newValue, storeId } = confirmAction;
@@ -252,6 +278,7 @@ export default function UsersTab() {
     if (confirmAction.type === "admin") handleAdminToggle();
     else if (confirmAction.type === "delivery") handleDeliveryToggle();
     else if (confirmAction.type === "agent") handleAgentToggle();
+    else if (confirmAction.type === "horeca") handleHorecaToggle();
     else handleDisableToggle();
   };
 
@@ -348,7 +375,7 @@ export default function UsersTab() {
                 {/* Avatar */}
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 ${
-                    u.isAdmin ? "bg-emerald-600" : u.isAgent ? "bg-orange-600" : u.isDelivery ? "bg-blue-600" : u.disabled ? "bg-red-400" : "bg-slate-400"
+                    u.isAdmin ? "bg-emerald-600" : u.isAgent ? "bg-orange-600" : u.isDelivery ? "bg-blue-600" : u.isHoreca ? "bg-purple-600" : u.disabled ? "bg-red-400" : "bg-slate-400"
                   }`}
                 >
                   {u.isAgent && !u.isAdmin ? <Warehouse className="w-5 h-5" /> : u.isDelivery && !u.isAdmin ? <Truck className="w-5 h-5" /> : initials}
@@ -373,6 +400,11 @@ export default function UsersTab() {
                     {u.isAgent && (
                       <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-[10px]">
                         Agent
+                      </Badge>
+                    )}
+                    {u.isHoreca && (
+                      <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-[10px]">
+                        HORECA
                       </Badge>
                     )}
                     {u.disabled && (
@@ -553,6 +585,31 @@ export default function UsersTab() {
                       </Button>
                     )}
 
+                    {/* HORECA (Hotel/Restaurant/Catering) toggle */}
+                    {u.isHoreca ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setConfirmAction({ type: "horeca", user: u, newValue: false })
+                        }
+                        className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                      >
+                        <UtensilsCrossed className="w-3.5 h-3.5" /> Revoke HORECA
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setConfirmAction({ type: "horeca", user: u, newValue: true })
+                        }
+                        className="text-purple-600 border-purple-300 hover:bg-purple-50"
+                      >
+                        <UtensilsCrossed className="w-3.5 h-3.5" /> Grant HORECA
+                      </Button>
+                    )}
+
                     {/* Disable/Enable toggle */}
                     {u.disabled ? (
                       <Button
@@ -599,6 +656,8 @@ export default function UsersTab() {
                 ? confirmAction.newValue ? "Grant Delivery Role?" : "Revoke Delivery Role?"
                 : confirmAction?.type === "agent"
                 ? confirmAction.newValue ? "Grant Agent Role?" : "Revoke Agent Role?"
+                : confirmAction?.type === "horeca"
+                ? confirmAction.newValue ? "Grant HORECA Access?" : "Revoke HORECA Access?"
                 : confirmAction?.newValue ? "Disable User Account?" : "Enable User Account?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -614,6 +673,10 @@ export default function UsersTab() {
                 ? confirmAction.newValue
                   ? `This will grant the agent role to ${confirmAction.user.displayName || confirmAction.user.phone || "this user"}. They will manage inventory and delivery for their assigned store.`
                   : `This will revoke the agent role from ${confirmAction.user.displayName || confirmAction.user.phone || "this user"}. They will no longer manage any store.`
+                : confirmAction?.type === "horeca"
+                ? confirmAction.newValue
+                  ? `This will grant HORECA access to ${confirmAction.user.displayName || confirmAction.user.phone || "this user"}. They will see economy-tier products with restaurant/hotel pricing instead of standard items.`
+                  : `This will revoke HORECA access from ${confirmAction.user.displayName || confirmAction.user.phone || "this user"}. They will only see standard-tier products.`
                 : confirmAction?.newValue
                 ? `This will disable the account for ${confirmAction?.user.displayName || confirmAction?.user.email || "this user"}. They will not be able to sign in or place orders.`
                 : `This will re-enable the account for ${confirmAction?.user.displayName || confirmAction?.user.email || "this user"}. They will be able to sign in and place orders again.`}
@@ -631,6 +694,8 @@ export default function UsersTab() {
                   ? "bg-blue-600 hover:bg-blue-700"
                   : confirmAction?.type === "agent"
                   ? "bg-orange-600 hover:bg-orange-700"
+                  : confirmAction?.type === "horeca"
+                  ? "bg-purple-600 hover:bg-purple-700"
                   : ""
               }
             >
