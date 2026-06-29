@@ -30,6 +30,7 @@ const alerts = require("./alerts");
 const ogBanner = require("./og-banner");
 const horeca = require("./horeca");
 const payments = require("./payments");
+const backup = require("./backup");
 
 module.exports = {
   ...orders,
@@ -44,4 +45,5 @@ module.exports = {
   ...ogBanner,
   ...horeca,
   ...payments,
+  ...backup,
 };

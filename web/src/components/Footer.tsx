@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { Phone, Mail, MapPin } from "lucide-react";
 import { useBusiness } from "@/contexts/BusinessContext";
 
@@ -68,8 +69,12 @@ export function Footer() {
         </div>
 
         {/* Bottom bar */}
-        <div className="border-t border-white/10 mt-8 pt-6 text-center text-white/40 text-xs">
-          &copy; {new Date().getFullYear()} {biz.storeName || "KKR Groceries"}. All rights reserved.
+        <div className="border-t border-white/10 mt-8 pt-6 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-center text-white/40 text-xs">
+          <span>&copy; {new Date().getFullYear()} {biz.storeName || "KKR Groceries"}. All rights reserved.</span>
+          <span className="hidden sm:inline">·</span>
+          <Link href="/privacy" className="hover:text-white/70 transition-colors">Privacy Policy</Link>
+          <span className="hidden sm:inline">·</span>
+          <Link href="/terms" className="hover:text-white/70 transition-colors">Terms of Service</Link>
         </div>
       </div>
     </footer>
