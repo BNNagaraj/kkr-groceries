@@ -24,6 +24,8 @@ export interface LedgerRow {
   balance: number;
   source: "auto-sale" | "auto-purchase" | "manual";
   refId?: string;
+  /** Payment info for auto-sale rows (lets the ledger show paid/unpaid). */
+  payment?: { status?: string; method?: string; ref?: string; collectedAmount?: number };
 }
 
 export interface PnLData {

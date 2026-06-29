@@ -104,7 +104,7 @@ export function downloadBuyListPdf(
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.text("B2B Vegetable Wholesale | Hyderabad", M, 18);
+  doc.text("B2B & B2C Vegetable Wholesale | Hyderabad", M, 18);
 
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");

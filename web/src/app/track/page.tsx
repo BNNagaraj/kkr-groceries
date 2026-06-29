@@ -505,7 +505,7 @@ export default function TrackPage() {
             This tracking link expires 24 hours after generation.
           </p>
           <p className="text-[10px] text-slate-300 mt-1">
-            KKR Groceries • Hyderabad B2B Wholesale
+            KKR Groceries • Hyderabad B2B & B2C Wholesale
           </p>
         </div>
       </div>

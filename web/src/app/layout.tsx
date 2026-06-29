@@ -129,7 +129,7 @@ const oswald = Oswald({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#064e3b",
+  themeColor: "#F7941D",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -137,14 +137,14 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "KKR Groceries | Hyderabad B2B Vegetable Wholesale",
+    default: "KKR Groceries | Hyderabad B2B & B2C Vegetable Wholesale",
     template: "%s | KKR Groceries",
   },
   description:
     "Fresh vegetables at APMC wholesale prices for hotels, restaurants & retailers in Hyderabad. Daily market rates from Bowenpally Yard.",
   keywords: [
     "wholesale vegetables Hyderabad",
-    "B2B groceries",
+    "B2B & B2C groceries",
     "APMC prices",
     "Bowenpally market yard",
     "bulk vegetable order",
@@ -158,24 +158,25 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_IN",
-    url: "https://kkrgroceries.com",
+    url: "https://kkr-groceries-02.web.app",
     siteName: "KKR Groceries",
-    title: "KKR Groceries | Hyderabad B2B Vegetable Wholesale",
+    title: "KKR Groceries | Hyderabad B2B & B2C Vegetable Wholesale",
     description:
       "Fresh vegetables at APMC wholesale prices for hotels, restaurants & retailers in Hyderabad.",
-    images: [{ url: "/og-image.png", width: 1200, height: 1200 }],
+    images: [{ url: "https://kkr-groceries-02.web.app/og-image.jpg", width: 1200, height: 630 }],
   },
   twitter: {
-    card: "summary",
-    title: "KKR Groceries | B2B Vegetable Wholesale",
+    card: "summary_large_image",
+    title: "KKR Groceries | B2B & B2C Vegetable Wholesale",
     description:
       "Fresh vegetables at APMC wholesale prices for hotels, restaurants & retailers in Hyderabad.",
+    images: ["https://kkr-groceries-02.web.app/og-image.jpg"],
   },
   robots: {
     index: true,
     follow: true,
   },
-  metadataBase: new URL("https://kkrgroceries.com"),
+  metadataBase: new URL("https://kkr-groceries-02.web.app"),
 };
 
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -191,8 +192,8 @@ const jsonLd = {
   "@type": "LocalBusiness",
   name: "KKR Groceries",
   description:
-    "B2B wholesale vegetable supplier in Hyderabad with live APMC market prices.",
-  url: "https://kkrgroceries.com",
+    "B2B & B2C wholesale vegetable supplier in Hyderabad with live APMC market prices.",
+  url: "https://kkr-groceries-02.web.app",
   telephone: "+91-XXXXXXXXXX",
   address: {
     "@type": "PostalAddress",

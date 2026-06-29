@@ -318,8 +318,33 @@ async function requireAdmin(request) {
   throw new HttpsError("permission-denied", "Admin access required.");
 }
 
+// ─── Business tagline (configurable via settings/business) ───
+const DEFAULT_TAGLINE = "Hyderabad B2B & B2C Wholesale";
+let _cachedTagline = DEFAULT_TAGLINE;
+let _taglineTs = 0;
+
+/**
+ * Returns the business tagline from settings/business, cached for 60s.
+ * Call this once before building an email so emailLayout picks up the latest
+ * value (emailLayout reads the cached value via its default parameter).
+ */
+async function getBusinessTagline() {
+  if (Date.now() - _taglineTs < 60000) return _cachedTagline;
+  try {
+    const snap = await db.collection("settings").doc("business").get();
+    const t = snap.exists ? String(snap.data().tagline || "").trim() : "";
+    _cachedTagline = t || DEFAULT_TAGLINE;
+  } catch (e) {
+    // keep last cached value
+  }
+  _taglineTs = Date.now();
+  return _cachedTagline;
+}
+
 // ─── Premium Email Template Builder ───
-function emailLayout(bodyContent, preheader = "") {
+function emailLayout(bodyContent, preheader = "", tagline = _cachedTagline) {
+  const taglineHtml = String(tagline || DEFAULT_TAGLINE)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>KKR Groceries</title>
@@ -332,9 +357,9 @@ ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;">${prehead
 <!-- Header -->
 <tr><td style="background:linear-gradient(135deg,#064e3b 0%,#047857 50%,#059669 100%);padding:32px 24px;text-align:center;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
-    <div style="width:56px;height:56px;background:rgba(255,255,255,0.15);border-radius:16px;line-height:56px;font-size:28px;margin:0 auto 12px;">\u{1F96C}</div>
+    <img src="https://storage.googleapis.com/kkr-groceries-02.firebasestorage.app/branding/logo-email-circle.png" alt="KKR Groceries" width="112" height="112" style="width:112px;height:112px;border-radius:50%;margin:0 auto 12px;display:block;" />
     <div style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px;">KKR Groceries</div>
-    <div style="color:#a7f3d0;font-size:11px;text-transform:uppercase;letter-spacing:3px;margin-top:4px;">Hyderabad B2B Wholesale</div>
+    <div style="color:#a7f3d0;font-size:11px;text-transform:uppercase;letter-spacing:3px;margin-top:4px;">${taglineHtml}</div>
   </td></tr></table>
 </td></tr>
 <!-- Body -->
@@ -344,7 +369,7 @@ ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;">${prehead
 <!-- Footer -->
 <tr><td style="background:#f8faf8;padding:24px;text-align:center;border-top:1px solid #e2e8f0;">
   <div style="color:#64748b;font-size:12px;line-height:1.6;">
-    <strong style="color:#047857;">KKR Groceries</strong> &mdash; Hyderabad B2B Vegetable Wholesale<br>
+    <strong style="color:#047857;">KKR Groceries</strong> &mdash; ${taglineHtml}<br>
     <span style="color:#94a3b8;">This is an automated notification. Please do not reply.</span>
   </div>
 </td></tr>
@@ -564,6 +589,7 @@ module.exports = {
   DEFAULT_SMTP,
   // Email templates
   emailLayout,
+  getBusinessTagline,
   buildItemsTable,
   buildOrderEmailHtml,
   buildStatusEmailHtml,

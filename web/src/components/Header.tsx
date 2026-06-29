@@ -2,25 +2,27 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useAppStore } from "@/contexts/AppContext";
+import { useAppStore, type ProductTier } from "@/contexts/AppContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBusiness } from "@/contexts/BusinessContext";
-import { ShoppingCart, User, LogOut, Settings, TrendingUp } from "lucide-react";
+import { ShoppingCart, User, LogOut, Settings, TrendingUp, UtensilsCrossed, Star, MessageCircle } from "lucide-react";
 import { markOffline } from "@/hooks/usePresence";
 
 import { EnquiryModal } from "./EnquiryModal";
+import { HorecaRegistrationModal } from "./HorecaRegistrationModal";
 import { NotificationBell } from "./NotificationBell";
 import { OtpPopup } from "./OtpPopup";
 import { OtpConfigWarning } from "./admin/OtpConfigWarning";
 import { AuthModal } from "./AuthModal";
 
 export function Header({ onOpenCart }: { onOpenCart: () => void }) {
-    const { cart } = useAppStore();
-    const { currentUser, isAdmin } = useAuth();
+    const { cart, activeTier, setActiveTier } = useAppStore();
+    const { currentUser, isAdmin, isHoreca } = useAuth();
     const { biz } = useBusiness();
     const logoSrc = biz.logoUrl || "/icon-192.png";
     const [menuOpen, setMenuOpen] = useState(false);
     const [enquiryOpen, setEnquiryOpen] = useState(false);
+    const [horecaOpen, setHorecaOpen] = useState(false);
     const [authOpen, setAuthOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
 
@@ -42,7 +44,7 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                         <img src={logoSrc} alt={biz.storeName || "KKR Groceries"} width={44} height={44} className="rounded-md" />
                         <div className="flex flex-col">
                             <span className="font-bold text-xl leading-none tracking-tight">{biz.storeName || "KKR Groceries"}</span>
-                            <span className="text-[10px] text-white/60 uppercase tracking-widest font-semibold mt-0.5">B2B Wholesale</span>
+                            <span className="text-[10px] text-white/60 uppercase tracking-widest font-semibold mt-0.5">{biz.tagline || "Hyderabad B2B & B2C Wholesale"}</span>
                         </div>
                     </Link>
 
@@ -56,12 +58,40 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                 <TrendingUp className="w-4 h-4" /> Market Rates
                             </Link>
                         )}
-                        <button
-                            onClick={() => setEnquiryOpen(true)}
-                            className="hidden sm:flex text-sm font-bold bg-white/10 hover:bg-white/20 transition-colors px-3 py-1.5 rounded-full items-center"
-                        >
-                            Partner with Us
-                        </button>
+                        {/* Tier toggle — HORECA users & admins */}
+                        {(isHoreca || isAdmin) && (
+                            <div className="hidden sm:inline-flex items-center gap-0.5 p-0.5 rounded-full bg-white/10 backdrop-blur-sm">
+                                <button
+                                    onClick={() => setActiveTier("standard")}
+                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                                        activeTier === "standard"
+                                            ? "bg-white text-emerald-700 shadow-sm"
+                                            : "text-white/70 hover:text-white hover:bg-white/10"
+                                    }`}
+                                >
+                                    <Star className="w-3 h-3" /> Regular
+                                </button>
+                                <button
+                                    onClick={() => setActiveTier("economy")}
+                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                                        activeTier === "economy"
+                                            ? "bg-purple-500 text-white shadow-sm"
+                                            : "text-white/70 hover:text-white hover:bg-white/10"
+                                    }`}
+                                >
+                                    <UtensilsCrossed className="w-3 h-3" /> Restaurant / Hotel
+                                </button>
+                            </div>
+                        )}
+                        {/* HORECA apply button — only for non-HORECA users */}
+                        {!isHoreca && (
+                            <button
+                                onClick={() => { if (currentUser) setHorecaOpen(true); else setAuthOpen(true); }}
+                                className="hidden sm:flex text-sm font-bold bg-purple-500/30 hover:bg-purple-500/50 transition-colors px-3 py-1.5 rounded-full items-center gap-1.5"
+                            >
+                                <UtensilsCrossed className="w-3.5 h-3.5" /> Restaurants / Hotels
+                            </button>
+                        )}
                         {isAdmin && (
                             <Link
                                 href="/dashboard/admin"
@@ -72,6 +102,17 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                         )}
 
                         {currentUser && <NotificationBell />}
+
+                        {currentUser && (
+                            <Link
+                                href="/dashboard/buyer?tab=messages"
+                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                                aria-label="Message Center"
+                                title="Message Center"
+                            >
+                                <MessageCircle className="w-5 h-5" />
+                            </Link>
+                        )}
 
                         <div className="relative">
                             <button
@@ -93,7 +134,7 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                             </button>
 
                             {menuOpen && (
-                                <div className="absolute top-[120%] right-0 w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-2 text-slate-800 animate-in fade-in slide-in-from-top-2">
+                                <div className="absolute top-[120%] right-0 w-52 sm:w-48 bg-white rounded-xl shadow-xl border border-slate-100 py-2 text-slate-800 animate-in fade-in slide-in-from-top-2">
                                     {currentUser ? (
                                         <>
                                             <div className="px-4 py-2 border-b border-slate-100 flex items-center gap-2">
@@ -120,8 +161,58 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                             <Link href="/dashboard/buyer?tab=orders" className="block px-4 py-2 text-sm hover:bg-slate-50 transition-colors">
                                                 My Orders
                                             </Link>
+
+                                            {/* ── Mobile-only items (hidden on sm+) ── */}
+                                            {/* Tier toggle for HORECA / admin */}
+                                            {(isHoreca || isAdmin) && (
+                                                <div className="sm:hidden border-t border-slate-100 px-4 py-2">
+                                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">View Prices</div>
+                                                    <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-slate-100 w-full">
+                                                        <button
+                                                            onClick={() => { setActiveTier("standard"); setMenuOpen(false); }}
+                                                            className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-full text-xs font-bold transition-all ${
+                                                                activeTier === "standard"
+                                                                    ? "bg-white text-emerald-700 shadow-sm"
+                                                                    : "text-slate-500 hover:text-slate-700"
+                                                            }`}
+                                                        >
+                                                            <Star className="w-3 h-3" /> Regular
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { setActiveTier("economy"); setMenuOpen(false); }}
+                                                            className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-full text-xs font-bold transition-all ${
+                                                                activeTier === "economy"
+                                                                    ? "bg-purple-500 text-white shadow-sm"
+                                                                    : "text-slate-500 hover:text-slate-700"
+                                                            }`}
+                                                        >
+                                                            <UtensilsCrossed className="w-3 h-3" /> Restaurant
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {/* HORECA apply — mobile only */}
+                                            {!isHoreca && (
+                                                <button
+                                                    onClick={() => { setMenuOpen(false); setHorecaOpen(true); }}
+                                                    className="sm:hidden w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-purple-50 transition-colors flex items-center gap-2 border-t border-slate-100"
+                                                >
+                                                    <UtensilsCrossed className="w-4 h-4" /> Restaurants / Hotels
+                                                </button>
+                                            )}
+                                            {/* Market Rates — mobile only, admin */}
+                                            {isAdmin && (
+                                                <Link
+                                                    href="/market-rates"
+                                                    onClick={() => setMenuOpen(false)}
+                                                    className="sm:hidden block px-4 py-2 text-sm hover:bg-slate-50 transition-colors flex items-center gap-2"
+                                                >
+                                                    <TrendingUp className="w-4 h-4" /> Market Rates
+                                                </Link>
+                                            )}
+
                                             <button
-                                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 border-t border-slate-100"
                                                 onClick={async () => {
                                                     if (currentUser) await markOffline(currentUser.uid);
                                                     const { auth } = await import("@/lib/firebase");
@@ -133,7 +224,7 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                             </button>
                                         </>
                                     ) : (
-                                        <div className="px-4 py-3">
+                                        <div className="px-4 py-3 space-y-2">
                                             <p className="text-xs text-slate-500 mb-2">Sign in to save addresses and view past orders.</p>
                                             <button
                                                 onClick={() => {
@@ -144,6 +235,13 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                                 style={{ background: "var(--color-primary)" }}
                                             >
                                                 Login / Sign Up
+                                            </button>
+                                            {/* HORECA apply — mobile, logged-out → prompt sign-in first */}
+                                            <button
+                                                onClick={() => { setMenuOpen(false); setAuthOpen(true); }}
+                                                className="sm:hidden w-full text-left text-sm text-purple-600 hover:bg-purple-50 transition-colors flex items-center gap-2 border-t border-slate-100 pt-2"
+                                            >
+                                                <UtensilsCrossed className="w-4 h-4" /> Restaurants / Hotels
                                             </button>
                                         </div>
                                     )}
@@ -171,6 +269,7 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                 </div>
             </header>
             <EnquiryModal isOpen={enquiryOpen} onClose={() => setEnquiryOpen(false)} />
+            <HorecaRegistrationModal isOpen={horecaOpen} onClose={() => setHorecaOpen(false)} />
             <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
             {currentUser && <OtpPopup />}
             <OtpConfigWarning />

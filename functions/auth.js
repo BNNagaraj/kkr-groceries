@@ -165,6 +165,49 @@ exports.setAgentClaim = onCall(async (request) => {
 });
 
 /**
+ * Set or remove the "horeca" (Hotel/Restaurant/Catering) custom claim on a user.
+ * HORECA users see economy-tier products instead of standard-tier.
+ */
+exports.setHorecaClaim = onCall(async (request) => {
+  try {
+    const caller = await requireAdmin(request);
+    if (await isRateLimited(caller.uid, "setHorecaClaim", 10, 10 * 60 * 1000)) {
+      throw new HttpsError("resource-exhausted", "Too many requests. Try again later.");
+    }
+
+    const { uid, horeca = true } = request.data;
+
+    if (!uid) {
+      throw new HttpsError("invalid-argument", "User UID is required.");
+    }
+
+    let user;
+    try {
+      user = await getAuth().getUser(uid);
+    } catch (userError) {
+      throw new HttpsError("not-found", `User with UID ${uid} not found.`);
+    }
+
+    const existingClaims = user.customClaims || {};
+    await getAuth().setCustomUserClaims(user.uid, { ...existingClaims, horeca });
+
+    console.log(`HORECA claim set for user ${user.displayName || user.uid}: horeca=${horeca}`);
+
+    return {
+      success: true,
+      message: `HORECA role ${horeca ? "granted" : "revoked"} for ${user.displayName || user.uid}`,
+      uid: user.uid,
+    };
+  } catch (error) {
+    console.error("Error in setHorecaClaim:", error);
+    throw new HttpsError(
+      error.code || "internal",
+      error.message || "Failed to set HORECA claim"
+    );
+  }
+});
+
+/**
  * List all registered Firebase Auth users (admin-only)
  */
 exports.listRegisteredUsers = onCall(async (request) => {
@@ -205,6 +248,7 @@ exports.listRegisteredUsers = onCall(async (request) => {
         isAdmin: u.customClaims?.admin === true,
         isDelivery: u.customClaims?.delivery === true,
         isAgent: u.customClaims?.agent === true,
+        isHoreca: u.customClaims?.horeca === true,
         agentStoreId: u.customClaims?.agentStoreId || null,
         orderCount: orderCounts[u.uid] || 0,
         totalSpent: orderTotals[u.uid] || 0,
@@ -217,6 +261,40 @@ exports.listRegisteredUsers = onCall(async (request) => {
       error.code || "internal",
       error.message || "Failed to list users"
     );
+  }
+});
+
+/**
+ * List ALL users who hold the delivery claim — regardless of whether they are
+ * online or have GPS. Used by the manual assignment dialog so an agent can be
+ * assigned even before they have ever opened the app.
+ */
+exports.listDeliveryAgents = onCall(async (request) => {
+  try {
+    const caller = await requireAdmin(request);
+    if (await isRateLimited(caller.uid, "listDeliveryAgents", 30, 5 * 60 * 1000)) {
+      throw new HttpsError("resource-exhausted", "Too many requests. Try again later.");
+    }
+    const agents = [];
+    let pageToken;
+    do {
+      const res = await getAuth().listUsers(1000, pageToken);
+      res.users.forEach((u) => {
+        if (u.customClaims && u.customClaims.delivery === true) {
+          agents.push({
+            uid: u.uid,
+            name: u.displayName || null,
+            phone: u.phoneNumber || null,
+            email: u.email || null,
+          });
+        }
+      });
+      pageToken = res.pageToken;
+    } while (pageToken);
+    return { agents };
+  } catch (error) {
+    console.error("Error in listDeliveryAgents:", error);
+    throw new HttpsError(error.code || "internal", error.message || "Failed to list delivery agents");
   }
 });
 

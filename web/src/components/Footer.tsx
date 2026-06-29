@@ -18,7 +18,7 @@ export function Footer() {
               <img src={logoSrc} alt={biz.storeName || "KKR Groceries"} width={40} height={40} className="rounded-md" />
               <div>
                 <div className="font-bold text-xl">{biz.storeName || "KKR Groceries"}</div>
-                <div className="text-white/60 text-xs uppercase tracking-widest font-semibold">B2B Wholesale</div>
+                <div className="text-white/60 text-xs uppercase tracking-widest font-semibold">{biz.tagline || "Hyderabad B2B & B2C Wholesale"}</div>
               </div>
             </div>
             <p className="text-white/50 text-sm leading-relaxed">

@@ -59,7 +59,7 @@ export default function StockReceiptForm({
   fixedStoreName,
 }: StockReceiptFormProps) {
   const { col } = useMode();
-  const { products } = useAppStore();
+  const { allProducts: products } = useAppStore();
   const [stores, setStores] = useState<Store[]>([]);
   const [storeId, setStoreId] = useState(fixedStoreId || "");
   const [productSearch, setProductSearch] = useState("");

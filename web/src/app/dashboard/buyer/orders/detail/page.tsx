@@ -22,10 +22,20 @@ import { useMode } from "@/contexts/ModeContext";
 import { Order, OrderCartItem } from "@/types/order";
 // jsPDF lazy-loaded on click (~200KB kept out of initial bundle)
 const lazyDownloadInvoice = async (order: Order) => {
-  const { downloadInvoice } = await import("@/lib/invoice");
-  lazyDownloadInvoice(order);
+  const [{ downloadInvoice }, { getDoc, doc }, { db }] = await Promise.all([
+    import("@/lib/invoice"),
+    import("firebase/firestore"),
+    import("@/lib/firebase"),
+  ]);
+  let biz;
+  try {
+    const snap = await getDoc(doc(db, "settings", "business"));
+    if (snap.exists()) biz = snap.data();
+  } catch { /* fall back to defaults */ }
+  downloadInvoice(order, biz);
 };
 import { StatusTimeline, formatStatusTime } from "@/components/OrderTimeline";
+import { PaymentCard } from "@/components/PaymentCard";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -294,6 +304,8 @@ export default function OrderDetailPage() {
 
           <StatusTimeline order={order} />
         </div>
+
+        <PaymentCard order={order} />
 
         {/* Active Delivery OTP Banner — shown when admin sends OTP via the Customer App channel */}
         {showOtpBanner && activeOtp && (

@@ -95,6 +95,25 @@ export interface Order {
   assignedStoreId?: string;    // store document ID
   assignedStoreName?: string;  // store name (denormalized)
   assignedAt?: Timestamp;
+  // Swiggy/Zomato-style live delivery progress (within the Shipped status)
+  deliveryStage?: "reached_store" | "picked_up" | "on_the_way";
+  deliveryStageAt?: Timestamp;
+  deliveredBy?: string;        // agent UID who completed the delivery
+  // Agent acceptance of the assignment
+  assignmentStatus?: "pending" | "accepted" | "rejected";
+  rejectedBy?: string[];       // agent UIDs who rejected — excluded on auto-reassign
+  // Payment
+  paymentStatus?: "unpaid" | "submitted" | "paid" | "partial" | "refunded";
+  paymentMethod?: string;      // "upi" | "razorpay" | "cash" | "cod"
+  paymentRef?: string;         // UPI UTR or gateway payment id
+  paymentSubmittedAt?: Timestamp;
+  paidAt?: Timestamp;
+  collectedBy?: string;        // agent UID who collected cash (COD)
+  collectedAmount?: number;    // cash actually collected (for full/partial)
+  // Cash settlement (agent → business handover)
+  cashSettled?: boolean;
+  settledAt?: Timestamp;
+  settledBy?: string;          // admin UID who confirmed the cash handover
 }
 
 export const STATUS_TIMESTAMP_FIELDS: Record<OrderStatus, string> = {

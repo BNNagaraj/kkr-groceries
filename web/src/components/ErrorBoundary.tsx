@@ -45,7 +45,15 @@ export class ErrorBoundary extends Component<Props, State> {
             // (prevents infinite reload loops)
             if (!lastReload || now - Number(lastReload) > 30_000) {
                 sessionStorage.setItem(RELOAD_KEY, String(now));
-                window.location.reload();
+                // Clear service worker caches so reload fetches fresh chunks
+                if ("caches" in window) {
+                    caches.keys().then(names => Promise.all(names.map(n => caches.delete(n))));
+                }
+                if ("serviceWorker" in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
+                }
+                // Small delay to let cache clearing complete
+                setTimeout(() => window.location.reload(), 200);
                 return;
             }
         }
@@ -71,9 +79,18 @@ export class ErrorBoundary extends Component<Props, State> {
                         <button
                             onClick={() => {
                                 this.setState({ hasError: false, errorMessage: "" });
-                                window.location.reload();
+                                // Clear all caches to ensure fresh load
+                                if ("caches" in window) {
+                                    caches.keys().then(names => Promise.all(names.map(n => caches.delete(n))));
+                                }
+                                if ("serviceWorker" in navigator) {
+                                    navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
+                                }
+                                sessionStorage.removeItem(RELOAD_KEY);
+                                setTimeout(() => window.location.reload(), 200);
                             }}
-                            className="bg-[#064e3b] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#065f46] transition-colors"
+                            style={{ background: "var(--color-primary-dark, #064e3b)" }}
+                            className="text-white px-6 py-3 rounded-xl font-bold transition-colors hover:brightness-110"
                         >
                             Try Again
                         </button>

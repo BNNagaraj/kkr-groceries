@@ -11,6 +11,7 @@ interface AuthContextType {
     isAdmin: boolean;
     isDelivery: boolean;
     isAgent: boolean;
+    isHoreca: boolean;
     agentStoreId: string | null;
     loading: boolean;
 }
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType>({
     isAdmin: false,
     isDelivery: false,
     isAgent: false,
+    isHoreca: false,
     agentStoreId: null,
     loading: true,
 });
@@ -38,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [hasClaim, setHasClaim] = useState(false);
     const [hasDeliveryClaim, setHasDeliveryClaim] = useState(false);
     const [hasAgentClaim, setHasAgentClaim] = useState(false);
+    const [hasHorecaClaim, setHasHorecaClaim] = useState(false);
     const [agentStoreId, setAgentStoreId] = useState<string | null>(null);
 
     // Listen to Firestore settings/admins for dynamic admin list
@@ -61,26 +64,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Auth state + custom claims check
     useEffect(() => {
+        const applyClaims = (claims: Record<string, unknown>) => {
+            setHasClaim(claims.admin === true);
+            setHasDeliveryClaim(claims.delivery === true);
+            setHasAgentClaim(claims.agent === true);
+            setHasHorecaClaim(claims.horeca === true);
+            setAgentStoreId((claims.agentStoreId as string) || null);
+        };
+        const resetClaims = () => {
+            setHasClaim(false);
+            setHasDeliveryClaim(false);
+            setHasAgentClaim(false);
+            setHasHorecaClaim(false);
+            setAgentStoreId(null);
+        };
+
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setCurrentUser(user);
             if (user) {
                 try {
-                    const result = await user.getIdTokenResult();
-                    setHasClaim(result.claims.admin === true);
-                    setHasDeliveryClaim(result.claims.delivery === true);
-                    setHasAgentClaim(result.claims.agent === true);
-                    setAgentStoreId((result.claims.agentStoreId as string) || null);
+                    // 1. Fast path: cached token for instant first render
+                    const cached = await user.getIdTokenResult();
+                    applyClaims(cached.claims);
                 } catch {
-                    setHasClaim(false);
-                    setHasDeliveryClaim(false);
-                    setHasAgentClaim(false);
-                    setAgentStoreId(null);
+                    resetClaims();
+                } finally {
+                    setLoading(false);
+                }
+
+                // 2. Authoritative: force-refresh so claims granted server-side
+                //    after sign-in (e.g. HORECA approval) take effect without
+                //    requiring sign out/in. Failures here (e.g. transient network)
+                //    must NOT wipe the valid cached claims applied above.
+                try {
+                    const fresh = await user.getIdTokenResult(true);
+                    applyClaims(fresh.claims);
+                } catch {
+                    /* keep cached claims */
                 }
             } else {
-                setHasClaim(false);
-                setHasDeliveryClaim(false);
-                setHasAgentClaim(false);
-                setAgentStoreId(null);
+                resetClaims();
             }
             setLoading(false);
         });
@@ -100,9 +123,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 
     const isAgent = hasAgentClaim;
+    const isHoreca = hasHorecaClaim;
 
     return (
-        <AuthContext.Provider value={{ currentUser, isAdmin, isDelivery, isAgent, agentStoreId, loading }}>
+        <AuthContext.Provider value={{ currentUser, isAdmin, isDelivery, isAgent, isHoreca, agentStoreId, loading }}>
             {children}
         </AuthContext.Provider>
     );

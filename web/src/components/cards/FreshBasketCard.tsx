@@ -42,12 +42,12 @@ export const FreshBasketCard = memo(function FreshBasketCard({ product }: { prod
     return (
         <>
             <div
-                className="overflow-hidden flex flex-col h-full hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-150 ease-out"
+                className="overflow-hidden flex flex-col h-full hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 ease-out"
                 style={{
                     borderRadius: "var(--theme-card-radius, 1rem)",
-                    background: "linear-gradient(180deg, #fef0dc 0%, #fef7ee 30%, #fefaf4 100%)",
-                    border: "1px solid #f5d5a8",
-                    boxShadow: "0 2px 8px rgba(247,148,29,0.12), 0 0 0 0.5px rgba(247,148,29,0.06)",
+                    background: "linear-gradient(180deg, #fef0dc 0%, #ffffff 40%, #ffffff 100%)",
+                    border: "1.5px solid #e0b06a",
+                    boxShadow: "0 4px 16px rgba(180,120,40,0.12), 0 2px 4px rgba(0,0,0,0.05)",
                 }}
             >
                 {/* ── Vibrant orange header (the basket band) ── */}
@@ -81,11 +81,11 @@ export const FreshBasketCard = memo(function FreshBasketCard({ product }: { prod
                 </div>
 
                 {/* ── Image + Info row ── */}
-                <div className={`flex ${img.containerClass} flex-1`}>
+                <div className={`flex ${img.containerClass} flex-1`} style={{ minHeight: img.isHorizontal ? "120px" : undefined }}>
                     {/* Image well — warm peach tint, never stark white */}
                     <div
                         className={`relative shrink-0 ${img.imageClass} overflow-hidden group/img ${hasImage ? "cursor-pointer" : ""}`}
-                        style={{ ...img.imageStyle, background: "linear-gradient(135deg, #fde8cc, #fef0dc)" }}
+                        style={{ ...img.imageStyle, minHeight: img.isHorizontal ? "120px" : undefined, background: "linear-gradient(135deg, #fde8cc, #fef0dc)" }}
                         onClick={() => hasImage && setLightboxOpen(true)}
                     >
                         {hasImage ? (

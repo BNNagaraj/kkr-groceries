@@ -1,25 +1,66 @@
 {
-  "name": "KKR Groceries - B2B Wholesale",
+  "id": "/",
+  "name": "KKR Groceries - B2B & B2C Wholesale",
   "short_name": "KKR Groceries",
   "description": "Fresh vegetables at APMC wholesale prices for hotels, restaurants & retailers in Hyderabad.",
-  "start_url": "/",
+  "start_url": "/?utm_source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#064e3b",
-  "background_color": "#f8fafc",
+  "display_override": ["standalone", "minimal-ui"],
+  "theme_color": "#F7941D",
+  "background_color": "#faf5ed",
   "orientation": "portrait-primary",
+  "lang": "en-IN",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "categories": ["food", "shopping", "business"]
+  "screenshots": [
+    {
+      "src": "/og-image.png",
+      "sizes": "1200x1200",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "KKR Groceries Homepage"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Browse Products",
+      "short_name": "Products",
+      "url": "/?utm_source=pwa_shortcut",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Track Order",
+      "short_name": "Track",
+      "url": "/track?utm_source=pwa_shortcut",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["food", "shopping", "business"],
+  "prefer_related_applications": false
 }

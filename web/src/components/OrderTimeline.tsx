@@ -62,7 +62,35 @@ export function StatusTimeline({ order }: { order: Order }) {
   });
 
   const completedCount = steps.filter((s) => formatStatusTime(s.time)).length;
-  if (completedCount <= 1) return null;
 
-  return <div className="mt-1.5 flex flex-wrap gap-1 items-center">{renderedSteps}</div>;
+  // Live delivery info — shown to the buyer while the order is in transit.
+  const stageLabels: Record<string, string> = {
+    reached_store: "Agent reached store",
+    picked_up: "Picked up",
+    on_the_way: "Out for delivery",
+  };
+  const inTransit = order.status === "Accepted" || order.status === "Shipped";
+  const showDelivery = !!order.assignedToName && inTransit;
+
+  if (completedCount <= 1 && !showDelivery) return null;
+
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      {completedCount > 1 && (
+        <div className="flex flex-wrap gap-1 items-center">{renderedSteps}</div>
+      )}
+      {showDelivery && (
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700">
+            🛵 Delivery partner: {order.assignedToName}
+          </span>
+          {order.deliveryStage && stageLabels[order.deliveryStage] && (
+            <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700">
+              {stageLabels[order.deliveryStage]}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

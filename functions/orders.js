@@ -14,7 +14,7 @@ const {
   isRateLimited, requireAdmin,
   getNotificationEmails,
   buildOrderEmailHtml, buildStatusEmailHtml,
-  emailLayout,
+  emailLayout, getBusinessTagline,
 } = require("./utils");
 
 /**
@@ -87,6 +87,28 @@ exports.submitOrder = onCall(async (request) => {
       );
     }
 
+    // ── HORECA tier enforcement ──
+    // Economy ("Restaurant / Hotel") products carry restricted wholesale pricing.
+    // Only accounts with the horeca claim (or admins) may order them. This guards
+    // the API directly, independent of the UI which already hides these items.
+    const isHorecaBuyer =
+      request.auth?.token?.horeca === true || request.auth?.token?.admin === true;
+    if (!isHorecaBuyer) {
+      const economyViolations = [];
+      for (const item of data.cart) {
+        const product = productMap[String(item.id)];
+        if (product && product.tier === "economy") {
+          economyViolations.push(item.name || product.name);
+        }
+      }
+      if (economyViolations.length > 0) {
+        throw new HttpsError(
+          "permission-denied",
+          `Restaurant / Hotel pricing requires an approved HORECA account: ${economyViolations.join(", ")}`
+        );
+      }
+    }
+
     // ── Delivery Zone Validation ──
     const orderLat = data.locationDetails?.lat;
     const orderLng = data.locationDetails?.lng;
@@ -157,6 +179,9 @@ exports.submitOrder = onCall(async (request) => {
       createdAt: FieldValue.serverTimestamp(),
       status: "Pending",
       source: "Cloud Function",
+      // Payment: method chosen at checkout (cod | upi); unpaid until collected/confirmed
+      paymentStatus: "unpaid",
+      paymentMethod: data.paymentMethod === "upi" ? "upi" : "cod",
       // GSTIN / billing details (from checkout or buyer profile)
       ...(buyerGstin && { buyerGstin }),
       ...(billingAddress && { billingAddress }),
@@ -246,6 +271,9 @@ exports.submitOrder = onCall(async (request) => {
       productCount: data.productCount || data.cart.length,
     };
 
+    // Refresh the configurable tagline so both emails reflect current settings
+    await getBusinessTagline();
+
     // Queue Admin Email
     try {
       const notifyEmails = await getNotificationEmails();
@@ -324,7 +352,7 @@ exports.notifyOrderStatusChange = onCall(async (request) => {
       try {
         const bizSnap = await db.collection("settings").doc("business").get();
         const bizData = bizSnap.exists ? bizSnap.data() : {};
-        const pdfBuffer = generateInvoicePdf(order, bizData);
+        const pdfBuffer = await generateInvoicePdf(order, bizData);
         const pdfBase64 = pdfBuffer.toString("base64");
         pdfAttachments = [{
           filename: `Invoice_${displayOrderId}.pdf`,
@@ -382,6 +410,7 @@ exports.notifyOrderStatusChange = onCall(async (request) => {
       productCount: order.productCount || 0,
       statusInfo,
     };
+    await getBusinessTagline();
     const emailHtml = buildStatusEmailHtml(statusEmailData);
 
     // Queue email to buyer if they have email

@@ -144,24 +144,79 @@ function getStatusBadge(status) {
    ══════════════════════════════════════════════════════════════════ */
 
 /**
+ * Download an image URL and return as base64 data URI for jsPDF.
+ * Returns null on failure (logo is optional — PDF still generates without it).
+ */
+async function fetchLogoBase64(url) {
+  if (!url) return null;
+  try {
+    const https = require("https");
+    const http = require("http");
+    const mod = url.startsWith("https") ? https : http;
+    return await new Promise((resolve) => {
+      const req = mod.get(url, { timeout: 5000 }, (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          // Follow one redirect
+          const loc = res.headers.location;
+          if (loc) {
+            const mod2 = loc.startsWith("https") ? https : http;
+            mod2.get(loc, { timeout: 5000 }, (res2) => {
+              if (res2.statusCode !== 200) { resolve(null); return; }
+              const chunks = [];
+              res2.on("data", (c) => chunks.push(c));
+              res2.on("end", () => {
+                const buf = Buffer.concat(chunks);
+                const ct = res2.headers["content-type"] || "image/png";
+                resolve(`data:${ct};base64,${buf.toString("base64")}`);
+              });
+              res2.on("error", () => resolve(null));
+            }).on("error", () => resolve(null));
+          } else { resolve(null); }
+          return;
+        }
+        if (res.statusCode !== 200) { resolve(null); return; }
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => {
+          const buf = Buffer.concat(chunks);
+          const ct = res.headers["content-type"] || "image/png";
+          resolve(`data:${ct};base64,${buf.toString("base64")}`);
+        });
+        res.on("error", () => resolve(null));
+      });
+      req.on("error", () => resolve(null));
+      req.on("timeout", () => { req.destroy(); resolve(null); });
+    });
+  } catch (e) {
+    console.warn("Failed to fetch logo for invoice:", e.message);
+    return null;
+  }
+}
+
+/**
  * Generate Invoice PDF for an order (server-side).
  * @param {Object} order — Firestore order document data
  * @param {Object} businessSettings — from settings/business (optional)
- * @returns {Buffer} PDF file as Node.js Buffer
+ * @returns {Promise<Buffer>} PDF file as Node.js Buffer
  */
-function generateInvoicePdf(order, businessSettings = {}) {
+async function generateInvoicePdf(order, businessSettings = {}) {
   const { jsPDF } = require("jspdf");
   const autoTablePlugin = require("jspdf-autotable");
   autoTablePlugin.applyPlugin(jsPDF);
 
   const SELLER = {
     name: businessSettings.storeName || "KKR Groceries",
-    tagline: "B2B Vegetable Wholesale",
+    tagline: businessSettings.tagline || "Hyderabad B2B & B2C Wholesale",
     address: businessSettings.address || "Hyderabad, Telangana, India",
     phone: businessSettings.contactPhone || "+91 93472 13498",
     gstin: businessSettings.gstNumber || "Not Registered",
     placeOfSupply: "Telangana (36)",
   };
+
+  // Fetch business logo (non-blocking — invoice still generates without it)
+  // Use the optimized 200x200 invoice logo (21 KB) — not the full-size 1 MB original
+  const logoUrl = "https://storage.googleapis.com/kkr-groceries-02.firebasestorage.app/branding/logo-invoice.png";
+  const logoDataUri = await fetchLogoBase64(logoUrl);
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const W = doc.internal.pageSize.getWidth();  // 210
@@ -208,16 +263,27 @@ function generateInvoicePdf(order, businessSettings = {}) {
   doc.setFillColor(...hex(C.greenMid));
   doc.rect(0, 30, W, 6, "F");
 
-  // Company name — left
+  // Logo — left side of header
+  let nameOffsetX = M + 2;
+  if (logoDataUri) {
+    try {
+      doc.addImage(logoDataUri, "PNG", M + 2, 4, 12, 12);
+      nameOffsetX = M + 16; // shift text right past logo
+    } catch (e) {
+      console.warn("Could not embed logo in PDF:", e.message);
+    }
+  }
+
+  // Company name — left (offset if logo present)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
   doc.setTextColor(...hex(C.white));
-  doc.text(SELLER.name, M + 2, 14);
+  doc.text(SELLER.name, nameOffsetX, 14);
 
   // Tagline
   doc.setFontSize(8);
   doc.setTextColor(167, 243, 208);
-  doc.text(SELLER.tagline.toUpperCase(), M + 2, 20);
+  doc.text(SELLER.tagline.toUpperCase(), nameOffsetX, 20);
 
   // Seller contact — right
   doc.setFontSize(7.5);

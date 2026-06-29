@@ -40,7 +40,11 @@ service cloud.firestore {
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
-    
+
+    function isDeliveryAgent() {
+      return isAuthenticated() && request.auth.token.delivery == true;
+    }
+
     function validString(value, minLen, maxLen) {
       return value is string && 
         value.size() >= minLen && 
@@ -80,22 +84,26 @@ service cloud.firestore {
     
     // Orders collection
     match /orders/{orderId} {
-      // Read: Admin can read all, users can read their own
-      allow read: if isAdmin() || 
-        (isAuthenticated() && resource.data.userId == request.auth.uid);
-      
+      // Read: Admin reads all; buyers read their own; delivery agents read
+      // orders assigned to them (so the delivery dashboard can list them).
+      allow read: if isAdmin() ||
+        (isAuthenticated() && resource.data.userId == request.auth.uid) ||
+        (isDeliveryAgent() && resource.data.assignedTo == request.auth.uid);
+
       // Create: Allow authenticated users to create their own orders
-      allow create: if isAuthenticated() && 
+      allow create: if isAuthenticated() &&
         request.auth.uid == request.resource.data.userId &&
         request.resource.data.keys().hasAll(['userId', 'items', 'total', 'address', 'createdAt']) &&
         request.resource.data.items is list &&
         request.resource.data.items.size() > 0 &&
         request.resource.data.total is number &&
         request.resource.data.total > 0;
-      
-      // Update: Admin can update status and timestamps
+
+      // Update: Admin only. Delivery agents complete deliveries via the
+      // completeDelivery Cloud Function (server-side, OTP-enforced) — they
+      // never write order docs directly.
       allow update: if isAdmin();
-      
+
       // Delete: Only admin
       allow delete: if isAdmin();
     }
@@ -205,6 +213,54 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // Announcements (admin creates, all authenticated users read)
+    match /announcements/{annId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Grievances / User Messages
+    match /grievances/{grvId} {
+      // Users can read their own, admins can read all
+      allow read: if isAdmin() ||
+        (isAuthenticated() && resource.data.userId == request.auth.uid);
+      // Authenticated users can create their own grievances
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.keys().hasAll(['userId', 'subject', 'message', 'status']) &&
+        request.resource.data.status == 'open';
+      // Users can update their own (add replies); admins can update any (reply, change status)
+      allow update: if isAdmin() ||
+        (isAuthenticated() && resource.data.userId == request.auth.uid);
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+
+    // HORECA (Hotel/Restaurant/Catering) access requests
+    // One request per account: the document id IS the applicant's uid, so a
+    // user can never create a second request (prevents double submission) and
+    // the claim is always granted to the exact account they applied from.
+    match /horeca_requests/{requestId} {
+      // Must be logged in; the doc id and requesterUid must be the caller's uid.
+      allow create: if isAuthenticated() &&
+        requestId == request.auth.uid &&
+        request.resource.data.requesterUid == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        validString(request.resource.data.contactName, 2, 100) &&
+        validString(request.resource.data.businessName, 2, 200) &&
+        validString(request.resource.data.phone, 10, 10);
+      // Admin reads all; a user can read their own request to see its status.
+      allow read: if isAdmin() ||
+        (isAuthenticated() && requestId == request.auth.uid);
+      // Admin can approve/reject. Owner may re-submit (only back to 'pending').
+      allow update: if isAdmin() ||
+        (isAuthenticated() && requestId == request.auth.uid &&
+         request.resource.data.requesterUid == request.auth.uid &&
+         request.resource.data.status == 'pending');
+      // Admin can delete old requests
+      allow delete: if isAdmin();
+    }
+
     // Delivery OTP collection (Cloud Functions only)
     match /delivery_otps/{docId} {
       allow read, write: if false;  // Server-side only
@@ -214,7 +270,8 @@ service cloud.firestore {
 
     match /test_orders/{orderId} {
       allow read: if isAdmin() ||
-        (isAuthenticated() && resource.data.userId == request.auth.uid);
+        (isAuthenticated() && resource.data.userId == request.auth.uid) ||
+        (isDeliveryAgent() && resource.data.assignedTo == request.auth.uid);
       allow create: if isAuthenticated();
       allow update: if isAdmin();
       allow delete: if isAdmin();

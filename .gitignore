@@ -33,3 +33,18 @@ Thumbs.db
 kkr-groceries-02-firebase-adminsdk-*.json
 serviceAccountKey.json
 serviceAccountkey.json
+.gstack/
+
+# Local tooling / scratch artifacts (not source)
+.claude/worktrees/
+.playwright-mcp/
+nano-banana-output/
+screenshots/
+tmp/
+tmp_*.css
+
+# Next.js build output
+web/.next/
+web/out/
+.next/
+out/

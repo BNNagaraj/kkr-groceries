@@ -8,7 +8,7 @@ const {
   resolveCol, getAppMode,
   isRateLimited,
   getAdminEmails, getNotificationEmails,
-  emailLayout,
+  emailLayout, getBusinessTagline,
 } = require("./utils");
 
 /**
@@ -201,6 +201,7 @@ exports.recordStockTransaction = onCall(async (request) => {
           });
 
           const alertSubject = `\u26A0\uFE0F Low Stock: ${productName} at ${storeName || storeId}`;
+          await getBusinessTagline();
           const alertBody = emailLayout(`
             <div style="padding:24px;">
               <div style="text-align:center;margin-bottom:16px;">

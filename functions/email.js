@@ -12,7 +12,7 @@ const {
   db, FieldValue,
   isRateLimited, requireAdmin,
   getSmtpConfig,
-  emailLayout,
+  emailLayout, getBusinessTagline,
 } = require("./utils");
 
 /**
@@ -129,6 +129,7 @@ exports.testSmtpConfig = onCall({ secrets: ["GMAIL_APP_PASSWORD"] }, async (requ
       auth: { user: smtp.user, pass: smtp.password },
     });
 
+    await getBusinessTagline();
     await transporter.sendMail({
       from: `${smtp.fromName} <${smtp.user}>`,
       to: recipient,

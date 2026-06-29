@@ -9,7 +9,7 @@ import { collection, query, where, getDocs, orderBy, deleteDoc, doc, getDoc, set
 import { httpsCallable } from "firebase/functions";
 import { updateProfile } from "firebase/auth";
 import Link from "next/link";
-import { Package, MapPin, Trash2, LogOut, ArrowLeft, BarChart2, ChevronRight, User, Pencil, Plus, FileText, Loader2, CheckCircle2, AlertCircle, Truck, ShoppingCart, Warehouse } from "lucide-react";
+import { Package, MapPin, Trash2, LogOut, ArrowLeft, BarChart2, ChevronRight, User, Pencil, Plus, FileText, Loader2, CheckCircle2, AlertCircle, Truck, ShoppingCart, Warehouse, MessageCircle } from "lucide-react";
 import { useMode } from "@/contexts/ModeContext";
 import { markOffline } from "@/hooks/usePresence";
 import { Order } from "@/types/order";
@@ -22,10 +22,23 @@ const AgentDashboard = dynamic(() => import("@/components/agent/AgentDashboard")
     loading: () => <div className="p-8 text-center text-slate-400 animate-pulse">Loading agent dashboard...</div>,
     ssr: false,
 });
+const MessageCenter = dynamic(() => import("@/components/MessageCenter"), {
+    loading: () => <div className="p-8 text-center text-slate-400 animate-pulse">Loading messages...</div>,
+    ssr: false,
+});
 // jsPDF lazy-loaded on click (~200KB kept out of initial bundle)
 const lazyDownloadInvoice = async (order: Order) => {
-  const { downloadInvoice } = await import("@/lib/invoice");
-  downloadInvoice(order);
+  const [{ downloadInvoice }, { getDoc, doc }, { db }] = await Promise.all([
+    import("@/lib/invoice"),
+    import("firebase/firestore"),
+    import("@/lib/firebase"),
+  ]);
+  let biz;
+  try {
+    const snap = await getDoc(doc(db, "settings", "business"));
+    if (snap.exists()) biz = snap.data();
+  } catch { /* fall back to defaults */ }
+  downloadInvoice(order, biz);
 };
 import { normalizeIndianPhone } from "@/lib/validation";
 import { toast } from "sonner";
@@ -207,8 +220,8 @@ function statusBadgeVariant(status: string): "default" | "secondary" | "destruct
     return "outline";
 }
 
-type TabKey = "overview" | "orders" | "addresses" | "profile";
-const VALID_TABS: TabKey[] = ["overview", "orders", "addresses", "profile"];
+type TabKey = "overview" | "orders" | "addresses" | "messages" | "profile";
+const VALID_TABS: TabKey[] = ["overview", "orders", "addresses", "messages", "profile"];
 
 export default function BuyerDashboard() {
     const { currentUser, isDelivery, isAgent, agentStoreId } = useAuth();
@@ -635,6 +648,10 @@ export default function BuyerDashboard() {
             );
         }
 
+        if (activeTab === "messages") {
+            return <MessageCenter />;
+        }
+
         if (activeTab === "profile") {
             return (
                 <div className="space-y-6">
@@ -864,6 +881,12 @@ export default function BuyerDashboard() {
                         <MapPin className="w-5 h-5" /> Addresses
                     </button>
                     <button
+                        onClick={() => setActiveTab("messages")}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'messages' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}
+                    >
+                        <MessageCircle className="w-5 h-5" /> Messages
+                    </button>
+                    <button
                         onClick={() => setActiveTab("profile")}
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'profile' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}
                     >
@@ -894,7 +917,7 @@ export default function BuyerDashboard() {
                         <DeliveryDashboard />
                     ) : (
                     <>
-                    <h1 className="text-2xl font-bold text-slate-800 mb-6 capitalize">{activeTab === "overview" ? "Overview" : activeTab === "orders" ? "Order History" : activeTab === "addresses" ? "Addresses" : "Profile"}</h1>
+                    <h1 className="text-2xl font-bold text-slate-800 mb-6 capitalize">{activeTab === "overview" ? "Overview" : activeTab === "orders" ? "Order History" : activeTab === "addresses" ? "Addresses" : activeTab === "messages" ? "Message Center" : "Profile"}</h1>
                     {renderCurrentTab()}
                     </>
                     )}
