@@ -1,10 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Timestamp } from "firebase/firestore";
+import { Timestamp, doc, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { functions } from "@/lib/firebase";
+import { functions, db } from "@/lib/firebase";
 import { useMode } from "@/contexts/ModeContext";
+import { DeliveryModel, DEFAULT_MODEL, rankRiderQueues, computeEta } from "@/lib/eta";
+import DemandForecastPanel from "./DemandForecastPanel";
+import DeliveryEconomicsPanel from "./DeliveryEconomicsPanel";
 import { usePresenceData } from "@/contexts/PresenceContext";
 import type { PresenceDoc } from "@/contexts/PresenceContext";
 import { Order } from "@/types/order";
@@ -143,6 +146,35 @@ export default function DeliveryFleetPanel({ orders, stores }: DeliveryFleetPane
     busy: deliveryBoys.filter((b) => b.isOnline && b.activeDeliveries > 0).length,
     offline: deliveryBoys.filter((b) => !b.isOnline).length,
   }), [deliveryBoys]);
+
+  // ── ETA / SLA watch ──
+  const [model, setModel] = useState<DeliveryModel>(DEFAULT_MODEL);
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "deliveryModel"), (snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setModel({
+          perStopMin: typeof d.perStopMin === "number" ? d.perStopMin : DEFAULT_MODEL.perStopMin,
+          slaMinutes: typeof d.slaMinutes === "number" ? d.slaMinutes : DEFAULT_MODEL.slaMinutes,
+          sampleCount: d.sampleCount,
+        });
+      }
+    });
+    return unsub;
+  }, []);
+
+  const slaWatch = useMemo(() => {
+    const active = orders.filter((o) => (o.status === "Accepted" || o.status === "Shipped") && !!o.assignedTo);
+    const ranks = rankRiderQueues(active);
+    let ontime = 0, atRisk = 0, late = 0;
+    for (const o of active) {
+      const r = computeEta(ranks.get(o.id) ?? 1, o.assignedAt?.toMillis?.() ?? null, model);
+      if (r.risk === "late") late += 1;
+      else if (r.risk === "at_risk") atRisk += 1;
+      else ontime += 1;
+    }
+    return { ontime, atRisk, late, total: active.length };
+  }, [orders, model]);
 
   // ── Leaflet Map ──
   const initMap = useCallback(async () => {
@@ -303,6 +335,28 @@ export default function DeliveryFleetPanel({ orders, stores }: DeliveryFleetPane
         />
       </div>
 
+      {/* SLA watch — live on-time / at-risk / late across all active deliveries */}
+      {slaWatch.total > 0 && (
+        <div className="flex items-center gap-2 flex-wrap bg-white rounded-xl border border-slate-200 p-3">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mr-1">
+            <Clock className="w-3.5 h-3.5" /> SLA Watch
+          </span>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+            {slaWatch.ontime} on time
+          </span>
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border ${slaWatch.atRisk > 0 ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-slate-50 text-slate-400 border-slate-200"}`}>
+            {slaWatch.atRisk} at risk
+          </span>
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border ${slaWatch.late > 0 ? "bg-red-50 text-red-700 border-red-200" : "bg-slate-50 text-slate-400 border-slate-200"}`}>
+            {slaWatch.late} late
+          </span>
+          <span className="text-[10px] text-slate-400 ml-auto">
+            model: ~{model.perStopMin}m/stop · SLA {model.slaMinutes}m
+            {model.sampleCount ? ` · learned from ${model.sampleCount}` : " · default"}
+          </span>
+        </div>
+      )}
+
       {/* Smart Batch Dispatch */}
       <BatchDispatchPanel orders={orders} />
 
@@ -399,6 +453,10 @@ export default function DeliveryFleetPanel({ orders, stores }: DeliveryFleetPane
           )}
         </>
       )}
+
+      {/* Demand forecast + unit economics (analytics — shown in both views) */}
+      <DemandForecastPanel orders={orders} model={model} />
+      <DeliveryEconomicsPanel orders={orders} model={model} />
     </div>
   );
 }
