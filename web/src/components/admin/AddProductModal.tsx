@@ -218,8 +218,10 @@ export default function AddProductModal({ open, onClose, existingIds, onProductA
                         <Input
                             type="number"
                             value={moq}
-                            onChange={(e) => setMoq(Number(e.target.value) || 1)}
-                            min={1}
+                            onChange={(e) => setMoq(Number(e.target.value) || 0)}
+                            min={0}
+                            step="any"
+                            placeholder="e.g. 1, 0.5, 0.25"
                         />
                     </div>
 

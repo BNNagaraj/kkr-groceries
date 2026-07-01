@@ -70,7 +70,10 @@ export function InlineQtyInput({
     variant?: "add" | "edit";
     minQty?: number;
 }) {
-    const [value, setValue] = useState(String(defaultValue));
+    // For the initial "add", default sub-1 MOQ items to a friendly 1 — the
+    // buyer can still type down to the real MOQ (enforced by minQty below).
+    const initialValue = variant === "add" && defaultValue < 1 ? 1 : defaultValue;
+    const [value, setValue] = useState(String(initialValue));
     const [error, setError] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
 

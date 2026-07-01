@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Timestamp } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
+import { useMode } from "@/contexts/ModeContext";
 import { usePresenceData } from "@/contexts/PresenceContext";
 import type { PresenceDoc } from "@/contexts/PresenceContext";
 import { Order } from "@/types/order";
@@ -26,7 +29,26 @@ import {
   TrendingUp,
   BarChart3,
   Star,
+  Route,
+  Layers,
+  Eye,
 } from "lucide-react";
+
+interface BatchPlan {
+  batchCount: number;
+  assignedOrders: number;
+  ridersUsed: number;
+  unassignedBatches: number;
+  skippedNoGeo: number;
+  batches: {
+    stopCount: number;
+    totalKm: number;
+    storeName: string | null;
+    rider: { uid: string; name: string } | null;
+    assigned: boolean;
+    stops: { orderId: string; seq: number; location: string | null; legKm: number }[];
+  }[];
+}
 
 // PresenceDoc is imported from @/contexts/PresenceContext
 
@@ -281,6 +303,9 @@ export default function DeliveryFleetPanel({ orders, stores }: DeliveryFleetPane
         />
       </div>
 
+      {/* Smart Batch Dispatch */}
+      <BatchDispatchPanel orders={orders} />
+
       {/* Delivery Performance Metrics */}
       {deliveryBoys.length > 0 && (
         <DeliveryPerformance deliveryBoys={deliveryBoys} orders={orders} />
@@ -373,6 +398,133 @@ export default function DeliveryFleetPanel({ orders, stores }: DeliveryFleetPane
             </div>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+// ─── Smart Batch Dispatch ─────────────────────────────────────────────────────
+// Groups pending, geocoded orders into route-sequenced multi-stop trips and
+// assigns each to one rider (the "100x" throughput lever). Preview first
+// (dry-run), then commit.
+function BatchDispatchPanel({ orders }: { orders: Order[] }) {
+  const { col } = useMode();
+  const [busy, setBusy] = useState<null | "preview" | "assign">(null);
+  const [plan, setPlan] = useState<BatchPlan | null>(null);
+
+  const pending = useMemo(
+    () =>
+      orders.filter(
+        (o) => o.status === "Accepted" && !o.assignedTo && typeof o.lat === "number" && typeof o.lng === "number"
+      ),
+    [orders]
+  );
+  const pendingNoGeo = useMemo(
+    () =>
+      orders.filter(
+        (o) => o.status === "Accepted" && !o.assignedTo && (typeof o.lat !== "number" || typeof o.lng !== "number")
+      ).length,
+    [orders]
+  );
+
+  const run = async (dryRun: boolean) => {
+    setBusy(dryRun ? "preview" : "assign");
+    try {
+      const fn = httpsCallable<{ orderCollection: string; dryRun: boolean }, BatchPlan>(functions, "autoBatchAssign");
+      const { data } = await fn({ orderCollection: col("orders"), dryRun });
+      if (dryRun) {
+        setPlan(data);
+        toast.success(`Plan: ${data.batchCount} trip(s), ${data.assignedOrders} stops across ${data.ridersUsed} rider(s).`);
+      } else {
+        setPlan(null);
+        toast.success(`Dispatched ${data.assignedOrders} order(s) into ${data.ridersUsed} trip(s).`);
+        if (data.unassignedBatches > 0) {
+          toast.warning(`${data.unassignedBatches} trip(s) had no available rider — try again once riders come online.`);
+        }
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Batch dispatch failed.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="bg-gradient-to-r from-indigo-50 to-white rounded-xl border border-indigo-200 p-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
+            <Layers className="w-4.5 h-4.5 text-white" />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+              Smart Batch Dispatch
+            </div>
+            <div className="text-[11px] text-slate-500">
+              {pending.length} order{pending.length !== 1 ? "s" : ""} ready to batch into route-optimised trips
+              {pendingNoGeo > 0 && <span className="text-amber-600"> · {pendingNoGeo} skipped (no GPS)</span>}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => run(true)}
+            disabled={busy !== null || pending.length === 0}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 transition-colors"
+          >
+            {busy === "preview" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Eye className="w-3.5 h-3.5" />}
+            Preview
+          </button>
+          <button
+            onClick={() => run(false)}
+            disabled={busy !== null || pending.length === 0}
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          >
+            {busy === "assign" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+            Assign trips
+          </button>
+        </div>
+      </div>
+
+      {/* Preview plan */}
+      {plan && plan.batches.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {plan.unassignedBatches > 0 && (
+            <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+              {plan.unassignedBatches} trip(s) have no available rider right now — bring more riders online, then Assign.
+            </div>
+          )}
+          {plan.batches.map((b, i) => (
+            <div key={i} className="bg-white rounded-lg border border-slate-200 p-2.5">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-700">
+                  <Route className="w-3.5 h-3.5" />
+                  Trip {i + 1} · {b.stopCount} stops · {b.totalKm} km
+                  {b.storeName && <span className="text-purple-600 font-medium">· {b.storeName}</span>}
+                </div>
+                <div className="text-[11px] font-semibold">
+                  {b.rider ? (
+                    <span className="text-emerald-700">→ {b.rider.name}</span>
+                  ) : (
+                    <span className="text-amber-600">no rider available</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {b.stops.map((s) => (
+                  <span
+                    key={s.orderId}
+                    className="text-[10px] bg-slate-100 text-slate-600 rounded px-1.5 py-0.5"
+                    title={s.location || ""}
+                  >
+                    {s.seq}. #{s.orderId}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div className="text-[10px] text-slate-400">Preview only — nothing is assigned until you tap “Assign trips”.</div>
+        </div>
       )}
     </div>
   );

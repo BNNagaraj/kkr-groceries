@@ -19,6 +19,33 @@ const {
 } = require("./utils");
 
 /**
+ * Best-effort push to a delivery agent's device on a new assignment.
+ * Reads the FCM token the client stored on presence/{uid} (see web push.ts).
+ * No-op if the agent hasn't registered a token — never throws.
+ */
+async function sendAssignmentPush(uid, displayId, location) {
+  try {
+    const snap = await db.collection("presence").doc(uid).get();
+    const token = snap.exists ? snap.data().fcmToken : null;
+    if (!token) return;
+    await getMessaging().send({
+      token,
+      notification: {
+        title: "New delivery assigned",
+        body: `Order #${displayId} — ${location || "address on file"}.`,
+      },
+      data: { type: "delivery_assigned", url: "/delivery", tag: "kkr-delivery" },
+      webpush: {
+        fcmOptions: { link: "/delivery" },
+        notification: { icon: "/icon-192.png", requireInteraction: true },
+      },
+    });
+  } catch (e) {
+    console.warn("[sendAssignmentPush] failed:", e.message);
+  }
+}
+
+/**
  * Find delivery-agent candidates near a reference point, excluding any UIDs
  * (e.g. agents who already rejected the order). Returns the best candidate
  * (available + nearest first) and the full sorted list.
@@ -37,6 +64,7 @@ async function findBestAgent(orderCol, refLat, refLng, excludeUids = []) {
     const p = docSnap.data();
     const uid = p.uid || docSnap.id;
     if (exclude.has(uid)) continue;
+    if (p.available === false) continue; // agent toggled themselves off-shift
     const lastSeenMs = p.lastSeen?.toMillis?.() || 0;
     if (lastSeenMs < twoMinutesAgo) continue;
     if (!p.lat || !p.lng) continue;
@@ -412,6 +440,99 @@ exports.completeDelivery = onCall(async (request) => {
 });
 
 /**
+ * reportDeliveryFailure — the agent (or admin) marks a delivery as failed with a
+ * reason. The order is returned to the dispatch pool (status → Accepted,
+ * unassigned) so it can be re-attempted, admins are emailed, and the customer is
+ * notified. Nothing is marked paid/fulfilled.
+ *
+ * Request data: { orderId, orderCollection?, reason }
+ */
+exports.reportDeliveryFailure = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in required.");
+  const { orderId, orderCollection, reason } = request.data || {};
+  const REASONS = ["customer_unavailable", "wrong_address", "customer_refused", "unreachable", "other"];
+  if (!orderId || !REASONS.includes(reason)) {
+    throw new HttpsError("invalid-argument", "orderId and a valid reason are required.");
+  }
+
+  const mode = await getAppMode();
+  const colName = orderCollection || resolveCol("orders", mode);
+  const orderRef = db.collection(colName).doc(orderId);
+  const snap = await orderRef.get();
+  if (!snap.exists) throw new HttpsError("not-found", "Order not found.");
+  const order = snap.data();
+
+  const caller = await authorizeAdminOrAssignedAgent(request, order);
+  const displayId = order.orderId || orderId;
+
+  const REASON_LABELS = {
+    customer_unavailable: "Customer not available",
+    wrong_address: "Wrong / incomplete address",
+    customer_refused: "Customer refused the order",
+    unreachable: "Couldn't reach the customer",
+    other: "Other",
+  };
+
+  // Return the order to the actionable pool, unassigned, for re-dispatch.
+  await orderRef.update({
+    status: "Accepted",
+    assignedTo: FieldValue.delete(),
+    assignedToName: FieldValue.delete(),
+    assignmentStatus: FieldValue.delete(),
+    deliveryStage: FieldValue.delete(),
+    deliveryFailed: true,
+    lastFailureReason: reason,
+    failedAt: FieldValue.serverTimestamp(),
+    failedBy: caller.uid,
+    failedAttempts: FieldValue.increment(1),
+  });
+
+  // Email admins
+  try {
+    const notifyEmails = await getNotificationEmails();
+    await getBusinessTagline();
+    const html = emailLayout(
+      `<div style="padding:28px 24px;">
+        <h2 style="color:#1e293b;font-size:20px;font-weight:700;margin:0 0 8px;">⚠️ Delivery attempt failed</h2>
+        <p style="color:#64748b;font-size:14px;margin:0 0 4px;">Order <strong>#${displayId}</strong> could not be delivered.</p>
+        <p style="color:#64748b;font-size:14px;margin:0 0 4px;">Reason: <strong>${REASON_LABELS[reason]}</strong></p>
+        <p style="color:#64748b;font-size:14px;margin:0;">${order.location || ""}</p>
+        <p style="color:#94a3b8;font-size:13px;margin:12px 0 0;">The order is back in the pool — reassign it to re-attempt delivery.</p>
+      </div>`,
+      `Delivery failed for order ${displayId}`
+    );
+    await db.collection("mail").add({
+      to: notifyEmails,
+      message: { subject: `⚠️ Delivery failed — Order ${displayId} (${REASON_LABELS[reason]})`, html },
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  } catch (e) {
+    console.warn("[reportDeliveryFailure] email failed:", e.message);
+  }
+
+  // Notify the customer
+  try {
+    if (order.userId && order.userId !== "anonymous") {
+      const notifCol = resolveCol("notifications", mode);
+      await db.collection(notifCol).add({
+        userId: order.userId,
+        orderId,
+        type: "delivery_failed",
+        title: "Delivery attempt unsuccessful",
+        message: `We couldn't complete delivery of order #${displayId}. Our team will re-attempt shortly.`,
+        read: false,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    }
+  } catch (e) {
+    console.warn("[reportDeliveryFailure] customer notify failed:", e.message);
+  }
+
+  console.log(`Order ${orderId} delivery failed (${reason}) reported by ${caller.uid}`);
+  return { success: true, reason };
+});
+
+/**
  * advanceDeliveryStage — Swiggy/Zomato-style live progress for an in-transit
  * order. Callable by the admin OR the assigned delivery agent. Sets the
  * `deliveryStage` field and pings the customer on the recognizable stages.
@@ -562,6 +683,9 @@ exports.autoAssignDeliveryBoy = onCall(async (request) => {
       console.warn("[autoAssignDeliveryBoy] notify failed:", notifErr.message);
     }
 
+    // Push notification to the agent's device (best-effort).
+    await sendAssignmentPush(best.uid, order.orderId || orderId, order.location);
+
     console.log(`[autoAssignDeliveryBoy] Assigned ${best.name} (${best.distanceKm}km) to order ${orderId}`);
 
     return {
@@ -580,6 +704,184 @@ exports.autoAssignDeliveryBoy = onCall(async (request) => {
     if (error.code) throw error;
     console.error("Error in autoAssignDeliveryBoy:", error);
     throw new HttpsError("internal", error.message || "Failed to auto-assign delivery boy.");
+  }
+});
+
+/**
+ * autoBatchAssign — the "100x" dispatch core.
+ *
+ * Instead of one-order-at-a-time assignment, this groups nearby pending orders
+ * into route-sequenced multi-stop TRIPS and hands each trip to a single rider,
+ * minimising total travel. For grocery (many small orders, short distances),
+ * this is the real throughput multiplier: one rider doing N batched drops per
+ * trip instead of N separate round-trips.
+ *
+ * Algorithm (greedy, deterministic, no external solver):
+ *   1. Collect pending, unassigned, geocoded orders.
+ *   2. Group by origin store so a trip departs from one hub (fallback: cluster
+ *      centroid when an order has no store).
+ *   3. Build batches by nearest-neighbour chaining from the origin — capping
+ *      batch size and the hop between consecutive stops (maxLegKm) so a batch
+ *      stays spatially tight and direction-coherent. The chain order *is* the
+ *      optimised stop sequence (nearest-next from the hub).
+ *   4. Assign each batch to the best available rider near its first stop, one
+ *      rider per batch per run.
+ *
+ * Request data: { orderCollection?, maxBatchSize=6, maxLegKm=3, dryRun=false }
+ *   - dryRun: compute and return the plan WITHOUT writing (for admin preview).
+ */
+exports.autoBatchAssign = onCall(async (request) => {
+  try {
+    const caller = await requireAdmin(request);
+    if (await isRateLimited(caller.uid, "autoBatchAssign", 10, 60 * 1000)) {
+      throw new HttpsError("resource-exhausted", "Too many requests. Try again later.");
+    }
+
+    const data = request.data || {};
+    const maxBatchSize = Math.min(Math.max(parseInt(data.maxBatchSize, 10) || 6, 1), 12);
+    const maxLegKm = Math.min(Math.max(Number(data.maxLegKm) || 3, 0.2), 20);
+    const dryRun = data.dryRun === true;
+
+    const mode = await getAppMode();
+    const orderCol = data.orderCollection || resolveCol("orders", mode);
+    const storeCol = resolveCol("stores", mode);
+    const notifCol = resolveCol("notifications", mode);
+
+    // 1. Pending, unassigned, geocoded orders.
+    const snap = await db.collection(orderCol).where("status", "==", "Accepted").get();
+    const pending = [];
+    let skippedNoGeo = 0;
+    snap.forEach((d) => {
+      const o = d.data();
+      if (o.assignedTo) return;
+      if (typeof o.lat !== "number" || typeof o.lng !== "number") { skippedNoGeo += 1; return; }
+      pending.push({ id: d.id, orderId: o.orderId || d.id, lat: o.lat, lng: o.lng, location: o.location || null, storeId: o.assignedStoreId || null });
+    });
+
+    if (pending.length === 0) {
+      return { success: true, batches: [], assignedOrders: 0, ridersUsed: 0, unassignedBatches: 0, skippedNoGeo, message: "No unassigned, geocoded orders to batch." };
+    }
+
+    // 2. Group by origin store; resolve each origin's coordinates.
+    const storeIds = [...new Set(pending.map((o) => o.storeId).filter(Boolean))];
+    const storeCoords = {};
+    await Promise.all(storeIds.map(async (sid) => {
+      const sDoc = await db.collection(storeCol).doc(sid).get();
+      if (sDoc.exists) {
+        const s = sDoc.data();
+        if (typeof s.lat === "number" && typeof s.lng === "number") storeCoords[sid] = { lat: s.lat, lng: s.lng, name: s.name || null };
+      }
+    }));
+
+    const groups = {};
+    for (const o of pending) {
+      const key = o.storeId && storeCoords[o.storeId] ? o.storeId : "_none";
+      (groups[key] = groups[key] || []).push(o);
+    }
+
+    // 3. Build route-sequenced batches per group (nearest-neighbour from origin).
+    const plannedBatches = [];
+    for (const [key, groupOrders] of Object.entries(groups)) {
+      const origin = key !== "_none" && storeCoords[key]
+        ? storeCoords[key]
+        : { // centroid fallback
+            lat: groupOrders.reduce((s, o) => s + o.lat, 0) / groupOrders.length,
+            lng: groupOrders.reduce((s, o) => s + o.lng, 0) / groupOrders.length,
+            name: null,
+          };
+      const remaining = [...groupOrders];
+      while (remaining.length) {
+        const batch = [];
+        let cur = { lat: origin.lat, lng: origin.lng };
+        while (batch.length < maxBatchSize && remaining.length) {
+          let bestIdx = 0;
+          let bestD = Infinity;
+          for (let i = 0; i < remaining.length; i++) {
+            const d = haversineKm(cur.lat, cur.lng, remaining[i].lat, remaining[i].lng);
+            if (d < bestD) { bestD = d; bestIdx = i; }
+          }
+          // Seed stop always joins; later stops only if within the leg cap.
+          if (batch.length > 0 && bestD > maxLegKm) break;
+          const [stop] = remaining.splice(bestIdx, 1);
+          stop.legKm = Math.round(bestD * 10) / 10;
+          batch.push(stop);
+          cur = { lat: stop.lat, lng: stop.lng };
+        }
+        plannedBatches.push({ origin, storeId: key === "_none" ? null : key, stops: batch });
+      }
+    }
+
+    // 4. Assign each batch to the best available rider (one rider per batch/run).
+    const usedRiders = new Set();
+    const results = [];
+    let assignedOrders = 0;
+    let unassignedBatches = 0;
+
+    for (const b of plannedBatches) {
+      const first = b.stops[0];
+      const { best } = await findBestAgent(orderCol, first.lat, first.lng, [...usedRiders]);
+      const totalKm = Math.round(b.stops.reduce((s, st) => s + (st.legKm || 0), 0) * 10) / 10;
+      const summary = {
+        stopCount: b.stops.length,
+        totalKm,
+        storeName: b.storeId && storeCoords[b.storeId] ? storeCoords[b.storeId].name : null,
+        stops: b.stops.map((s, i) => ({ orderId: s.orderId, seq: i + 1, location: s.location, legKm: s.legKm })),
+        rider: best ? { uid: best.uid, name: best.name } : null,
+        assigned: false,
+      };
+
+      if (!best) { unassignedBatches += 1; results.push(summary); continue; }
+
+      if (!dryRun) {
+        const batchId = db.collection(orderCol).doc().id;
+        const wb = db.batch();
+        b.stops.forEach((s, i) => {
+          wb.update(db.collection(orderCol).doc(s.id), {
+            assignedTo: best.uid,
+            assignedToName: best.name,
+            assignmentStatus: "pending",
+            assignedAt: FieldValue.serverTimestamp(),
+            batchId,
+            batchSize: b.stops.length,
+            batchStopIndex: i,
+          });
+        });
+        await wb.commit();
+
+        // One notification + one push per trip.
+        try {
+          await db.collection(notifCol).add({
+            userId: best.uid,
+            type: "delivery_assigned",
+            title: `New trip — ${b.stops.length} stops`,
+            message: `${b.stops.length} deliveries batched into one route (${totalKm} km).`,
+            read: false,
+            createdAt: FieldValue.serverTimestamp(),
+          });
+        } catch (_) { /* ignore */ }
+        await sendAssignmentPush(best.uid, `${b.stops.length}-stop trip`, `${totalKm} km route`);
+      }
+
+      usedRiders.add(best.uid);
+      assignedOrders += b.stops.length; // orders assigned (real run) / would-assign (dry run)
+      summary.assigned = !dryRun;
+      results.push(summary);
+    }
+
+    return {
+      success: true,
+      dryRun,
+      batches: results,
+      batchCount: results.length,
+      assignedOrders, // in dryRun this is the count that WOULD be assigned
+      ridersUsed: usedRiders.size,
+      unassignedBatches,
+      skippedNoGeo,
+    };
+  } catch (error) {
+    if (error.code) throw error;
+    console.error("Error in autoBatchAssign:", error);
+    throw new HttpsError("internal", error.message || "Failed to batch-assign.");
   }
 });
 
@@ -688,6 +990,7 @@ exports.respondToAssignment = onCall(async (request) => {
           createdAt: FieldValue.serverTimestamp(),
         });
       } catch (_) { /* ignore */ }
+      await sendAssignmentPush(best.uid, displayId, order.location);
       console.log(`[respondToAssignment] Order ${orderId} reassigned to ${best.name} after rejection by ${caller.uid}`);
       return { success: true, status: "reassigned", assigned: { uid: best.uid, name: best.name, distanceKm: best.distanceKm } };
     }

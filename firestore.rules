@@ -70,13 +70,13 @@ service cloud.firestore {
       allow create: if isAdmin() && 
         validString(request.resource.data.name, 1, 100) &&
         validString(request.resource.data.unit, 1, 20) &&
-        validNumber(request.resource.data.moq, 1, 10000) &&
+        validNumber(request.resource.data.moq, 0, 10000) &&
         validNumber(request.resource.data.price, 0, 100000);
       
       allow update: if isAdmin() && 
         validString(request.resource.data.name, 1, 100) &&
         validString(request.resource.data.unit, 1, 20) &&
-        validNumber(request.resource.data.moq, 1, 10000) &&
+        validNumber(request.resource.data.moq, 0, 10000) &&
         validNumber(request.resource.data.price, 0, 100000);
       
       allow delete: if isAdmin();

@@ -102,6 +102,10 @@ export interface Order {
   // Agent acceptance of the assignment
   assignmentStatus?: "pending" | "accepted" | "rejected";
   rejectedBy?: string[];       // agent UIDs who rejected — excluded on auto-reassign
+  // Smart-batch dispatch (autoBatchAssign): a multi-stop, route-sequenced trip
+  batchId?: string;            // shared id for all stops in one rider's trip
+  batchSize?: number;          // total stops in the trip
+  batchStopIndex?: number;     // 0-based optimised sequence position of this stop
   // Payment
   paymentStatus?: "unpaid" | "submitted" | "paid" | "partial" | "refunded";
   paymentMethod?: string;      // "upi" | "razorpay" | "cash" | "cod"

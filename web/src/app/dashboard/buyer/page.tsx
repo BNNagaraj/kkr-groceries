@@ -914,7 +914,16 @@ export default function BuyerDashboard() {
                     {isAgent && viewMode === "agent" ? (
                         <AgentDashboard />
                     ) : isDelivery && viewMode === "delivery" ? (
-                        <DeliveryDashboard />
+                        <>
+                            <a
+                                href="/delivery"
+                                className="flex items-center justify-between gap-2 mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
+                            >
+                                <span className="flex items-center gap-2"><Truck className="w-4 h-4" /> Open the dedicated Delivery Console (mobile-friendly)</span>
+                                <span aria-hidden>→</span>
+                            </a>
+                            <DeliveryDashboard />
+                        </>
                     ) : (
                     <>
                     <h1 className="text-2xl font-bold text-slate-800 mb-6 capitalize">{activeTab === "overview" ? "Overview" : activeTab === "orders" ? "Order History" : activeTab === "addresses" ? "Addresses" : activeTab === "messages" ? "Message Center" : "Profile"}</h1>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMode } from "@/contexts/ModeContext";
 import { db, functions } from "@/lib/firebase";
@@ -33,6 +33,7 @@ import {
   Send,
   X,
   Banknote,
+  Route,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +53,14 @@ const STAGES = [
   { key: "on_the_way", label: "On the way" },
 ] as const;
 
+const FAIL_REASONS = [
+  { key: "customer_unavailable", label: "Customer not available" },
+  { key: "wrong_address", label: "Wrong / incomplete address" },
+  { key: "customer_refused", label: "Customer refused order" },
+  { key: "unreachable", label: "Couldn't reach customer" },
+  { key: "other", label: "Other" },
+] as const;
+
 /** Google Maps link — directions to coords if available, else a search on the address text. */
 function buildMapsUrl(order: { lat?: number; lng?: number; location?: string }): string | null {
   if (order.lat && order.lng) {
@@ -61,6 +70,18 @@ function buildMapsUrl(order: { lat?: number; lng?: number; location?: string }):
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.location)}`;
   }
   return null;
+}
+
+/** Multi-stop Google Maps route for a batched trip: intermediate stops as
+ *  waypoints, the last stop as the destination, origin = rider's location. */
+function buildRouteUrl(stops: { lat?: number; lng?: number }[]): string | null {
+  const pts = stops.filter((s) => typeof s.lat === "number" && typeof s.lng === "number") as { lat: number; lng: number }[];
+  if (pts.length === 0) return null;
+  const dest = pts[pts.length - 1];
+  let url = `https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}`;
+  const waypoints = pts.slice(0, -1).map((p) => `${p.lat},${p.lng}`).join("|");
+  if (waypoints) url += `&waypoints=${encodeURIComponent(waypoints)}`;
+  return url;
 }
 
 export default function DeliveryDashboard() {
@@ -81,6 +102,8 @@ export default function DeliveryDashboard() {
   const [respondingId, setRespondingId] = useState<string | null>(null);
   const [cashMode, setCashMode] = useState<"full" | "partial" | "none">("full");
   const [partialAmount, setPartialAmount] = useState("");
+  const [failFor, setFailFor] = useState<string | null>(null);
+  const [failing, setFailing] = useState(false);
 
   // Load whether delivery OTP is required (public setting)
   useEffect(() => {
@@ -120,9 +143,33 @@ export default function DeliveryDashboard() {
     return unsub;
   }, [currentUser, col]);
 
-  const activeOrders = orders.filter(
-    (o) => o.status === "Accepted" || o.status === "Shipped"
-  );
+  // Active orders, ordered so batched trips come first and each trip's stops
+  // appear in their optimised (route-sequenced) order — the rider just works
+  // top to bottom.
+  const activeOrders = useMemo(() => {
+    const list = orders.filter((o) => o.status === "Accepted" || o.status === "Shipped");
+    return list.sort((a, b) => {
+      const aHas = !!a.batchId;
+      const bHas = !!b.batchId;
+      if (aHas !== bHas) return aHas ? -1 : 1;
+      if (aHas && bHas) {
+        if (a.batchId !== b.batchId) return (a.batchId as string) < (b.batchId as string) ? -1 : 1;
+        return (a.batchStopIndex ?? 0) - (b.batchStopIndex ?? 0);
+      }
+      return 0;
+    });
+  }, [orders]);
+
+  // Stops grouped by trip (already sorted), used to render a trip header +
+  // full-route navigation once per batch.
+  const batchGroups = useMemo(() => {
+    const g: Record<string, Order[]> = {};
+    for (const o of activeOrders) {
+      if (o.batchId) (g[o.batchId] = g[o.batchId] || []).push(o);
+    }
+    return g;
+  }, [activeOrders]);
+
   const completedOrders = orders.filter(
     (o) => o.status === "Fulfilled" || o.status === "Rejected"
   );
@@ -168,6 +215,26 @@ export default function DeliveryDashboard() {
         toast.error(msg);
       } finally {
         setRespondingId(null);
+      }
+    },
+    [col]
+  );
+
+  // Report a failed delivery attempt (returns the order to the pool)
+  const handleReportFailure = useCallback(
+    async (orderId: string, reason: string) => {
+      setFailing(true);
+      try {
+        const fn = httpsCallable(functions, "reportDeliveryFailure");
+        await fn({ orderId, orderCollection: col("orders"), reason });
+        toast.success("Marked as failed — sent back to admin to re-attempt.");
+        setFailFor(null);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Failed to report.";
+        console.error("[DeliveryDashboard] report failure error:", e);
+        toast.error(msg);
+      } finally {
+        setFailing(false);
       }
     },
     [col]
@@ -374,10 +441,36 @@ export default function DeliveryDashboard() {
           const isMarking = markingId === order.id;
           const total = parseTotal(order.totalValue);
 
+          // Batched-trip context (only in the active tab; completed orders drop batch UI)
+          const batchStops = tab === "active" && order.batchId ? batchGroups[order.batchId] : null;
+          const isBatchLead = !!batchStops && batchStops[0]?.id === order.id;
+          const routeUrl = batchStops ? buildRouteUrl(batchStops) : null;
+
           return (
+            <React.Fragment key={order.id}>
+              {/* Trip header — rendered once, above the first stop of a batch */}
+              {isBatchLead && batchStops && (
+                <div className="flex items-center justify-between gap-2 mt-1 px-1">
+                  <div className="flex items-center gap-1.5 text-indigo-700 font-bold text-xs">
+                    <Route className="w-4 h-4" />
+                    Trip · {batchStops.length} stops
+                  </div>
+                  {routeUrl && (
+                    <a
+                      href={routeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg px-2.5 py-1.5 transition-colors"
+                    >
+                      <Navigation className="w-3.5 h-3.5" /> Navigate route
+                    </a>
+                  )}
+                </div>
+              )}
             <div
-              key={order.id}
-              className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+              className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${
+                batchStops ? "border-indigo-200 border-l-4 border-l-indigo-400" : "border-slate-200"
+              }`}
             >
               {/* Card Header */}
               <button
@@ -401,6 +494,11 @@ export default function DeliveryDashboard() {
                         {order.assignedStoreName}
                       </Badge>
                     )}
+                    {tab === "active" && typeof order.batchStopIndex === "number" && order.batchSize ? (
+                      <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px]">
+                        Stop {order.batchStopIndex + 1}/{order.batchSize}
+                      </Badge>
+                    ) : null}
                   </div>
                   <div className="text-sm text-slate-700 font-medium">
                     {order.customerName}
@@ -693,9 +791,45 @@ export default function DeliveryDashboard() {
                       );
                     })()}
                   </div>
+
+                  {/* Couldn't deliver — failed attempt */}
+                  {(order.status === "Accepted" || order.status === "Shipped") &&
+                    order.assignmentStatus !== "pending" &&
+                    otpFor !== order.id &&
+                    (failFor === order.id ? (
+                      <div className="rounded-xl border border-red-200 bg-red-50/60 p-3 space-y-2">
+                        <div className="text-xs font-semibold text-red-700">Why couldn&apos;t you deliver?</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {FAIL_REASONS.map((r) => (
+                            <button
+                              key={r.key}
+                              onClick={() => handleReportFailure(order.id, r.key)}
+                              disabled={failing}
+                              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-red-200 bg-white text-red-700 hover:bg-red-100 disabled:opacity-50"
+                            >
+                              {failing ? <Loader2 className="w-3 h-3 animate-spin" /> : r.label}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => setFailFor(null)}
+                          className="text-xs text-slate-500 hover:underline inline-flex items-center gap-1"
+                        >
+                          <X className="w-3 h-3" /> Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setFailFor(order.id)}
+                        className="text-xs font-medium text-red-500 hover:text-red-600 hover:underline"
+                      >
+                        Couldn&apos;t deliver?
+                      </button>
+                    ))}
                 </div>
               )}
             </div>
+            </React.Fragment>
           );
         })}
     </div>
