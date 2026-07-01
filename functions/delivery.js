@@ -435,6 +435,40 @@ exports.completeDelivery = onCall(async (request) => {
 
   await orderRef.update(update);
 
+  // ── Self-learning flywheel ──
+  // Feed the actual outcome back into the fleet ETA model. We learn the real
+  // "minutes per stop" (travel + wait + service) directly from completions —
+  // coordinate-free and robust. For a batched trip, elapsed since assignment is
+  // divided by the stops completed so far to approximate per-stop time. An EMA
+  // lets the model track seasonal/operational drift. This is the compounding
+  // loop: every delivery sharpens future ETAs. Best-effort — never blocks.
+  try {
+    const startMs = order.assignedAt?.toMillis?.() || order.acceptedAt?.toMillis?.() || null;
+    if (startMs) {
+      const elapsedMin = (Date.now() - startMs) / 60000;
+      const stopsSoFar = (typeof order.batchStopIndex === "number" ? order.batchStopIndex : 0) + 1;
+      const perStop = elapsedMin / stopsSoFar;
+      if (perStop >= 1 && perStop <= 180) { // drop implausible samples
+        const modelRef = db.collection("settings").doc("deliveryModel");
+        await db.runTransaction(async (tx) => {
+          const snap = await tx.get(modelRef);
+          const m = snap.exists ? snap.data() : {};
+          const prev = typeof m.perStopMin === "number" ? m.perStopMin : perStop;
+          const alpha = 0.2; // weight on the newest sample
+          const perStopMin = Math.round((prev * (1 - alpha) + perStop * alpha) * 10) / 10;
+          tx.set(modelRef, {
+            perStopMin,
+            sampleCount: (m.sampleCount || 0) + 1,
+            slaMinutes: typeof m.slaMinutes === "number" ? m.slaMinutes : 90,
+            updatedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("[flywheel] model update skipped:", e.message);
+  }
+
   console.log(`Order ${orderId} delivered by ${caller.isAdmin ? "admin" : "agent"} ${caller.uid} (cash: ${cashOutcome || "full"})`);
   return { success: true, message: "Delivery completed.", cashCollected: update.paymentMethod === "cash" };
 });

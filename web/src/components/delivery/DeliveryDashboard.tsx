@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { Order } from "@/types/order";
+import { DeliveryModel, DEFAULT_MODEL, rankRiderQueues, computeEta, etaLabel } from "@/lib/eta";
 import { formatCurrency, parseTotal } from "@/lib/helpers";
 import { toast } from "sonner";
 import {
@@ -34,6 +35,7 @@ import {
   X,
   Banknote,
   Route,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -104,6 +106,22 @@ export default function DeliveryDashboard() {
   const [partialAmount, setPartialAmount] = useState("");
   const [failFor, setFailFor] = useState<string | null>(null);
   const [failing, setFailing] = useState(false);
+  const [model, setModel] = useState<DeliveryModel>(DEFAULT_MODEL);
+
+  // Fleet ETA model (learned minutes-per-stop + SLA) — public settings doc
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "deliveryModel"), (snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setModel({
+          perStopMin: typeof d.perStopMin === "number" ? d.perStopMin : DEFAULT_MODEL.perStopMin,
+          slaMinutes: typeof d.slaMinutes === "number" ? d.slaMinutes : DEFAULT_MODEL.slaMinutes,
+          sampleCount: d.sampleCount,
+        });
+      }
+    });
+    return unsub;
+  }, []);
 
   // Load whether delivery OTP is required (public setting)
   useEffect(() => {
@@ -169,6 +187,10 @@ export default function DeliveryDashboard() {
     }
     return g;
   }, [activeOrders]);
+
+  // ETA queue ranking — each active order's position in the rider's remaining
+  // sequence, used to project a delivery ETA + SLA risk.
+  const queueRanks = useMemo(() => rankRiderQueues(activeOrders), [activeOrders]);
 
   const completedOrders = orders.filter(
     (o) => o.status === "Fulfilled" || o.status === "Rejected"
@@ -446,6 +468,12 @@ export default function DeliveryDashboard() {
           const isBatchLead = !!batchStops && batchStops[0]?.id === order.id;
           const routeUrl = batchStops ? buildRouteUrl(batchStops) : null;
 
+          // Projected ETA + SLA risk for active orders
+          const eta =
+            tab === "active"
+              ? computeEta(queueRanks.get(order.id) ?? 1, order.assignedAt?.toMillis?.() ?? null, model)
+              : null;
+
           return (
             <React.Fragment key={order.id}>
               {/* Trip header — rendered once, above the first stop of a batch */}
@@ -499,6 +527,21 @@ export default function DeliveryDashboard() {
                         Stop {order.batchStopIndex + 1}/{order.batchSize}
                       </Badge>
                     ) : null}
+                    {eta && (
+                      eta.risk === "late" ? (
+                        <Badge className="bg-red-100 text-red-700 border-red-200 text-[10px] gap-0.5">
+                          <AlertTriangle className="w-2.5 h-2.5" /> Late
+                        </Badge>
+                      ) : eta.risk === "at_risk" ? (
+                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[10px] gap-0.5">
+                          <AlertTriangle className="w-2.5 h-2.5" /> At risk · {etaLabel(eta.etaMin)}
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-slate-100 text-slate-600 border-slate-200 text-[10px] gap-0.5">
+                          <Clock className="w-2.5 h-2.5" /> ETA {etaLabel(eta.etaMin)}
+                        </Badge>
+                      )
+                    )}
                   </div>
                   <div className="text-sm text-slate-700 font-medium">
                     {order.customerName}
