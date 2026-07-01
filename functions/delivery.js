@@ -82,12 +82,18 @@ async function findBestAgent(orderCol, refLat, refLng, excludeUids = []) {
       lat: p.lat,
       lng: p.lng,
       distanceKm: Math.round(haversineKm(refLat, refLng, p.lat, p.lng) * 10) / 10,
+      tier: p.tier === "overflow" ? "overflow" : "core",
       isBusy: !activeOrders.empty,
     });
   }
 
   candidates.sort((a, b) => {
     if (a.isBusy !== b.isBusy) return a.isBusy ? 1 : -1; // available first
+    // Prefer core riders; overflow/gig riders are only reached once core
+    // capacity is exhausted (no available core nearer than them).
+    const at = a.tier === "overflow" ? 1 : 0;
+    const bt = b.tier === "overflow" ? 1 : 0;
+    if (at !== bt) return at - bt;
     return a.distanceKm - b.distanceKm; // then nearest
   });
 
@@ -917,6 +923,25 @@ exports.autoBatchAssign = onCall(async (request) => {
     console.error("Error in autoBatchAssign:", error);
     throw new HttpsError("internal", error.message || "Failed to batch-assign.");
   }
+});
+
+/**
+ * setRiderTier — admin designates a delivery agent as "core" (regular staff,
+ * preferred for assignment) or "overflow" (gig/peak riders, used only once
+ * core capacity is exhausted). Writes presence/{uid}.tier via the admin SDK
+ * (presence rules only allow self-writes, so this must be a server function).
+ *
+ * Request data: { uid, tier: "core" | "overflow" }
+ */
+exports.setRiderTier = onCall(async (request) => {
+  const caller = await requireAdmin(request);
+  const { uid, tier } = request.data || {};
+  if (!uid || (tier !== "core" && tier !== "overflow")) {
+    throw new HttpsError("invalid-argument", "uid and tier (core|overflow) are required.");
+  }
+  await db.collection("presence").doc(uid).set({ tier }, { merge: true });
+  console.log(`[setRiderTier] ${caller.uid} set rider ${uid} -> ${tier}`);
+  return { success: true, tier };
 });
 
 /**

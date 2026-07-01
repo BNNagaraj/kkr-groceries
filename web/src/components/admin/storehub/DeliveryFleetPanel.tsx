@@ -68,6 +68,7 @@ interface DeliveryBoyInfo {
   totalDeliveries: number;
   activeDeliveries: number;
   isOnline: boolean;
+  tier: "core" | "overflow";
 }
 
 interface DeliveryFleetPanelProps {
@@ -122,6 +123,7 @@ export default function DeliveryFleetPanel({ orders, stores }: DeliveryFleetPane
         currentOrder,
         totalDeliveries,
         activeDeliveries,
+        tier: (p as { tier?: string }).tier === "overflow" ? "overflow" : "core",
       } as DeliveryBoyInfo;
     }).sort((a, b) => {
       if (a.isOnline && !b.isOnline) return -1;
@@ -590,6 +592,20 @@ function BatchDispatchPanel({ orders }: { orders: Order[] }) {
 
 // ─── Delivery Boy Card ────────────────────────────────────────────────────────
 function DeliveryBoyCard({ boy }: { boy: DeliveryBoyInfo }) {
+  const [savingTier, setSavingTier] = useState(false);
+  const toggleTier = async () => {
+    const next = boy.tier === "core" ? "overflow" : "core";
+    setSavingTier(true);
+    try {
+      const fn = httpsCallable(functions, "setRiderTier");
+      await fn({ uid: boy.uid, tier: next });
+      toast.success(`${boy.name} set to ${next === "core" ? "Core" : "Overflow"}.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to update tier.");
+    } finally {
+      setSavingTier(false);
+    }
+  };
   return (
     <div
       className={`p-4 rounded-xl border transition-all ${
@@ -660,6 +676,22 @@ function DeliveryBoyCard({ boy }: { boy: DeliveryBoyInfo }) {
           </span>
         )}
       </div>
+
+      {/* Core / Overflow tier — core is preferred for assignment; overflow (gig)
+          riders are reached only once core capacity is exhausted */}
+      <button
+        onClick={toggleTier}
+        disabled={savingTier}
+        title="Core riders are preferred for assignment; overflow / gig riders are used only when no core rider is available"
+        className={`w-full mb-2 text-[11px] font-semibold px-2 py-1.5 rounded-lg border transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 ${
+          boy.tier === "overflow"
+            ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+            : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+        }`}
+      >
+        {savingTier ? <Loader2 className="w-3 h-3 animate-spin" /> : <Layers className="w-3 h-3" />}
+        {boy.tier === "overflow" ? "Overflow / gig" : "Core rider"} · tap to switch
+      </button>
 
       {/* Current Delivery */}
       {boy.currentOrder && (
