@@ -95,7 +95,7 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                         {isAdmin && (
                             <Link
                                 href="/dashboard/admin"
-                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                                className="hidden sm:flex w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 items-center justify-center transition-colors"
                             >
                                 <Settings className="w-5 h-5" />
                             </Link>
@@ -106,7 +106,7 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                         {currentUser && (
                             <Link
                                 href="/dashboard/buyer?tab=messages"
-                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                                className="hidden sm:flex w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 items-center justify-center transition-colors"
                                 aria-label="Message Center"
                                 title="Message Center"
                             >
@@ -161,6 +161,24 @@ export function Header({ onOpenCart }: { onOpenCart: () => void }) {
                                             <Link href="/dashboard/buyer?tab=orders" className="block px-4 py-2 text-sm hover:bg-slate-50 transition-colors">
                                                 My Orders
                                             </Link>
+                                            {/* Messages — mobile only (icon hidden on mobile) */}
+                                            <Link
+                                                href="/dashboard/buyer?tab=messages"
+                                                onClick={() => setMenuOpen(false)}
+                                                className="sm:hidden px-4 py-2 text-sm hover:bg-slate-50 transition-colors flex items-center gap-2"
+                                            >
+                                                <MessageCircle className="w-4 h-4" /> Messages
+                                            </Link>
+                                            {/* Admin Dashboard — mobile only, admin (gear hidden on mobile) */}
+                                            {isAdmin && (
+                                                <Link
+                                                    href="/dashboard/admin"
+                                                    onClick={() => setMenuOpen(false)}
+                                                    className="sm:hidden px-4 py-2 text-sm hover:bg-slate-50 transition-colors flex items-center gap-2"
+                                                >
+                                                    <Settings className="w-4 h-4" /> Admin Dashboard
+                                                </Link>
+                                            )}
 
                                             {/* ── Mobile-only items (hidden on sm+) ── */}
                                             {/* Tier toggle for HORECA / admin */}

@@ -1,6 +1,12 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import {
+    getFirestore,
+    initializeFirestore,
+    persistentLocalCache,
+    persistentMultipleTabManager,
+    type Firestore,
+} from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
 
@@ -18,7 +24,25 @@ const firebaseConfig = {
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// ── Firestore with offline persistence ──
+// In the browser we enable IndexedDB-backed persistent cache so delivery agents
+// (and buyers) can view previously-loaded orders/products even on flaky mobile
+// networks, and queued reads resolve from cache when offline. On the server
+// (static export / build) IndexedDB is unavailable, so fall back to plain init.
+function initDb(): Firestore {
+    if (typeof window === "undefined") return getFirestore(app);
+    try {
+        return initializeFirestore(app, {
+            localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+        });
+    } catch {
+        // Already initialized (hot reload) or persistence unsupported → reuse default.
+        return getFirestore(app);
+    }
+}
+
+export const db = initDb();
 export const functions = getFunctions(app);
 export const functionsAsia = getFunctions(app, "asia-south1");
 export const storage = getStorage(app);

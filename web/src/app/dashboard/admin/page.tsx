@@ -863,7 +863,9 @@ export default function AdminDashboard() {
                                                     <td className="px-4 py-3 text-center">
                                                         <input
                                                             type="number"
-                                                            value={p.moq || 1}
+                                                            value={p.moq ?? 1}
+                                                            min={0}
+                                                            step="any"
                                                             onChange={(e) => handleProductChange(p.id, 'moq', Number(e.target.value))}
                                                             className="w-16 px-2 py-1 border border-slate-200 rounded text-center focus:ring-1 focus:ring-emerald-500"
                                                         />
