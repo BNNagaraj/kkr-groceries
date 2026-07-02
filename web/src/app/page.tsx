@@ -4,10 +4,11 @@ import React, { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Header } from "@/components/Header";
 import { ProductCard } from "@/components/ProductCard";
+import { BuyAgainStrip } from "@/components/BuyAgainStrip";
 import { Footer } from "@/components/Footer";
 import { useAppStore } from "@/contexts/AppContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Search, ShoppingBasket, Truck, Clock, Shield, UtensilsCrossed, Star } from "lucide-react";
+import { Search, ShoppingBasket, Truck, Clock, Shield, UtensilsCrossed, Star, ArrowUpDown } from "lucide-react";
 import { CATEGORY_GROUPS, getGroupForCategory } from "@/lib/constants";
 import { useBusiness } from "@/contexts/BusinessContext";
 
@@ -23,6 +24,8 @@ const GROUP_TABS = [
   ...CATEGORY_GROUPS.map((g) => ({ id: g.id, label: g.label })),
 ];
 
+type SortKey = "featured" | "price-asc" | "price-desc" | "name";
+
 export default function Home() {
   const { products, loadingProducts, activeTier, setActiveTier } = useAppStore();
   const { theme } = useTheme();
@@ -31,6 +34,7 @@ export default function Home() {
   const [activeGroup, setActiveGroup] = useState<string>("vegetables");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortKey>("featured");
 
   // Sub-categories shown beneath the active group tab
   const subCategories = useMemo(() => {
@@ -48,7 +52,7 @@ export default function Home() {
     setActiveCategory("all");
   };
 
-  const filteredProducts = products.filter((p) => {
+  const filteredProducts = useMemo(() => products.filter((p) => {
     if (p.isHidden) return false;
 
     // Group filter (top tab)
@@ -72,7 +76,22 @@ export default function Home() {
     }
 
     return true;
-  });
+  }), [products, activeGroup, activeCategory, searchQuery]);
+
+  // Buyer-facing sort. "featured" preserves the admin-curated sortOrder.
+  const sortedProducts = useMemo(() => {
+    const list = [...filteredProducts];
+    switch (sortBy) {
+      case "price-asc":
+        return list.sort((a, b) => a.price - b.price);
+      case "price-desc":
+        return list.sort((a, b) => b.price - a.price);
+      case "name":
+        return list.sort((a, b) => a.name.localeCompare(b.name));
+      default:
+        return list;
+    }
+  }, [filteredProducts, sortBy]);
 
   return (
     <div className="min-h-screen pb-20">
@@ -141,6 +160,9 @@ export default function Home() {
       )}
 
       <main id="main-content" className="max-w-[1400px] mx-auto px-4 mt-4">
+        {/* Buy again — quick reorder from the buyer's last order */}
+        <BuyAgainStrip />
+
         {/* Controls: Search, Group Tabs, Sub-category Chips */}
         <div className="mb-6 space-y-3">
           <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
@@ -155,6 +177,23 @@ export default function Home() {
                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 shadow-sm"
                 style={{ "--tw-ring-color": "var(--color-primary)" } as React.CSSProperties}
               />
+            </div>
+
+            {/* Sort */}
+            <div className="relative shrink-0">
+              <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <select
+                aria-label="Sort products"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortKey)}
+                className="appearance-none w-full md:w-auto pl-9 pr-8 py-3 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 focus:outline-none focus:ring-2 shadow-sm cursor-pointer"
+                style={{ "--tw-ring-color": "var(--color-primary)" } as React.CSSProperties}
+              >
+                <option value="featured">Featured</option>
+                <option value="price-asc">Price: Low to High</option>
+                <option value="price-desc">Price: High to Low</option>
+                <option value="name">Name: A–Z</option>
+              </select>
             </div>
 
             {/* Top-level group tabs */}
@@ -215,10 +254,10 @@ export default function Home() {
         </div>
 
         {/* Product count & Grid */}
-        {!loadingProducts && filteredProducts.length > 0 && (
+        {!loadingProducts && sortedProducts.length > 0 && (
           <div className="flex items-center justify-between mb-3 gap-2">
             <p className="text-sm font-medium" style={{ color: "var(--color-primary-dark)" }}>
-              Showing <span className="font-bold">{filteredProducts.length}</span> product{filteredProducts.length !== 1 ? "s" : ""}
+              Showing <span className="font-bold">{sortedProducts.length}</span> product{sortedProducts.length !== 1 ? "s" : ""}
               {activeCategory !== "all" && activeGroup !== "all" ? ` in ${subCategories.find(c => c.id === activeCategory)?.label || ""}` : activeGroup !== "all" ? ` in ${GROUP_TABS.find(g => g.id === activeGroup)?.label || ""}` : ""}
             </p>
             {activeTier === "economy" && (
@@ -259,7 +298,7 @@ export default function Home() {
               </div>
             ))}
           </div>
-        ) : filteredProducts.length > 0 ? (
+        ) : sortedProducts.length > 0 ? (
           <div
             className="theme-grid"
             style={{
@@ -269,9 +308,15 @@ export default function Home() {
               "--grid-cols-xl": theme.grid.wide,
             } as React.CSSProperties}
           >
-            {filteredProducts.map((product) => (
+            {sortedProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
+          </div>
+        ) : products.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-2xl border border-slate-100 shadow-sm">
+            <div className="text-6xl mb-4">🧺</div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">No products available yet</h3>
+            <p className="text-slate-500">Our catalog is being updated — please check back soon.</p>
           </div>
         ) : (
           <div className="text-center py-20 bg-white rounded-2xl border border-slate-100 shadow-sm">
