@@ -66,13 +66,24 @@ exports.submitOrder = onCall(async (request) => {
     }
 
     // Validate slab pricing — ensure client-sent price matches server-resolved slab
+    // Also computes the authoritative server total (client totalValue is not trusted).
     const priceViolations = [];
+    let serverTotal = 0;
     for (const item of data.cart) {
+      const qty = Number(item.qty);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        throw new HttpsError("invalid-argument", `Invalid quantity for item ${String(item.id)}.`);
+      }
       const productId = String(item.id);
       const product = productMap[productId];
-      if (!product) continue;
+      if (!product) {
+        // Unknown product — cannot price authoritatively; use client price for the total only.
+        serverTotal += qty * (Number(item.price) || 0);
+        continue;
+      }
 
-      const expectedPrice = resolveSlabPrice(item.qty, product.price, product.priceTiers);
+      const expectedPrice = resolveSlabPrice(qty, product.price, product.priceTiers);
+      serverTotal += qty * expectedPrice;
       if (Math.abs(item.price - expectedPrice) > 0.01) {
         priceViolations.push(
           `${item.name || product.name}: expected \u20B9${expectedPrice} for qty ${item.qty}, got \u20B9${item.price}`
@@ -84,6 +95,16 @@ exports.submitOrder = onCall(async (request) => {
       throw new HttpsError(
         "invalid-argument",
         `Price mismatch: ${priceViolations.join("; ")}`
+      );
+    }
+
+    // Authoritative, server-computed total — overwrites whatever the client sent.
+    serverTotal = Math.round(serverTotal);
+    const serverTotalValue = `₹${serverTotal.toLocaleString("en-IN")}`;
+    const clientTotalNum = parseInt(String(data.totalValue || "").replace(/[^0-9]/g, ""), 10) || 0;
+    if (Math.abs(clientTotalNum - serverTotal) > 1) {
+      console.warn(
+        `[submitOrder] total mismatch — client=${clientTotalNum} server=${serverTotal} user=${request.auth?.uid || "anon"}`
       );
     }
 
@@ -174,7 +195,8 @@ exports.submitOrder = onCall(async (request) => {
       cart: data.cart,
       orderSummary: data.orderSummary || "",
       productCount: data.productCount || 0,
-      totalValue: data.totalValue,
+      totalValue: serverTotalValue,
+      totalAmount: serverTotal,
       timestamp: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
       createdAt: FieldValue.serverTimestamp(),
       status: "Pending",
