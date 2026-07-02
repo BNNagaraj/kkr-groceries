@@ -103,7 +103,11 @@ export default function AdminAnalytics() {
     (async () => {
       try {
         const snap = await getDocs(collection(db, col("orders")));
-        const data = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order);
+        // Exclude AwaitingPayment — unpaid UPI orders aren't placed, so they
+        // must not skew analytics (top products, status counts, revenue, maps).
+        const data = snap.docs
+          .map((d) => ({ ...d.data(), id: d.id }) as Order)
+          .filter((o) => (o.status || "Pending") !== "AwaitingPayment");
         setOrders(data);
       } catch (e) {
         console.error("[AdminAnalytics] Failed to fetch orders:", e);

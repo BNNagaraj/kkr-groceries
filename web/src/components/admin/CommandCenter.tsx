@@ -399,7 +399,9 @@ export default function CommandCenter({ onNavigateToOrder }: CommandCenterProps)
     if (selectedStoreIds.length > 0) {
       result = result.filter((o) => o.assignedStoreId && selectedStoreIds.includes(o.assignedStoreId));
     }
-    return result;
+    // Exclude AwaitingPayment — unpaid UPI orders aren't placed, so they must
+    // not count toward active-order counts, fulfilment rate, etc.
+    return result.filter((o) => (o.status || "Pending") !== "AwaitingPayment");
   }, [dateRange, orders, todayOrders, yesterdayOrders, selectedStoreIds]);
 
   // ── KPIs (from filteredOrders) ──

@@ -179,9 +179,13 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
       const snap = await getDocs(q);
       let newOrders = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order);
 
-      // Apply status filter client-side (no composite index needed)
+      // Apply status filter client-side (no composite index needed).
+      // "all" hides AwaitingPayment (unpaid UPI orders aren't placed) — they're
+      // only visible via the explicit "Awaiting Payment" chip.
       if (statusFilter !== "all") {
         newOrders = newOrders.filter((o) => (o.status || "Pending") === statusFilter);
+      } else {
+        newOrders = newOrders.filter((o) => (o.status || "Pending") !== "AwaitingPayment");
       }
 
       setHasMore(snap.docs.length === fetchLimit);
@@ -200,6 +204,8 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
         let data = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order);
         if (statusFilter !== "all") {
           data = data.filter((o) => (o.status || "Pending") === statusFilter);
+        } else {
+          data = data.filter((o) => (o.status || "Pending") !== "AwaitingPayment");
         }
         setOrders(data);
         setHasMore(false);

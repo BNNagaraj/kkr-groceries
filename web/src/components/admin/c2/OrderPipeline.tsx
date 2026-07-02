@@ -511,7 +511,7 @@ export default function OrderPipeline({ orders, onStatusChange, onBulkStatusChan
             </button>
           )}
           <span className="text-[10px] font-mono" style={{ color: "var(--c2-text-muted)" }}>
-            {orders.length} total
+            {orders.filter((o) => (o.status || "Pending") !== "AwaitingPayment").length} total
           </span>
         </div>
       </div>
