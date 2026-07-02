@@ -371,7 +371,10 @@ export default function OrderPipeline({ orders, onStatusChange, onBulkStatusChan
 
   const grouped = useMemo(() => {
     const map: Record<OrderStatus, Order[]> = {
-      Pending: [], Accepted: [], Shipped: [], Fulfilled: [], Rejected: [],
+      // AwaitingPayment orders exist but are NOT in the fulfilment pipeline —
+      // they're bucketed here only so the typed record is total; the pipeline
+      // columns don't render this bucket.
+      AwaitingPayment: [], Pending: [], Accepted: [], Shipped: [], Fulfilled: [], Rejected: [],
     };
     orders.forEach((o) => {
       const status = o.status || "Pending";

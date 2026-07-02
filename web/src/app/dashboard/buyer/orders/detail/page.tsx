@@ -19,7 +19,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useMode } from "@/contexts/ModeContext";
-import { Order, OrderCartItem } from "@/types/order";
+import { Order, OrderCartItem, ORDER_STATUS_LABELS } from "@/types/order";
 // jsPDF lazy-loaded on click (~200KB kept out of initial bundle)
 const lazyDownloadInvoice = async (order: Order) => {
   const [{ downloadInvoice }, { getDoc, doc }, { db }] = await Promise.all([
@@ -294,7 +294,7 @@ export default function OrderDetailPage() {
             </div>
             <div className="flex items-center gap-2">
               <Badge variant={statusBadgeVariant(order.status || "Pending")}>
-                {order.status || "Pending"}
+                {ORDER_STATUS_LABELS[order.status || "Pending"] || order.status || "Pending"}
               </Badge>
               <Button variant="secondary" size="sm" onClick={() => lazyDownloadInvoice(order)}>
                 <FileText className="w-4 h-4" /> Invoice

@@ -10,7 +10,7 @@ import {
   Clock,
   Truck,
 } from "lucide-react";
-import { Order, OrderStatus, OrderCartItem } from "@/types/order";
+import { Order, OrderStatus, OrderCartItem, ORDER_STATUS_LABELS } from "@/types/order";
 import { StatusTimeline, formatStatusTime } from "@/components/OrderTimeline";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +55,8 @@ export function AdminOrderCard({
   onMarkPaid,
 }: AdminOrderCardProps) {
   const hasPendingMod = o.modificationStatus === "PendingBuyerApproval";
-  const statusText = hasPendingMod ? "Pending Approval" : o.status || "Pending";
+  const rawStatus = o.status || "Pending";
+  const statusText = hasPendingMod ? "Pending Approval" : ORDER_STATUS_LABELS[rawStatus] || rawStatus;
   const cart = o.cart || [];
 
   return (

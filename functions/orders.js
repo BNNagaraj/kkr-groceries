@@ -199,7 +199,10 @@ exports.submitOrder = onCall(async (request) => {
       totalAmount: serverTotal,
       timestamp: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
       createdAt: FieldValue.serverTimestamp(),
-      status: "Pending",
+      // UPI orders are NOT considered placed until the buyer completes payment
+      // (or switches to COD): they start as AwaitingPayment and are activated
+      // to "Pending" by submitPaymentUTR / chooseCOD. COD orders place directly.
+      status: data.paymentMethod === "upi" ? "AwaitingPayment" : "Pending",
       source: "Cloud Function",
       // Payment: method chosen at checkout (cod | upi); unpaid until collected/confirmed
       paymentStatus: "unpaid",
@@ -279,56 +282,67 @@ exports.submitOrder = onCall(async (request) => {
       console.warn("[submitOrder] Auto-routing failed (order still placed):", routingErr.message);
     }
 
-    // Build email data shared between admin and buyer emails
-    const emailData = {
-      orderId,
-      customerName: data.customerName,
-      phone: data.customerPhone,
-      shopName: data.shopName || "Not specified",
-      deliveryAddress: data.deliveryAddress || null,
-      lat: data.locationDetails?.lat || null,
-      lng: data.locationDetails?.lng || null,
-      cart: data.cart,
-      totalValue: data.totalValue,
-      productCount: data.productCount || data.cart.length,
-    };
+    // "Placed" emails only go out for orders that actually entered the pipeline.
+    // AwaitingPayment (UPI) orders defer these to submitPaymentUTR / chooseCOD.
+    if (orderDoc.status === "Pending") {
+      // Build email data shared between admin and buyer emails
+      const emailData = {
+        orderId,
+        customerName: data.customerName,
+        phone: data.customerPhone,
+        shopName: data.shopName || "Not specified",
+        deliveryAddress: data.deliveryAddress || null,
+        lat: data.locationDetails?.lat || null,
+        lng: data.locationDetails?.lng || null,
+        cart: data.cart,
+        totalValue: serverTotalValue,
+        productCount: data.productCount || data.cart.length,
+      };
 
-    // Refresh the configurable tagline so both emails reflect current settings
-    await getBusinessTagline();
+      // Refresh the configurable tagline so both emails reflect current settings
+      await getBusinessTagline();
 
-    // Queue Admin Email
-    try {
-      const notifyEmails = await getNotificationEmails();
-      await db.collection("mail").add({
-        to: notifyEmails,
-        message: {
-          subject: `\u{1F6D2} New Order: ${orderId} \u2014 ${data.totalValue}`,
-          html: buildOrderEmailHtml({ ...emailData, variant: "admin" }),
-        },
-        createdAt: FieldValue.serverTimestamp(),
-      });
-    } catch (emailError) {
-      console.error("Admin email queue failed:", emailError);
-    }
-
-    // Queue Buyer Confirmation Email
-    const buyerEmail = request.auth?.token?.email;
-    if (buyerEmail) {
+      // Queue Admin Email
       try {
+        const notifyEmails = await getNotificationEmails();
         await db.collection("mail").add({
-          to: [buyerEmail],
+          to: notifyEmails,
           message: {
-            subject: `\u2705 Order Confirmed: ${orderId} \u2014 ${data.totalValue}`,
-            html: buildOrderEmailHtml({ ...emailData, variant: "buyer" }),
+            subject: `\u{1F6D2} New Order: ${orderId} \u2014 ${serverTotalValue}`,
+            html: buildOrderEmailHtml({ ...emailData, variant: "admin" }),
           },
           createdAt: FieldValue.serverTimestamp(),
         });
       } catch (emailError) {
-        console.error("Buyer email queue failed:", emailError);
+        console.error("Admin email queue failed:", emailError);
+      }
+
+      // Queue Buyer Confirmation Email
+      const buyerEmail = request.auth?.token?.email;
+      if (buyerEmail) {
+        try {
+          await db.collection("mail").add({
+            to: [buyerEmail],
+            message: {
+              subject: `\u2705 Order Confirmed: ${orderId} \u2014 ${serverTotalValue}`,
+              html: buildOrderEmailHtml({ ...emailData, variant: "buyer" }),
+            },
+            createdAt: FieldValue.serverTimestamp(),
+          });
+        } catch (emailError) {
+          console.error("Buyer email queue failed:", emailError);
+        }
       }
     }
 
-    return { success: true, orderId: orderId, message: "Order placed successfully!" };
+    return {
+      success: true,
+      orderId: orderId,
+      awaitingPayment: orderDoc.status === "AwaitingPayment",
+      message: orderDoc.status === "AwaitingPayment"
+        ? "Order created \u2014 complete payment to place it."
+        : "Order placed successfully!",
+    };
 
   } catch (error) {
     console.error("Error submitting order:", error);

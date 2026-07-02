@@ -54,7 +54,17 @@ export interface PendingModification {
   status: "PendingBuyerApproval";
 }
 
-export type OrderStatus = "Pending" | "Accepted" | "Shipped" | "Fulfilled" | "Rejected";
+/**
+ * AwaitingPayment: UPI order created but NOT yet placed — the buyer must
+ * complete payment (or switch to COD) before it enters the fulfilment pipeline.
+ * COD orders skip this state and start at "Pending".
+ */
+export type OrderStatus = "AwaitingPayment" | "Pending" | "Accepted" | "Shipped" | "Fulfilled" | "Rejected";
+
+/** Human-friendly labels for statuses whose raw value reads poorly in the UI. */
+export const ORDER_STATUS_LABELS: Record<string, string> = {
+  AwaitingPayment: "Awaiting Payment",
+};
 
 export interface Order {
   id: string;
@@ -121,6 +131,7 @@ export interface Order {
 }
 
 export const STATUS_TIMESTAMP_FIELDS: Record<OrderStatus, string> = {
+  AwaitingPayment: "createdAt",
   Pending: "placedAt",
   Accepted: "acceptedAt",
   Shipped: "shippedAt",
