@@ -37,7 +37,9 @@ import {
     Phone,
     User as UserIcon,
     ArrowRightLeft,
+    PackagePlus,
 } from "lucide-react";
+import ItemRequestsPanel from "./ItemRequestsPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -100,7 +102,7 @@ const STATUS_OPTIONS: { value: Grievance["status"]; label: string; color: string
 
 export default function MessagesTab() {
     const { currentUser } = useAuth();
-    const [section, setSection] = useState<"grievances" | "announcements">("grievances");
+    const [section, setSection] = useState<"grievances" | "announcements" | "requests">("grievances");
 
     // ── Grievances state ──
     const [grievances, setGrievances] = useState<Grievance[]>([]);
@@ -292,7 +294,18 @@ export default function MessagesTab() {
                 >
                     <Megaphone className="w-4 h-4" /> Announcements ({announcements.length})
                 </button>
+                <button
+                    onClick={() => setSection("requests")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        section === "requests" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    }`}
+                >
+                    <PackagePlus className="w-4 h-4" /> Item Requests
+                </button>
             </div>
+
+            {/* ═══════════ ITEM REQUESTS SECTION ═══════════ */}
+            {section === "requests" && <ItemRequestsPanel />}
 
             {/* ═══════════ GRIEVANCES SECTION ═══════════ */}
             {section === "grievances" && (

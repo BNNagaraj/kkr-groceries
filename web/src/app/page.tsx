@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Header } from "@/components/Header";
 import { ProductCard } from "@/components/ProductCard";
 import { BuyAgainStrip } from "@/components/BuyAgainStrip";
+import { RequestItemCard } from "@/components/RequestItemCard";
 import { Footer } from "@/components/Footer";
 import { useAppStore } from "@/contexts/AppContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -319,10 +320,12 @@ export default function Home() {
             <p className="text-slate-500">Our catalog is being updated — please check back soon.</p>
           </div>
         ) : (
-          <div className="text-center py-20 bg-white rounded-2xl border border-slate-100 shadow-sm">
+          <div className="text-center py-20 px-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
             <div className="text-6xl mb-4">🔍</div>
             <h3 className="text-xl font-bold text-slate-800 mb-2">No products found</h3>
             <p className="text-slate-500">Try adjusting your search or category filter.</p>
+            {/* Demand capture: let the buyer request the item we don't stock */}
+            <RequestItemCard initialItem={searchQuery.trim()} />
           </div>
         )}
       </main>
