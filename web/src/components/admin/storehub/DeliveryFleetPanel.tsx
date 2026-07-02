@@ -241,7 +241,7 @@ export default function DeliveryFleetPanel({ orders, stores }: DeliveryFleetPane
       });
 
       const marker = L.marker([store.lat, store.lng], { icon }).addTo(map);
-      marker.bindPopup(`<b>${store.name}</b><br/><small>${store.address}</small>`);
+      marker.bindPopup(`<b>${esc(store.name)}</b><br/><small>${esc(store.address)}</small>`);
       markersRef.current.push(marker);
       bounds.push([store.lat, store.lng]);
     });
@@ -273,12 +273,12 @@ export default function DeliveryFleetPanel({ orders, stores }: DeliveryFleetPane
 
       const popupContent = `
         <div style="min-width:160px;">
-          <b>${boy.name}</b>${boy.phone ? ` <small>(${boy.phone})</small>` : ""}
+          <b>${esc(boy.name)}</b>${boy.phone ? ` <small>(${esc(boy.phone)})</small>` : ""}
           <br/><small style="color:${boy.isOnline ? (boy.activeDeliveries > 0 ? '#3b82f6' : '#10b981') : '#94a3b8'}">
             ${boy.isOnline ? (boy.activeDeliveries > 0 ? `On delivery (${boy.activeDeliveries} active)` : "Available") : "Offline"}
           </small>
-          ${boy.currentOrder ? `<br/><small>Delivering #${boy.currentOrder.orderId || boy.currentOrder.id.slice(0, 8)} to ${boy.currentOrder.customerName}</small>` : ""}
-          <br/><small style="color:#94a3b8">${formatLastSeen(boy.lastSeen)}</small>
+          ${boy.currentOrder ? `<br/><small>Delivering #${esc(boy.currentOrder.orderId || boy.currentOrder.id.slice(0, 8))} to ${esc(boy.currentOrder.customerName)}</small>` : ""}
+          <br/><small style="color:#94a3b8">${esc(formatLastSeen(boy.lastSeen))}</small>
         </div>
       `;
       marker.bindPopup(popupContent);
@@ -835,6 +835,18 @@ function DeliveryPerformance({ deliveryBoys, orders }: { deliveryBoys: DeliveryB
       )}
     </div>
   );
+}
+
+/** Escape user-controlled text before it goes into a Leaflet popup's innerHTML.
+ *  Buyer name/address and store name are attacker-controllable, so this blocks
+ *  stored XSS in the admin fleet map. */
+function esc(v: unknown): string {
+  return String(v ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function formatLastSeen(ts: Timestamp | null): string {

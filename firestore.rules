@@ -90,14 +90,13 @@ service cloud.firestore {
         (isAuthenticated() && resource.data.userId == request.auth.uid) ||
         (isDeliveryAgent() && resource.data.assignedTo == request.auth.uid);
 
-      // Create: Allow authenticated users to create their own orders
-      allow create: if isAuthenticated() &&
-        request.auth.uid == request.resource.data.userId &&
-        request.resource.data.keys().hasAll(['userId', 'items', 'total', 'address', 'createdAt']) &&
-        request.resource.data.items is list &&
-        request.resource.data.items.size() > 0 &&
-        request.resource.data.total is number &&
-        request.resource.data.total > 0;
+      // Create: DISALLOWED from the client. Orders are created exclusively by
+      // the submitOrder Cloud Function (Admin SDK), which enforces slab pricing,
+      // MOQ, HORECA-tier gating, delivery-zone limits and the server-computed
+      // total. A direct client write would bypass all of that, so it is denied.
+      // (The old key-validation rule checked fields — items/total/address — that
+      // real orders don't even use, so it validated nothing meaningful.)
+      allow create: if false;
 
       // Update: Admin only. Delivery agents complete deliveries via the
       // completeDelivery Cloud Function (server-side, OTP-enforced) — they
@@ -287,7 +286,8 @@ service cloud.firestore {
       allow read: if isAdmin() ||
         (isAuthenticated() && resource.data.userId == request.auth.uid) ||
         (isDeliveryAgent() && resource.data.assignedTo == request.auth.uid);
-      allow create: if isAuthenticated();
+      // Created only by the submitOrder Cloud Function (Admin SDK) — see /orders.
+      allow create: if false;
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
