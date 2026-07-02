@@ -111,10 +111,12 @@ export default function StoreDetail({ store, orders, inventory, onBack, onNaviga
 
   // Pipeline counts
   const pipeline = useMemo(() => {
+    // AwaitingPayment is intentionally absent — unpaid UPI orders aren't in
+    // the store's fulfilment pipeline (the `in counts` guard skips them).
     const counts = { Pending: 0, Accepted: 0, Shipped: 0, Fulfilled: 0, Rejected: 0 };
     for (const o of storeOrders) {
       const s = o.status || "Pending";
-      if (s in counts) counts[s as OrderStatus]++;
+      if (s in counts) counts[s as keyof typeof counts]++;
     }
     return counts;
   }, [storeOrders]);
@@ -576,6 +578,7 @@ function PipelineTab({
 
 function StatusBadge({ status }: { status: OrderStatus }) {
   const styles: Record<OrderStatus, string> = {
+    AwaitingPayment: "bg-slate-50 text-slate-500",
     Pending: "bg-amber-50 text-amber-700",
     Accepted: "bg-blue-50 text-blue-700",
     Shipped: "bg-purple-50 text-purple-700",
@@ -591,6 +594,7 @@ function StatusBadge({ status }: { status: OrderStatus }) {
 
 function getStatusDotColor(status: OrderStatus): string {
   const colors: Record<OrderStatus, string> = {
+    AwaitingPayment: "bg-slate-400",
     Pending: "bg-amber-500",
     Accepted: "bg-blue-500",
     Shipped: "bg-purple-500",

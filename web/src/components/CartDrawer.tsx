@@ -514,9 +514,16 @@ export function CartDrawer({
             const result = await submitOrderApi(payload);
 
             if (result.data.success) {
-                toast.success("Order placed successfully!", {
-                    description: `Order ID: ${result.data.orderId}`,
-                });
+                if (paymentMethod === "online") {
+                    // UPI: the order is NOT placed yet — it activates on payment.
+                    toast.info("Almost done — complete payment to place your order", {
+                        description: `Order ID: ${result.data.orderId}`,
+                    });
+                } else {
+                    toast.success("Order placed successfully!", {
+                        description: `Order ID: ${result.data.orderId}`,
+                    });
+                }
                 clearCart();
                 setStep(1);
                 onClose();

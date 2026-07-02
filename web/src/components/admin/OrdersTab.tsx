@@ -28,7 +28,7 @@ import {
   List,
   ShoppingCart,
 } from "lucide-react";
-import { Order, OrderStatus, STATUS_TIMESTAMP_FIELDS, OrderCartItem } from "@/types/order";
+import { Order, OrderStatus, STATUS_TIMESTAMP_FIELDS, ORDER_STATUS_LABELS, OrderCartItem } from "@/types/order";
 import { useDeliveryOTP } from "@/hooks/useDeliveryOTP";
 // jsPDF lazy-loaded on click (~200KB kept out of initial bundle)
 const lazyDownloadInvoice = async (order: Order) => {
@@ -74,7 +74,7 @@ const DATE_FILTERS = [
 
 type DateFilterKey = (typeof DATE_FILTERS)[number]["key"];
 
-const STATUS_FILTERS: Array<OrderStatus | "all"> = ["all", "Pending", "Accepted", "Shipped", "Fulfilled", "Rejected"];
+const STATUS_FILTERS: Array<OrderStatus | "all"> = ["all", "AwaitingPayment", "Pending", "Accepted", "Shipped", "Fulfilled", "Rejected"];
 
 const DATE_MS_MAP: Record<string, number> = {
   week: 7 * DAY,
@@ -276,12 +276,22 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
 
   const handleMarkPaid = async (orderId: string, paid: boolean) => {
     try {
-      await updateDoc(doc(db, col("orders"), orderId), paid
-        ? { paymentStatus: "paid", paidAt: serverTimestamp() }
-        : { paymentStatus: "unpaid" }
-      );
-      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, paymentStatus: paid ? "paid" : "unpaid" } : o)));
-      toast.success(paid ? "Order marked as paid." : "Order marked as unpaid.");
+      // If the admin confirms payment on a UPI order still awaiting it, the
+      // order is now officially placed — activate it into the pipeline too.
+      const target = orders.find((o) => o.id === orderId);
+      const activating = paid && target?.status === "AwaitingPayment";
+      await updateDoc(doc(db, col("orders"), orderId), {
+        ...(paid
+          ? { paymentStatus: "paid", paidAt: serverTimestamp() }
+          : { paymentStatus: "unpaid" }),
+        ...(activating ? { status: "Pending", placedAt: serverTimestamp() } : {}),
+      });
+      setOrders((prev) => prev.map((o) => (o.id === orderId
+        ? { ...o, paymentStatus: paid ? "paid" : "unpaid", ...(activating ? { status: "Pending" as const } : {}) }
+        : o)));
+      toast.success(paid
+        ? (activating ? "Payment confirmed — order placed into the pipeline." : "Order marked as paid.")
+        : "Order marked as unpaid.");
     } catch (e) {
       console.error("Failed to update payment status:", e);
       toast.error("Failed to update payment status.");
@@ -488,7 +498,7 @@ export default function OrdersTab({ products = [], highlightOrderId, onHighlight
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            {s === "all" ? "All Statuses" : s}
+            {s === "all" ? "All Statuses" : ORDER_STATUS_LABELS[s] || s}
           </button>
         ))}
       </div>}

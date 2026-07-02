@@ -12,7 +12,7 @@ import Link from "next/link";
 import { Package, MapPin, Trash2, LogOut, ArrowLeft, BarChart2, ChevronRight, User, Pencil, Plus, FileText, Loader2, CheckCircle2, AlertCircle, Truck, ShoppingCart, Warehouse, MessageCircle } from "lucide-react";
 import { useMode } from "@/contexts/ModeContext";
 import { markOffline } from "@/hooks/usePresence";
-import { Order } from "@/types/order";
+import { Order, ORDER_STATUS_LABELS } from "@/types/order";
 
 const DeliveryDashboard = dynamic(() => import("@/components/delivery/DeliveryDashboard"), {
     loading: () => <div className="p-8 text-center text-slate-400 animate-pulse">Loading delivery dashboard...</div>,
@@ -550,7 +550,7 @@ export default function BuyerDashboard() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Badge variant={statusBadgeVariant(o.status || "Pending")}>
-                                            {o.status || "Pending"}
+                                            {ORDER_STATUS_LABELS[o.status || "Pending"] || o.status || "Pending"}
                                         </Badge>
                                         {hasPendingMod && (
                                             <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">

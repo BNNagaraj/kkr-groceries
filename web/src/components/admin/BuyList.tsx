@@ -68,6 +68,7 @@ type SortField = "name" | "qty" | "cost" | "orderCount" | "category";
 const STATUS_OPTIONS: OrderStatus[] = ["Pending", "Accepted", "Shipped", "Fulfilled"];
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
+  AwaitingPayment: "bg-slate-100 text-slate-500 border-slate-300",
   Pending: "bg-amber-100 text-amber-800 border-amber-300",
   Accepted: "bg-blue-100 text-blue-800 border-blue-300",
   Shipped: "bg-purple-100 text-purple-800 border-purple-300",
